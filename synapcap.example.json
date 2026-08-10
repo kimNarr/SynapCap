@@ -1,0 +1,38 @@
+{
+  "settings": {
+    "refresh_interval_sec": 30,
+    "always_on_top": true,
+    "widget_width": 300,
+    "widget_size": "Medium",
+    "theme": "dark"
+  },
+  "providers": [
+    {
+      "id": "codex",
+      "name": "GPT",
+      "type": "codex",
+      "enabled": true,
+      "api_key": "",
+      "limit": 100.0,
+      "unit": "%"
+    },
+    {
+      "id": "antigravity",
+      "name": "Gemini",
+      "type": "antigravity",
+      "enabled": true,
+      "auth_token": "",
+      "limit": 100.0,
+      "unit": "%"
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "type": "claude",
+      "enabled": true,
+      "api_key": "",
+      "limit": 100.0,
+      "unit": "%"
+    }
+  ]
+}
