@@ -40,6 +40,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "widget_width": 300,
         "widget_size": "Medium",
         "usage_view": "bar",
+        "check_updates": True,
         "theme": "dark"
     },
     "providers": [
@@ -102,12 +103,14 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
     try:
         with source_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
-            if "settings" not in data:
-                data["settings"] = DEFAULT_CONFIG["settings"].copy()
-            if "widget_size" not in data["settings"]:
-                data["settings"]["widget_size"] = "Medium"
-            if data["settings"].get("usage_view") not in {"bar", "ring"}:
-                data["settings"]["usage_view"] = "bar"
+            loaded_settings = data.get("settings", {})
+            if not isinstance(loaded_settings, dict):
+                loaded_settings = {}
+            settings = deepcopy(DEFAULT_CONFIG["settings"])
+            settings.update(loaded_settings)
+            if settings.get("usage_view") not in {"bar", "ring"}:
+                settings["usage_view"] = "bar"
+            data["settings"] = settings
             if "providers" not in data or not data["providers"]:
                 data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])
             if source_path != requested_path:

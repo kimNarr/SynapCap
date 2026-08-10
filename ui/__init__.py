@@ -4,7 +4,6 @@ from .settings_dialog import SettingsDialog
 from .icon import (
     create_app_icon,
     create_app_pixmap,
-    create_eye_icon,
     create_status_dot_pixmap,
     create_plus_icon,
     create_arrow_up_icon,
@@ -22,7 +21,6 @@ __all__ = [
     "SettingsDialog",
     "create_app_icon",
     "create_app_pixmap",
-    "create_eye_icon",
     "create_status_dot_pixmap",
     "create_plus_icon",
     "create_arrow_up_icon",

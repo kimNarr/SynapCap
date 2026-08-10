@@ -1,10 +1,13 @@
 import sys
+from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication
 
 from config import load_config, save_config
 from providers import load_providers_from_config
 from workers import UsageWorker
 from ui import SynapCapWidget, SynapCapTray, SettingsDialog, create_app_icon
+from updates import UpdateCheckWorker
 from version import APP_VERSION
 
 def main():
@@ -29,6 +32,13 @@ def main():
 
     # 4. System Tray 생성
     tray = SynapCapTray(parent_widget=widget, always_on_top=always_on_top)
+
+    update_worker = UpdateCheckWorker(APP_VERSION)
+    update_worker.update_available.connect(
+        lambda info: tray.set_update_available(info.version, info.url)
+    )
+    if settings.get("check_updates", True):
+        QTimer.singleShot(4000, update_worker.start)
 
     # 5. Background Worker 생성 및 실행
     worker = UsageWorker(providers, interval_sec=refresh_interval)
@@ -81,12 +91,18 @@ def main():
 
     def handle_quit():
         worker.stop()
+        if update_worker.isRunning():
+            update_worker.requestInterruption()
+            update_worker.wait(6000)
         app.quit()
 
     tray.toggle_widget_requested.connect(toggle_widget)
     tray.refresh_requested.connect(worker.trigger_manual_refresh)
     tray.always_on_top_toggled.connect(handle_always_on_top)
     tray.settings_requested.connect(open_settings_dialog)
+    tray.update_requested.connect(
+        lambda url: QDesktopServices.openUrl(QUrl(url))
+    )
     tray.quit_requested.connect(handle_quit)
 
     widget.settings_requested.connect(open_settings_dialog)

@@ -14,6 +14,7 @@ from .icon import (
     create_trash_icon
 )
 from providers import PROVIDER_TYPE_OPTIONS
+from version import APP_VERSION
 
 class NoWheelComboBox(QComboBox):
     """마우스 휠 스크롤 시 선택 항목이 실수로 변경되지 않도록 휠 이벤트를 무시하는 콤보박스"""
@@ -30,7 +31,7 @@ class SettingsDialog(QDialog):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("SynapCap Settings")
+        self.setWindowTitle(f"SynapCap {APP_VERSION} Settings")
         self.setWindowIcon(create_app_icon(32))
         self.setMinimumSize(560, 600)
         self.setStyleSheet("""
@@ -60,7 +61,7 @@ class SettingsDialog(QDialog):
                 background-color: #181825;
                 border-radius: 4px;
             }
-            QLineEdit, QSpinBox, QDoubleSpinBox {
+            QLineEdit, QSpinBox {
                 background-color: #11111B;
                 color: #CDD6F4;
                 border: 1px solid #313244;
@@ -69,11 +70,11 @@ class SettingsDialog(QDialog):
                 font-size: 13px;
                 selection-background-color: #45475A;
             }
-            QLineEdit:hover, QSpinBox:hover, QDoubleSpinBox:hover {
+            QLineEdit:hover, QSpinBox:hover {
                 border: 1px solid #45475A;
                 background-color: #181825;
             }
-            QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+            QLineEdit:focus, QSpinBox:focus {
                 border: 1px solid #89B4FA;
                 background-color: #1E1E2E;
                 color: #FFFFFF;
@@ -107,7 +108,7 @@ class SettingsDialog(QDialog):
                 width: 10px;
                 height: 10px;
             }
-            QSpinBox::up-button, QDoubleSpinBox::up-button {
+            QSpinBox::up-button {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 20px;
@@ -117,10 +118,10 @@ class SettingsDialog(QDialog):
                 background-color: #313244;
                 border-radius: 3px;
             }
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
+            QSpinBox::up-button:hover {
                 background-color: #89B4FA;
             }
-            QSpinBox::down-button, QDoubleSpinBox::down-button {
+            QSpinBox::down-button {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 20px;
@@ -130,7 +131,7 @@ class SettingsDialog(QDialog):
                 background-color: #313244;
                 border-radius: 3px;
             }
-            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+            QSpinBox::down-button:hover {
                 background-color: #89B4FA;
             }
             QCheckBox {
@@ -273,6 +274,10 @@ class SettingsDialog(QDialog):
         self.always_top_check = QCheckBox("항상 위에 위젯 창 고정")
         self.always_top_check.setChecked(settings.get("always_on_top", True))
         form.addRow("화면 고정:", self.always_top_check)
+
+        self.update_check = QCheckBox("시작할 때 새 버전 확인")
+        self.update_check.setChecked(settings.get("check_updates", True))
+        form.addRow("업데이트:", self.update_check)
 
         # Widget Size Preset (Small / Medium / Large) - NoWheelComboBox 적용
         self.size_combo = NoWheelComboBox()
@@ -478,6 +483,7 @@ class SettingsDialog(QDialog):
         # Update Settings
         self.config_data["settings"]["refresh_interval_sec"] = self.interval_spin.value()
         self.config_data["settings"]["always_on_top"] = self.always_top_check.isChecked()
+        self.config_data["settings"]["check_updates"] = self.update_check.isChecked()
         self.config_data["settings"]["widget_size"] = self.size_combo.currentText()
         self.config_data["settings"]["widget_width"] = self.width_spin.value()
 

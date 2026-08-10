@@ -11,6 +11,12 @@ STAGING_DIR="$REPO_ROOT/build/dmg-$ARCH_NAME"
 cd "$REPO_ROOT"
 mkdir -p "$ARTIFACT_DIR"
 
+APP_VERSION="$(python scripts/manage_version.py current)"
+if [[ "$VERSION" != "$APP_VERSION" ]]; then
+  echo "Build version '$VERSION' does not match APP_VERSION '$APP_VERSION'." >&2
+  exit 1
+fi
+
 python scripts/generate_icons.py
 python -m PyInstaller \
   --noconfirm \
@@ -39,4 +45,3 @@ hdiutil create \
 
 codesign --verify --deep --strict dist/SynapCap.app
 echo "Created $DMG_PATH"
-

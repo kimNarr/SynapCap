@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,7 +22,9 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements-build.txt
+        run: pip install -r requirements.txt
+      - name: Validate tag and app version
+        run: python scripts/manage_version.py check "${GITHUB_REF_NAME}"
       - name: Run tests
         env:
           QT_QPA_PLATFORM: offscreen
@@ -82,6 +88,10 @@ jobs:
     needs: [windows, macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -89,6 +99,10 @@ jobs:
       - name: Create checksums
         working-directory: artifacts
         run: sha256sum * > SHA256SUMS.txt
+      - name: Prepare release notes
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: python scripts/manage_version.py notes "$TAG_NAME" > release-notes.md
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,5 +111,5 @@ jobs:
           gh release create "$TAG_NAME" artifacts/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "SynapCap $TAG_NAME" \
-            --generate-notes \
+            --notes-file release-notes.md \
             --verify-tag

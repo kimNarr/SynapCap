@@ -28,37 +28,6 @@ def create_app_pixmap(size: int = 32) -> QPixmap:
     painter.end()
     return pixmap
 
-def create_eye_icon(show: bool = True, size: int = 24) -> QIcon:
-    pixmap = QPixmap(size, size)
-    pixmap.fill(QColor(0, 0, 0, 0))
-    
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    
-    color = QColor("#89B4FA") if show else QColor("#6C7086")
-    pen = QPen(color, 2.0)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    painter.setPen(pen)
-    
-    # Eye Shape (Arc)
-    rect = QRectF(2, 6, size - 4, size - 12)
-    painter.drawArc(rect, 30 * 16, 120 * 16)
-    painter.drawArc(rect, 210 * 16, 120 * 16)
-    
-    center_x = size / 2.0
-    center_y = size / 2.0
-    
-    if show:
-        # Pupil Center Circle
-        painter.setBrush(color)
-        painter.drawEllipse(QPointF(center_x, center_y), 3.0, 3.0)
-    else:
-        # Slash diagonal line
-        painter.drawLine(5, size - 5, size - 5, 5)
-        
-    painter.end()
-    return QIcon(pixmap)
-
 def create_status_dot_pixmap(status_type: str = "success", size: int = 12) -> QPixmap:
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))

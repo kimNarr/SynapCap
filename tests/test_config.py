@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,6 +22,32 @@ class ConfigTests(unittest.TestCase):
 
         first["settings"]["usage_view"] = "ring"
         self.assertEqual(second["settings"]["usage_view"], "bar")
+
+    def test_new_settings_are_added_to_existing_config(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "settings": {"always_on_top": False},
+                        "providers": [
+                            {
+                                "id": "codex",
+                                "name": "Codex",
+                                "type": "codex",
+                                "enabled": True,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertFalse(settings["always_on_top"])
+            self.assertTrue(settings["check_updates"])
+            self.assertEqual(settings["usage_view"], "bar")
 
 
 if __name__ == "__main__":

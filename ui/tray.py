@@ -1,12 +1,14 @@
 from PySide6.QtCore import Signal, QObject
 from PySide6.QtWidgets import QSystemTrayIcon, QMenu
 from .icon import create_app_icon
+from version import APP_VERSION
 
 class SynapCapTray(QObject):
     refresh_requested = Signal()
     toggle_widget_requested = Signal()
     always_on_top_toggled = Signal(bool)
     settings_requested = Signal()
+    update_requested = Signal(str)
     quit_requested = Signal()
 
     def __init__(self, parent_widget=None, always_on_top: bool = True):
@@ -21,7 +23,7 @@ class SynapCapTray(QObject):
 
     def init_icon(self):
         self.tray_icon.setIcon(create_app_icon(32))
-        self.tray_icon.setToolTip("SynapCap")
+        self.tray_icon.setToolTip(f"SynapCap {APP_VERSION}")
         self.tray_icon.activated.connect(self._on_activated)
 
     def init_menu(self):
@@ -60,6 +62,11 @@ class SynapCapTray(QObject):
         self.settings_action = menu.addAction("설정...")
         self.settings_action.triggered.connect(self.settings_requested.emit)
 
+        self.update_action = menu.addAction("")
+        self.update_action.setVisible(False)
+        self.update_action.triggered.connect(self._open_update)
+        self._update_url = ""
+
         self.always_top_action = menu.addAction("항상 위에 고정")
         self.always_top_action.setCheckable(True)
         self.always_top_action.setChecked(self.always_on_top)
@@ -79,3 +86,18 @@ class SynapCapTray(QObject):
     def _on_top_toggled(self, checked: bool):
         self.always_on_top = checked
         self.always_on_top_toggled.emit(checked)
+
+    def set_update_available(self, version: str, url: str):
+        self._update_url = url
+        self.update_action.setText(f"업데이트 v{version} 받기")
+        self.update_action.setVisible(True)
+        self.tray_icon.showMessage(
+            "SynapCap 업데이트",
+            f"새 버전 v{version}을 사용할 수 있습니다.",
+            QSystemTrayIcon.MessageIcon.Information,
+            5000,
+        )
+
+    def _open_update(self):
+        if self._update_url:
+            self.update_requested.emit(self._update_url)

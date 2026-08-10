@@ -24,6 +24,10 @@ $python = $pythonCandidates | Select-Object -First 1
 if (-not $python) {
     throw "Python was not found. Create .venv or add Python to PATH."
 }
+$appVersion = (& $python (Join-Path $repoRoot "scripts\manage_version.py") current).Trim()
+if ($LASTEXITCODE -ne 0 -or $Version -ne $appVersion) {
+    throw "Build version '$Version' does not match APP_VERSION '$appVersion'."
+}
 
 New-Item -ItemType Directory -Path (Split-Path $versionFile) -Force | Out-Null
 New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null

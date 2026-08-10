@@ -4,15 +4,18 @@
     "always_on_top": true,
     "widget_width": 300,
     "widget_size": "Medium",
+    "usage_view": "bar",
+    "check_updates": true,
     "theme": "dark"
   },
   "providers": [
     {
       "id": "codex",
-      "name": "GPT",
+      "name": "Codex",
       "type": "codex",
       "enabled": true,
-      "api_key": "",
+      "source": "local_subscription",
+      "cache_ttl_sec": 60,
       "limit": 100.0,
       "unit": "%"
     },
@@ -21,7 +24,9 @@
       "name": "Gemini",
       "type": "antigravity",
       "enabled": true,
-      "auth_token": "",
+      "source": "local_subscription",
+      "quota_group": "Gemini Models",
+      "cache_ttl_sec": 120,
       "limit": 100.0,
       "unit": "%"
     },
@@ -30,7 +35,8 @@
       "name": "Claude",
       "type": "claude",
       "enabled": true,
-      "api_key": "",
+      "source": "local_subscription",
+      "cache_ttl_sec": 60,
       "limit": 100.0,
       "unit": "%"
     }
