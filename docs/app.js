@@ -22,14 +22,16 @@ function configurePrimaryDownload() {
 
   if (platform === "windows") {
     button.href = `${releaseBase}/${assets.windows}`;
+    button.dataset.asset = assets.windows;
     label.textContent = "Windows 10/11 · 64비트";
     document.querySelector('[data-platform-card="windows"]').classList.add("recommended");
   } else if (platform === "mac") {
-    button.href = `${releaseBase}/${assets.macArm}`;
-    label.textContent = "macOS · Apple Silicon";
-    document.querySelector('[data-platform-card="mac"]').classList.add("recommended");
+    button.href = "#download";
+    delete button.dataset.asset;
+    label.textContent = "macOS · Apple Silicon 또는 Intel 선택";
   } else {
     button.href = "#download";
+    delete button.dataset.asset;
     label.textContent = "Windows 및 macOS";
   }
 }
@@ -66,4 +68,3 @@ async function loadLatestRelease() {
 
 configurePrimaryDownload();
 loadLatestRelease();
-
