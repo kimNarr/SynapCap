@@ -1,8 +1,37 @@
 import json
 import os
+import sys
+from copy import deepcopy
+from pathlib import Path
 from typing import Dict, Any
 
-CONFIG_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "synapcap.json")
+from version import APP_NAME
+
+
+def _default_config_path() -> Path:
+    override = os.environ.get("SYNAPCAP_CONFIG_DIR")
+    if override:
+        return Path(override).expanduser() / "synapcap.json"
+
+    if getattr(sys, "frozen", False):
+        if sys.platform == "win32":
+            base = Path(
+                os.environ.get("APPDATA")
+                or Path.home() / "AppData" / "Roaming"
+            )
+        elif sys.platform == "darwin":
+            base = Path.home() / "Library" / "Application Support"
+        else:
+            base = Path(
+                os.environ.get("XDG_CONFIG_HOME")
+                or Path.home() / ".config"
+            )
+        return base / APP_NAME / "synapcap.json"
+
+    return Path(__file__).resolve().parent / "synapcap.json"
+
+
+CONFIG_FILE_PATH = str(_default_config_path())
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "settings": {
@@ -10,17 +39,17 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "always_on_top": True,
         "widget_width": 300,
         "widget_size": "Medium",
+        "usage_view": "bar",
         "theme": "dark"
     },
     "providers": [
         {
             "id": "codex",
-            "name": "GPT",
+            "name": "Codex",
             "type": "codex",
             "enabled": True,
-            "api_key": "",
-            "custom_used": 100.0,
-            "custom_status": "8월 17일 리셋",
+            "source": "local_subscription",
+            "cache_ttl_sec": 60,
             "limit": 100.0,
             "unit": "%"
         },
@@ -29,20 +58,19 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "name": "Gemini",
             "type": "antigravity",
             "enabled": True,
-            "auth_token": "",
-            "custom_used": 27.0,
-            "custom_status": "5시간 리셋: 1시간 8분 후",
+            "source": "local_subscription",
+            "quota_group": "Gemini Models",
+            "cache_ttl_sec": 120,
             "limit": 100.0,
             "unit": "%"
         },
         {
             "id": "claude",
-            "name": "Claude 3.7",
+            "name": "Claude",
             "type": "claude",
             "enabled": True,
-            "api_key": "",
-            "custom_used": 100.0,
-            "custom_status": "5시간 리셋: 3시간 후",
+            "source": "local_subscription",
+            "cache_ttl_sec": 60,
             "limit": 100.0,
             "unit": "%"
         }
@@ -50,30 +78,50 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 def get_default_config() -> Dict[str, Any]:
-    return DEFAULT_CONFIG.copy()
+    return deepcopy(DEFAULT_CONFIG)
+
+
+def _legacy_config_path() -> Path | None:
+    if not getattr(sys, "frozen", False):
+        return None
+    candidate = Path(sys.executable).resolve().parent / "synapcap.json"
+    return candidate if candidate.is_file() else None
 
 def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
-    if not os.path.exists(file_path):
-        save_config(DEFAULT_CONFIG, file_path)
-        return DEFAULT_CONFIG.copy()
+    requested_path = Path(file_path)
+    source_path = requested_path
+    if not source_path.exists():
+        legacy_path = _legacy_config_path()
+        if legacy_path is not None:
+            source_path = legacy_path
+        else:
+            defaults = get_default_config()
+            save_config(defaults, str(requested_path))
+            return defaults
     
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with source_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
             if "settings" not in data:
                 data["settings"] = DEFAULT_CONFIG["settings"].copy()
             if "widget_size" not in data["settings"]:
                 data["settings"]["widget_size"] = "Medium"
+            if data["settings"].get("usage_view") not in {"bar", "ring"}:
+                data["settings"]["usage_view"] = "bar"
             if "providers" not in data or not data["providers"]:
-                data["providers"] = DEFAULT_CONFIG["providers"].copy()
+                data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])
+            if source_path != requested_path:
+                save_config(data, str(requested_path))
             return data
     except Exception as e:
         print(f"[SynapCap Config] Error loading config ({e}). Using default settings.")
-        return DEFAULT_CONFIG.copy()
+        return get_default_config()
 
 def save_config(config_data: Dict[str, Any], file_path: str = CONFIG_FILE_PATH) -> bool:
     try:
-        with open(file_path, "w", encoding="utf-8") as f:
+        destination = Path(file_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)
         return True
     except Exception as e:

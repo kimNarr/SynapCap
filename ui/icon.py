@@ -220,6 +220,40 @@ def create_refresh_icon(size: int = 16, color: str = "#89B4FA") -> QIcon:
     painter.end()
     return QIcon(pixmap)
 
+
+def create_usage_view_icon(
+    target_view: str = "ring",
+    size: int = 16,
+    color: str = "#A6ADC8",
+) -> QIcon:
+    """Icon for switching between the compact bar and ring usage views."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    pen = QPen(QColor(color), 1.7)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    painter.setPen(pen)
+
+    if target_view == "ring":
+        rect = QRectF(size * 0.18, size * 0.18, size * 0.64, size * 0.64)
+        painter.drawEllipse(rect)
+        accent_pen = QPen(QColor("#89B4FA"), 2.2)
+        accent_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(accent_pen)
+        painter.drawArc(rect, 90 * 16, -130 * 16)
+    else:
+        starts = (0.26, 0.50, 0.74)
+        lengths = (0.42, 0.68, 0.54)
+        for y, length in zip(starts, lengths):
+            painter.drawLine(
+                QPointF(size * 0.18, size * y),
+                QPointF(size * (0.18 + length), size * y),
+            )
+
+    painter.end()
+    return QIcon(pixmap)
+
 def create_settings_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
     """누가 봐도 명확한 6-Teeth 톱니바퀴(Gear Cog) 백터 아이콘"""
     pixmap = QPixmap(size, size)

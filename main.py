@@ -5,11 +5,13 @@ from config import load_config, save_config
 from providers import load_providers_from_config
 from workers import UsageWorker
 from ui import SynapCapWidget, SynapCapTray, SettingsDialog, create_app_icon
+from version import APP_VERSION
 
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("SynapCap")
+    app.setApplicationVersion(APP_VERSION)
     app.setWindowIcon(create_app_icon(64))
 
     # 1. Config 로드
@@ -73,6 +75,10 @@ def main():
         save_config(config_data)
         widget.set_always_on_top(checked)
 
+    def handle_view_mode_changed(mode: str):
+        config_data.setdefault("settings", {})["usage_view"] = mode
+        save_config(config_data)
+
     def handle_quit():
         worker.stop()
         app.quit()
@@ -85,6 +91,7 @@ def main():
 
     widget.settings_requested.connect(open_settings_dialog)
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
+    widget.view_mode_changed.connect(handle_view_mode_changed)
     widget.quit_requested.connect(handle_quit)
 
     print("[SynapCap] HUD Application with GUI Settings started successfully.")

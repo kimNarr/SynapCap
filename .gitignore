@@ -10,6 +10,7 @@ __pycache__/
 build/
 devel/
 dist/
+artifacts/
 downloads/
 ebin/
 eggs/
@@ -47,3 +48,8 @@ Thumbs.db
 # Sensitive local configuration with API keys
 # 실제 API Key가 들어있는 개인 설정 파일은 Git 추적에서 제외합니다.
 synapcap.json
+
+# Generated application icons (created by scripts/generate_icons.py)
+assets/synapcap.png
+assets/synapcap.ico
+assets/synapcap.icns

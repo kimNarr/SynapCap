@@ -2,18 +2,18 @@ import copy
 import uuid
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QDoubleSpinBox,
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QCheckBox, QComboBox, QLineEdit, QPushButton, QTabWidget, QWidget,
     QGroupBox, QFormLayout, QScrollArea, QMessageBox
 )
 from .icon import (
     create_app_icon,
-    create_eye_icon,
     create_plus_icon,
     create_arrow_up_icon,
     create_arrow_down_icon,
     create_trash_icon
 )
+from providers import PROVIDER_TYPE_OPTIONS
 
 class NoWheelComboBox(QComboBox):
     """마우스 휠 스크롤 시 선택 항목이 실수로 변경되지 않도록 휠 이벤트를 무시하는 콤보박스"""
@@ -212,20 +212,6 @@ class SettingsDialog(QDialog):
                 background-color: #F38BA8;
                 border: 1px solid #F38BA8;
             }
-            QPushButton#toggleEyeBtn {
-                background-color: #11111B;
-                border: 1px solid #313244;
-                border-left: none;
-                border-top-right-radius: 8px;
-                border-bottom-right-radius: 8px;
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 0px;
-                padding: 0px;
-            }
-            QPushButton#toggleEyeBtn:hover {
-                background-color: #181825;
-                border-color: #45475A;
-            }
             QPushButton#saveBtn {
                 background-color: #89B4FA;
                 color: #11111B;
@@ -384,15 +370,7 @@ class SettingsDialog(QDialog):
 
         # Provider Type Selection Combo (NoWheelComboBox 적용)
         type_combo = NoWheelComboBox()
-        type_options = [
-            ("OpenAI / GPT", "codex"),
-            ("Google Gemini", "antigravity"),
-            ("Anthropic Claude", "claude"),
-            ("DeepSeek AI", "deepseek"),
-            ("xAI Grok", "grok"),
-            ("Ollama 로컬 LLM", "ollama"),
-            ("사용자 정의 REST API", "custom")
-        ]
+        type_options = PROVIDER_TYPE_OPTIONS
         for label, val in type_options:
             type_combo.addItem(label, val)
 
@@ -415,48 +393,24 @@ class SettingsDialog(QDialog):
         name_edit = QLineEdit(p_data.get("name", ""))
         g_layout.addRow("표시 이름:", name_edit)
 
-        # Secret Key / Token Edit (통합 Input Group 디자인)
-        key_field = "api_key" if "api_key" in p_data else ("auth_token" if "auth_token" in p_data else "api_key")
-        key_val = p_data.get(key_field, "")
-        
-        key_layout = QHBoxLayout()
-        key_layout.setSpacing(0)  # 통합 필드 밀착
+        connection_label = QLabel()
+        connection_label.setWordWrap(True)
+        connection_label.setStyleSheet("color: #A6E3A1; font-size: 11px;")
+        g_layout.addRow("연결 방식:", connection_label)
 
-        key_edit = QLineEdit(key_val)
-        key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        key_edit.setPlaceholderText("API Key / Token 입력")
-        key_edit.setStyleSheet("""
-            QLineEdit {
-                border-top-right-radius: 0px;
-                border-bottom-right-radius: 0px;
-                border-right: none;
-            }
-            QLineEdit:focus {
-                border-top-right-radius: 0px;
-                border-bottom-right-radius: 0px;
-                border-right: none;
-            }
-        """)
+        def update_connection_mode(_index=None):
+            selected_type = type_combo.currentData() or "codex"
+            cli_name = {
+                "codex": "Codex 앱/CLI",
+                "antigravity": "Antigravity CLI",
+                "claude": "Claude Code CLI",
+            }[selected_type]
+            connection_label.setText(
+                f"{cli_name}의 로컬 로그인 사용 · API 키 불필요"
+            )
 
-        toggle_btn = QPushButton()
-        toggle_btn.setObjectName("toggleEyeBtn")
-        toggle_btn.setIcon(create_eye_icon(show=False, size=18))
-        toggle_btn.setFixedSize(36, 33)
-        toggle_btn.setToolTip("API Key / Token 보기/숨기기")
-        toggle_btn.setCheckable(True)
-        
-        def make_toggle_handler(edit=key_edit, btn=toggle_btn):
-            def toggle(checked):
-                edit.setEchoMode(QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password)
-                btn.setIcon(create_eye_icon(show=checked, size=18))
-            return toggle
-
-        toggle_btn.toggled.connect(make_toggle_handler(key_edit, toggle_btn))
-        
-        key_layout.addWidget(key_edit)
-        key_layout.addWidget(toggle_btn)
-        
-        g_layout.addRow("API Key / Token:", key_layout)
+        type_combo.currentIndexChanged.connect(update_connection_mode)
+        update_connection_mode()
 
         g_main_layout.addLayout(g_layout)
 
@@ -468,8 +422,7 @@ class SettingsDialog(QDialog):
             "type_combo": type_combo,
             "enabled_check": enabled_check,
             "name_edit": name_edit,
-            "key_edit": key_edit,
-            "key_field": key_field
+            "original_data": dict(p_data),
         }
 
         # Connect Order & Delete Button Slots
@@ -510,13 +463,12 @@ class SettingsDialog(QDialog):
             self.container_layout.addWidget(item["group"])
 
     def on_add_provider(self):
-        new_id = f"custom_{str(uuid.uuid4())[:6]}"
+        new_id = f"provider_{str(uuid.uuid4())[:6]}"
         default_data = {
             "id": new_id,
-            "name": "새 프로바이더",
-            "type": "custom",
+            "name": "Codex",
+            "type": "codex",
             "enabled": True,
-            "api_key": "",
             "limit": 100.0,
             "unit": "%"
         }
@@ -533,15 +485,26 @@ class SettingsDialog(QDialog):
         for pw in self.provider_widgets:
             selected_type_val = pw["type_combo"].currentData() or "codex"
 
-            p_data = {
+            p_data = dict(pw["original_data"])
+            p_data.update({
                 "id": pw["id"],
                 "name": pw["name_edit"].text().strip() or "AI Provider",
                 "type": selected_type_val,
                 "enabled": pw["enabled_check"].isChecked(),
-                pw["key_field"]: pw["key_edit"].text().strip(),
                 "limit": 100.0,
-                "unit": "%"
-            }
+                "unit": "%",
+            })
+            for stale_key in ("api_key", "auth_token", "endpoint"):
+                p_data.pop(stale_key, None)
+            p_data["source"] = "local_subscription"
+            p_data.setdefault(
+                "cache_ttl_sec",
+                120 if selected_type_val == "antigravity" else 60,
+            )
+            if selected_type_val == "antigravity":
+                p_data.setdefault("quota_group", "Gemini Models")
+            else:
+                p_data.pop("quota_group", None)
             updated_providers.append(p_data)
 
         self.config_data["providers"] = updated_providers

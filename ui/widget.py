@@ -1,4 +1,8 @@
-from PySide6.QtCore import Qt, QPoint, Signal
+import re
+from datetime import datetime, timedelta
+
+from PySide6.QtCore import Qt, QPoint, QRectF, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QPushButton
 )
@@ -7,10 +11,11 @@ from .icon import (
     create_status_dot_pixmap,
     create_power_icon,
     create_refresh_icon,
+    create_usage_view_icon,
     create_settings_icon,
     create_close_icon
 )
-from providers import BaseAIProvider, ModelUsage
+from providers import BaseAIProvider, ModelUsage, UsageWindow
 
 SIZE_PRESETS = {
     "Small": {
@@ -36,10 +41,47 @@ SIZE_PRESETS = {
     }
 }
 
+
+class UsageRing(QWidget):
+    def __init__(self, used: float, color: str, parent=None):
+        super().__init__(parent)
+        self.used = max(0.0, min(100.0, float(used)))
+        self.color = QColor(color)
+        self.setFixedSize(42, 42)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        ring_rect = QRectF(3.5, 3.5, 35, 35)
+
+        background_pen = QPen(QColor("#313244"), 4.0)
+        background_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(background_pen)
+        painter.drawArc(ring_rect, 90 * 16, -360 * 16)
+
+        usage_pen = QPen(self.color, 4.0)
+        usage_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(usage_pen)
+        painter.drawArc(ring_rect, 90 * 16, round(-360 * 16 * self.used / 100))
+
+        painter.setPen(QColor("#A6ADC8"))
+        painter.setFont(QFont("Segoe UI", 6))
+        painter.drawText(QRectF(5, 8, 32, 11), Qt.AlignmentFlag.AlignCenter, "사용")
+        painter.setPen(QColor("#CDD6F4"))
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        painter.drawText(
+            QRectF(4, 18, 34, 14),
+            Qt.AlignmentFlag.AlignCenter,
+            f"{self.used:.0f}%",
+        )
+
+        painter.end()
+
 class SynapCapWidget(QWidget):
     settings_requested = Signal()
     refresh_requested = Signal()
     quit_requested = Signal()
+    view_mode_changed = Signal(str)
 
     def __init__(self, config_data: dict, providers: list[BaseAIProvider]):
         super().__init__()
@@ -47,6 +89,11 @@ class SynapCapWidget(QWidget):
         self.providers = providers
         self.drag_position = QPoint()
         self.provider_ui_map = {}
+        configured_view = self.config_data.get("settings", {}).get(
+            "usage_view", "bar"
+        )
+        self.usage_view = configured_view if configured_view in {"bar", "ring"} else "bar"
+        self.latest_usage: list[ModelUsage] = []
 
         self.init_ui()
 
@@ -122,6 +169,14 @@ class SynapCapWidget(QWidget):
             }
         """
 
+        # Usage graph mode toggle (bar/ring)
+        self.view_btn = QPushButton()
+        self.view_btn.setFixedSize(22, 22)
+        self.view_btn.setStyleSheet(btn_style)
+        self.view_btn.clicked.connect(self._toggle_usage_view)
+        self._update_view_button()
+        header_layout.addWidget(self.view_btn)
+
         # 1) 지금 새로고침 버튼 (Refresh Now Vector Icon Button)
         self.refresh_btn = QPushButton()
         self.refresh_btn.setFixedSize(22, 22)
@@ -162,7 +217,7 @@ class SynapCapWidget(QWidget):
 
         # 2. Dynamic Provider Cards Container
         self.cards_layout = QVBoxLayout()
-        self.cards_layout.setSpacing(10)
+        self.cards_layout.setSpacing(5)
 
         self._build_provider_cards()
 
@@ -170,6 +225,20 @@ class SynapCapWidget(QWidget):
         outer_layout.addWidget(self.frame)
         
         self.adjustSize()
+
+    def _update_view_button(self):
+        target_view = "ring" if self.usage_view == "bar" else "bar"
+        self.view_btn.setIcon(create_usage_view_icon(target_view, 14))
+        target_name = "링" if target_view == "ring" else "막대"
+        self.view_btn.setToolTip(f"{target_name} 그래프로 변경")
+
+    def _toggle_usage_view(self):
+        self.usage_view = "ring" if self.usage_view == "bar" else "bar"
+        self.config_data.setdefault("settings", {})["usage_view"] = self.usage_view
+        self._update_view_button()
+        self.view_mode_changed.emit(self.usage_view)
+        if self.latest_usage:
+            self.update_data(self.latest_usage)
 
     def _build_provider_cards(self):
         self.provider_ui_map.clear()
@@ -186,9 +255,12 @@ class SynapCapWidget(QWidget):
         while self.cards_layout.count():
             item = self.cards_layout.takeAt(0)
             if item.widget():
-                item.widget().deleteLater()
+                widget = item.widget()
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
 
-        for provider in self.providers:
+        for index, provider in enumerate(self.providers):
             card_widget = QWidget()
             c_layout = QVBoxLayout(card_widget)
             c_layout.setContentsMargins(0, 0, 0, 0)
@@ -211,31 +283,17 @@ class SynapCapWidget(QWidget):
 
             title_row.addStretch()
 
-            # Usage Text & Reset Info
-            val_label = QLabel(f"0{provider.unit} (대기 중)")
+            # Waiting/error summary. Successful usage is rendered below.
+            val_label = QLabel("대기 중")
             val_label.setStyleSheet(f"color: #A6ADC8; font-size: {preset['val_size']}px;")
             title_row.addWidget(val_label)
 
             c_layout.addLayout(title_row)
 
-            # Progress Bar
-            pbar = QProgressBar()
-            pbar.setFixedHeight(preset["pbar_height"])
-            pbar.setRange(0, int(provider.limit))
-            pbar.setValue(0)
-            pbar.setTextVisible(False)
-            pbar.setStyleSheet("""
-                QProgressBar {
-                    background-color: #313244;
-                    border: none;
-                    border-radius: 4px;
-                }
-                QProgressBar::chunk {
-                    background-color: #89B4FA;
-                    border-radius: 4px;
-                }
-            """)
-            c_layout.addWidget(pbar)
+            windows_layout = QVBoxLayout()
+            windows_layout.setContentsMargins(0, 0, 0, 0)
+            windows_layout.setSpacing(5)
+            c_layout.addLayout(windows_layout)
 
             self.cards_layout.addWidget(card_widget)
 
@@ -244,10 +302,17 @@ class SynapCapWidget(QWidget):
                 "dot": dot_label,
                 "name": name_label,
                 "val": val_label,
-                "pbar": pbar,
+                "windows_layout": windows_layout,
+                "window_rows": [],
                 "limit": provider.limit,
                 "unit": provider.unit
             }
+
+            if index < len(self.providers) - 1:
+                separator = QFrame()
+                separator.setFixedHeight(1)
+                separator.setStyleSheet("background-color: #313244; border: none;")
+                self.cards_layout.addWidget(separator)
             
         self.adjustSize()
 
@@ -256,6 +321,10 @@ class SynapCapWidget(QWidget):
         self.providers = providers
 
         settings = self.config_data.get("settings", {})
+        configured_view = settings.get("usage_view", self.usage_view)
+        if configured_view in {"bar", "ring"}:
+            self.usage_view = configured_view
+            self._update_view_button()
         size_key = settings.get("widget_size", "Medium")
         preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
 
@@ -266,7 +335,187 @@ class SynapCapWidget(QWidget):
         self._build_provider_cards()
         self.adjustSize()
 
+    @staticmethod
+    def _progress_style(color: str) -> str:
+        return f"""
+            QProgressBar {{
+                background-color: #313244;
+                border: none;
+                border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {color};
+                border-radius: 4px;
+            }}
+        """
+
+    def _clear_usage_rows(self, ui: dict):
+        layout = ui["windows_layout"]
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                widget = item.widget()
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
+        ui["window_rows"] = []
+
+    @staticmethod
+    def _usage_color(used: float) -> str:
+        if used >= 80:
+            return "#F38BA8"
+        if used >= 60:
+            return "#F9E2AF"
+        return "#89B4FA"
+
+    @staticmethod
+    def _reset_presentation(
+        reset_text: str,
+        now: datetime | None = None,
+    ) -> tuple[str, str]:
+        if not reset_text:
+            return "", ""
+
+        tooltip = f"정확한 리셋: {reset_text}"
+        match = re.fullmatch(
+            r"(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{2})",
+            reset_text.strip(),
+        )
+        if not match:
+            return reset_text, tooltip
+
+        current = now or datetime.now()
+        try:
+            reset_at = current.replace(
+                month=int(match.group(1)),
+                day=int(match.group(2)),
+                hour=int(match.group(3)),
+                minute=int(match.group(4)),
+                second=0,
+                microsecond=0,
+            )
+            if reset_at < current - timedelta(minutes=1):
+                reset_at = reset_at.replace(year=reset_at.year + 1)
+        except ValueError:
+            return reset_text, tooltip
+
+        total_minutes = max(
+            0,
+            int((reset_at - current).total_seconds() + 59) // 60,
+        )
+        if total_minutes <= 1:
+            relative = "곧"
+        elif total_minutes < 60:
+            relative = f"{total_minutes}분 후"
+        elif total_minutes < 1440:
+            hours, minutes = divmod(total_minutes, 60)
+            relative = f"{hours}시간"
+            if minutes:
+                relative += f" {minutes}분"
+            relative += " 후"
+        else:
+            days, remaining_minutes = divmod(total_minutes, 1440)
+            hours = remaining_minutes // 60
+            relative = f"{days}일"
+            if hours:
+                relative += f" {hours}시간"
+            relative += " 후"
+        return relative, tooltip
+
+    def _render_usage_rows(
+        self,
+        ui: dict,
+        windows: list[UsageWindow],
+        preset: dict,
+    ):
+        self._clear_usage_rows(ui)
+
+        for window in windows:
+            row_widget = QWidget()
+            remaining = (
+                window.remaining
+                if window.remaining is not None
+                else max(0.0, 100.0 - window.used)
+            )
+            usage_tooltip = f"{window.used:.0f}% 사용 · {remaining:.0f}% 남음"
+            reset_display, reset_tooltip = self._reset_presentation(
+                window.reset_text
+            )
+            color = self._usage_color(window.used)
+
+            if self.usage_view == "ring":
+                row_layout = QHBoxLayout(row_widget)
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                row_layout.setSpacing(8)
+
+                details_layout = QVBoxLayout()
+                details_layout.setContentsMargins(0, 0, 0, 0)
+                details_layout.setSpacing(1)
+
+                window_label = QLabel(window.label)
+                window_label.setStyleSheet(
+                    f"color: #CDD6F4; font-size: {preset['val_size']}px;"
+                )
+                details_layout.addWidget(window_label)
+
+                if not reset_display:
+                    reset_caption = "리셋 시각 미상"
+                elif "리셋" in reset_display:
+                    reset_caption = reset_display
+                else:
+                    reset_caption = f"{reset_display} 리셋"
+                reset_label = QLabel(reset_caption)
+                reset_label.setToolTip(reset_tooltip)
+                reset_label.setStyleSheet(
+                    f"color: #6C7086; font-size: {max(8, preset['val_size'] - 1)}px;"
+                )
+                details_layout.addWidget(reset_label)
+                row_layout.addLayout(details_layout)
+                row_layout.addStretch()
+
+                ring = UsageRing(window.used, color)
+                ring.setToolTip(usage_tooltip)
+                row_layout.addWidget(ring)
+            else:
+                row_layout = QVBoxLayout(row_widget)
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                row_layout.setSpacing(2)
+
+                info_layout = QHBoxLayout()
+                info_layout.setContentsMargins(0, 0, 0, 0)
+                info_layout.setSpacing(6)
+
+                reset_suffix = f" · {reset_display}" if reset_display else ""
+                window_label = QLabel(f"{window.label}{reset_suffix}")
+                window_label.setToolTip(reset_tooltip)
+                window_label.setStyleSheet(
+                    f"color: #A6ADC8; font-size: {preset['val_size']}px;"
+                )
+                info_layout.addWidget(window_label)
+                info_layout.addStretch()
+
+                value_label = QLabel(f"사용 {window.used:.0f}%")
+                value_label.setToolTip(usage_tooltip)
+                value_label.setStyleSheet(
+                    f"color: {color}; font-size: {preset['val_size']}px;"
+                )
+                info_layout.addWidget(value_label)
+                row_layout.addLayout(info_layout)
+
+                pbar = QProgressBar()
+                pbar.setFixedHeight(preset["pbar_height"])
+                pbar.setRange(0, 100)
+                pbar.setValue(round(window.used))
+                pbar.setTextVisible(False)
+                pbar.setToolTip(usage_tooltip)
+                pbar.setStyleSheet(self._progress_style(color))
+                row_layout.addWidget(pbar)
+
+            ui["windows_layout"].addWidget(row_widget)
+            ui["window_rows"].append(row_widget)
+
     def update_data(self, usage_list: list[ModelUsage]):
+        self.latest_usage = list(usage_list)
         settings = self.config_data.get("settings", {})
         size_key = settings.get("widget_size", "Medium")
         preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
@@ -280,29 +529,39 @@ class SynapCapWidget(QWidget):
 
             if usage.error:
                 ui["dot"].setPixmap(create_status_dot_pixmap("error", 12))
-                ui["val"].setText(f"0% ({usage.error})")
+                ui["dot"].setToolTip(f"조회 실패: {usage.error}")
+                ui["val"].show()
+                ui["val"].setText("조회 오류")
+                ui["val"].setToolTip(usage.error)
                 ui["val"].setStyleSheet(f"color: #F38BA8; font-size: {v_size}px; border: none; background: transparent;")
-                ui["pbar"].setValue(0)
-                ui["pbar"].setStyleSheet("""
-                    QProgressBar { background-color: #313244; border: none; border-radius: 4px; }
-                    QProgressBar::chunk { background-color: #F38BA8; border-radius: 4px; }
-                """)
+                self._clear_usage_rows(ui)
             else:
-                status_st = "connected" if usage.status_text == "연결됨" else "warning"
-                ui["dot"].setPixmap(create_status_dot_pixmap(status_st, 12))
+                ui["dot"].setPixmap(create_status_dot_pixmap("connected", 12))
+                ui["dot"].setToolTip("정상 조회 · 최신 데이터")
+                ui["val"].hide()
+                windows = usage.windows or [
+                    UsageWindow(
+                        label="사용량",
+                        used=usage.used,
+                        reset_text=(
+                            ""
+                            if usage.status_text in (None, "연결됨")
+                            else usage.status_text
+                        ),
+                        remaining=(
+                            max(0.0, 100.0 - usage.used)
+                            if usage.unit == "%"
+                            else None
+                        ),
+                    )
+                ]
+                self._render_usage_rows(ui, windows, preset)
 
-                status_suffix = f" ({usage.status_text})" if usage.status_text else ""
-                ui["val"].setText(f"{usage.used:.0f}%{status_suffix}")
-                ui["val"].setStyleSheet(f"color: #BAC2DE; font-size: {v_size}px; border: none; background: transparent;")
-
-                val_int = int(usage.used)
-                ui["pbar"].setValue(val_int)
-
-                chunk_color = "#89B4FA" if usage.status_text == "연결됨" else "#F9E2AF"
-                ui["pbar"].setStyleSheet(f"""
-                    QProgressBar {{ background-color: #313244; border: none; border-radius: 4px; }}
-                    QProgressBar::chunk {{ background-color: {chunk_color}; border-radius: 4px; }}
-                """)
+        self.cards_layout.activate()
+        self.frame_layout.activate()
+        if self.layout() is not None:
+            self.layout().activate()
+        self.resize(self.width(), self.frame.sizeHint().height())
 
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
