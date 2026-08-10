@@ -1,18 +1,17 @@
-# Byte-compiled / optimized / DLL files
+# Python bytecode and native extensions
 __pycache__/
-*.py[cod]
+*.py[codz]
 *$py.class
-
-# C extensions
 *.so
 
-# Distribution / packaging (PyInstaller 빌드 결과물)
+# Build and packaging output
+.Python
 build/
 devel/
+develop-eggs/
 dist/
 artifacts/
 downloads/
-ebin/
 eggs/
 .eggs/
 lib/
@@ -25,31 +24,62 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
+*.manifest
 *.spec
 
-# PyInstaller single-folder builds
-*.manifest
-
-# Environments (가상환경 - 용량이 매우 크므로 제외 필수)
+# Virtual environments and local environment files
+.env
+.envrc
 .venv/
 venv/
 ENV/
 env/
+env.bak/
+venv.bak/
 
-# IDE / Editor (VSCode, PyCharm 등)
+# Tests, coverage, and type-checker caches
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Editors and operating-system metadata
 .vscode/
 .idea/
-
-# OS specific files
 .DS_Store
 Thumbs.db
+tempCodeRunnerFile.py
 
-# Sensitive local configuration with API keys
-# 실제 API Key가 들어있는 개인 설정 파일은 Git 추적에서 제외합니다.
+# Local application configuration and generated assets
 synapcap.json
-
-# Generated application icons (created by scripts/generate_icons.py)
 assets/synapcap.png
 assets/synapcap.ico
 assets/synapcap.icns
+
+# Common local data and secrets
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+instance/
+.webassets-cache/
+.pdm-python
+.pdm-build/
+.pixi/
+__pypackages__/
+.ipynb_checkpoints/
+.pypirc
