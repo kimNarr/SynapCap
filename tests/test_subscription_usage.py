@@ -57,8 +57,7 @@ class SubscriptionUsageTests(unittest.TestCase):
             patch.dict(os.environ, {"PATH": path_value}),
         ):
             directories = [
-                value.replace("\\", "/")
-                for value in _cli_environment()["PATH"].split(os.pathsep)
+                value.replace("\\", "/") for value in _cli_environment()["PATH"].split(os.pathsep)
             ]
 
         self.assertNotIn("/Volumes/team-tools/bin", directories)
@@ -71,17 +70,13 @@ class SubscriptionUsageTests(unittest.TestCase):
         kwargs = _hidden_process_kwargs()
 
         self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
-        self.assertTrue(
-            kwargs["startupinfo"].dwFlags & subprocess.STARTF_USESHOWWINDOW
-        )
+        self.assertTrue(kwargs["startupinfo"].dwFlags & subprocess.STARTF_USESHOWWINDOW)
         self.assertEqual(kwargs["startupinfo"].wShowWindow, subprocess.SW_HIDE)
 
     @patch("subscription_usage._read_codex_app_server")
     @patch("subscription_usage._codex_cache_copy")
     @patch("subscription_usage._find_codex_command")
-    def test_codex_uses_most_constrained_window(
-        self, find_command, cache_copy, read_server
-    ):
+    def test_codex_uses_most_constrained_window(self, find_command, cache_copy, read_server):
         find_command.return_value = cache_copy.return_value = "codex.exe"
         read_server.return_value = {
             "rateLimits": {
@@ -128,6 +123,7 @@ class SubscriptionUsageTests(unittest.TestCase):
         self.assertEqual([window.used_percent for window in result.windows], [8.0, 48.0])
         environment = run_command.call_args.kwargs["env_overrides"]
         self.assertIn("PATH", environment)
+        self.assertEqual(environment["AGY_CLI_DISABLE_AUTO_UPDATE"], "true")
         self.assertNotIn("HOME", environment)
         self.assertNotIn("USERPROFILE", environment)
         self.assertNotIn(".local", environment["PATH"])
@@ -180,9 +176,7 @@ Current week (all models): 50% used · resets Aug 12, 4am (Asia/Seoul)
             '{"mcpServers":{}}\n',
         )
         self.assertEqual(
-            run_command.call_args.kwargs["env_overrides"][
-                "MCP_CONNECTION_NONBLOCKING"
-            ],
+            run_command.call_args.kwargs["env_overrides"]["MCP_CONNECTION_NONBLOCKING"],
             "true",
         )
         self.assertEqual(result.used_percent, 50.0)
@@ -224,9 +218,7 @@ class ProviderCacheTests(unittest.TestCase):
             ),
             SubscriptionSnapshot(20, "Codex", "주간"),
         ]
-        provider = CodexProvider(
-            {"id": "codex", "name": "Codex", "cache_ttl_sec": 3600}
-        )
+        provider = CodexProvider({"id": "codex", "name": "Codex", "cache_ttl_sec": 3600})
 
         first = provider.fetch_usage()
         self.assertEqual(first.used, 10)

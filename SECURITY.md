@@ -8,4 +8,4 @@
 
 공개 Issue에 토큰, 계정 정보, 로컬 경로 또는 재현 로그 원문을 올리지 마세요. 저장소 소유자에게 비공개로 연락하거나 GitHub의 Private vulnerability reporting 기능을 사용해 주세요.
 
-SynapCap은 사용자의 로컬 CLI 로그인 상태를 사용하며 API 키를 수집하지 않습니다. 업데이트 확인은 앱 시작 시 GitHub의 최신 Release 정보만 조회하며 설정에서 끌 수 있습니다.
+SynapCap은 사용자의 로컬 CLI 로그인 상태를 사용하며 API 키를 수집하지 않습니다. 업데이트 확인은 앱 시작 시 GitHub의 최신 Release 정보만 조회하며 설정에서 끌 수 있습니다. 사용자가 설치를 선택한 경우에만 `kimNarr/SynapCap` 공식 GitHub Release의 고정된 파일명과 HTTPS 경로에서 설치 파일·체크섬을 내려받습니다. SHA-256 검증에 실패하면 파일을 실행하지 않고 기존 버전을 유지합니다.

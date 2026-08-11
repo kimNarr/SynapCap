@@ -1,26 +1,49 @@
 import copy
 import sys
 import uuid
+
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPolygon
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
-    QCheckBox, QComboBox, QLineEdit, QPushButton, QTabWidget, QWidget,
-    QGroupBox, QFormLayout, QScrollArea, QMessageBox, QStyle,
-    QStyleOptionComboBox, QStyleOptionSpinBox, QFrame
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QFrame,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QStyle,
+    QStyleFactory,
+    QStyleOptionComboBox,
+    QStyleOptionSpinBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
-from .icon import (
-    create_app_icon,
-    create_plus_icon,
-    create_arrow_up_icon,
-    create_arrow_down_icon,
-    create_trash_icon
-)
+
 from providers import PROVIDER_TYPE_OPTIONS
 from version import APP_VERSION
 
+from .icon import (
+    create_app_icon,
+    create_arrow_down_icon,
+    create_arrow_up_icon,
+    create_plus_icon,
+    create_provider_icon,
+    create_trash_icon,
+)
+
+
 class NoWheelComboBox(QComboBox):
     """마우스 휠 스크롤 시 선택 항목이 실수로 변경되지 않도록 휠 이벤트를 무시하는 콤보박스"""
+
     def wheelEvent(self, event):
         event.ignore()
 
@@ -120,10 +143,7 @@ class SettingsTitleBar(QWidget):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if (
-            self._drag_offset is not None
-            and event.buttons() & Qt.MouseButton.LeftButton
-        ):
+        if self._drag_offset is not None and event.buttons() & Qt.MouseButton.LeftButton:
             self._dialog.move(event.globalPosition().toPoint() - self._drag_offset)
             event.accept()
             return
@@ -132,6 +152,7 @@ class SettingsTitleBar(QWidget):
     def mouseReleaseEvent(self, event):
         self._drag_offset = None
         super().mouseReleaseEvent(event)
+
 
 class SettingsDialog(QDialog):
     config_saved = Signal(dict)
@@ -143,11 +164,16 @@ class SettingsDialog(QDialog):
         self.init_ui()
 
     def init_ui(self):
+        # Fusion avoids native Cocoa controls overriding the Windows-oriented
+        # dimensions and palette used by the custom stylesheet.
+        app = QApplication.instance()
+        if isinstance(app, QApplication) and app.style().objectName().lower() != "fusion":
+            fusion_style = QStyleFactory.create("Fusion")
+            if fusion_style is not None:
+                app.setStyle(fusion_style)
         self.setWindowTitle(f"SynapCap {APP_VERSION} Settings")
         self.setWindowIcon(create_app_icon(32))
-        self.setWindowFlags(
-            Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint
-        )
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMinimumSize(560, 600)
         self.setStyleSheet("""
@@ -398,7 +424,7 @@ class SettingsDialog(QDialog):
 
         # Tab Widget
         self.tabs = QTabWidget()
-        
+
         # 1. 일반 설정 Tab
         self.general_tab = QWidget()
         self.init_general_tab()
@@ -491,10 +517,10 @@ class SettingsDialog(QDialog):
         main_layout.addLayout(top_bar)
 
         # Scroll Area for Providers
-        self.scroll = QScrollArea(self.providers_tab)  # type: ignore
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll.setStyleSheet("""
+        self.providers_scroll = QScrollArea(self.providers_tab)
+        self.providers_scroll.setWidgetResizable(True)
+        self.providers_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.providers_scroll.setStyleSheet("""
             QScrollArea, QScrollArea > QWidget > QWidget {
                 border: none;
                 background: transparent;
@@ -523,19 +549,19 @@ class SettingsDialog(QDialog):
                 background: transparent;
             }
         """)
-        
+
         self.container = QWidget()
         self.container_layout = QVBoxLayout(self.container)  # type: ignore
         self.container_layout.setSpacing(14)
 
         self.provider_widgets = []
         providers = self.config_data.get("providers", [])
-        
+
         for p in providers:
             self._add_provider_widget_item(p)
 
-        self.scroll.setWidget(self.container)
-        main_layout.addWidget(self.scroll)  # type: ignore
+        self.providers_scroll.setWidget(self.container)
+        main_layout.addWidget(self.providers_scroll)
 
     def _add_provider_widget_item(self, p_data: dict):
         group = QGroupBox()
@@ -576,16 +602,14 @@ class SettingsDialog(QDialog):
         # Form Layout
         g_layout = QFormLayout()
         g_layout.setSpacing(12)
-        g_layout.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
-        )
+        g_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         g_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
 
         # Provider Type Selection Combo (NoWheelComboBox 적용)
         type_combo = NoWheelComboBox()
         type_options = PROVIDER_TYPE_OPTIONS
         for label, val in type_options:
-            type_combo.addItem(label, val)
+            type_combo.addItem(create_provider_icon(val, 18), label, val)
 
         curr_type = p_data.get("type", "codex").lower()
         idx_to_set = 0
@@ -638,39 +662,27 @@ class SettingsDialog(QDialog):
                     weekly_check.setChecked(True)
                     five_hour_check.setEnabled(False)
                     weekly_check.setEnabled(False)
-                    five_hour_check.setToolTip(
-                        "Codex는 현재 주간 한도만 제공합니다."
-                    )
-                    weekly_check.setToolTip(
-                        "Codex에서 제공하는 유일한 한도입니다."
-                    )
+                    five_hour_check.setToolTip("Codex는 현재 주간 한도만 제공합니다.")
+                    weekly_check.setToolTip("Codex에서 제공하는 유일한 한도입니다.")
                     return
 
                 if not five_hour_check.isChecked() and not weekly_check.isChecked():
                     weekly_check.setChecked(True)
                 five_hour_check.setEnabled(weekly_check.isChecked())
                 weekly_check.setEnabled(five_hour_check.isChecked())
-                five_hour_check.setToolTip(
-                    "둘 중 하나 이상의 한도는 표시해야 합니다."
-                )
-                weekly_check.setToolTip(
-                    "둘 중 하나 이상의 한도는 표시해야 합니다."
-                )
+                five_hour_check.setToolTip("둘 중 하나 이상의 한도는 표시해야 합니다.")
+                weekly_check.setToolTip("둘 중 하나 이상의 한도는 표시해야 합니다.")
             finally:
                 updating_window_options = False
 
         def update_connection_mode(_index=None):
             selected_type = type_combo.currentData() or "codex"
             cli_name = {
-                "codex": (
-                    "Codex 앱/CLI" if sys.platform == "win32" else "Codex CLI"
-                ),
+                "codex": ("Codex 앱/CLI" if sys.platform == "win32" else "Codex CLI"),
                 "antigravity": "Antigravity CLI",
                 "claude": "Claude Code CLI",
             }[selected_type]
-            connection_label.setText(
-                f"{cli_name} 설치 및 로컬 로그인 필요 · API 키 불필요"
-            )
+            connection_label.setText(f"{cli_name} 설치 및 로컬 로그인 필요 · API 키 불필요")
             update_window_options()
 
         type_combo.currentIndexChanged.connect(update_connection_mode)
@@ -710,9 +722,10 @@ class SettingsDialog(QDialog):
 
         def delete_item(checked=False, info=item_info, target_group=group):
             reply = QMessageBox.question(
-                self, "삭제 확인",
+                self,
+                "삭제 확인",
                 f"'{info['name_edit'].text()}' 프로바이더를 삭제하시겠습니까?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
                 if info in self.provider_widgets:
@@ -740,7 +753,7 @@ class SettingsDialog(QDialog):
             "type": "codex",
             "enabled": True,
             "limit": 100.0,
-            "unit": "%"
+            "unit": "%",
         }
         self._add_provider_widget_item(default_data)
 
@@ -758,16 +771,18 @@ class SettingsDialog(QDialog):
             selected_type_val = pw["type_combo"].currentData() or "codex"
 
             p_data = dict(pw["original_data"])
-            p_data.update({
-                "id": pw["id"],
-                "name": pw["name_edit"].text().strip() or "AI Provider",
-                "type": selected_type_val,
-                "enabled": pw["enabled_check"].isChecked(),
-                "show_five_hour": pw["five_hour_check"].isChecked(),
-                "show_weekly": pw["weekly_check"].isChecked(),
-                "limit": 100.0,
-                "unit": "%",
-            })
+            p_data.update(
+                {
+                    "id": pw["id"],
+                    "name": pw["name_edit"].text().strip() or "AI Provider",
+                    "type": selected_type_val,
+                    "enabled": pw["enabled_check"].isChecked(),
+                    "show_five_hour": pw["five_hour_check"].isChecked(),
+                    "show_weekly": pw["weekly_check"].isChecked(),
+                    "limit": 100.0,
+                    "unit": "%",
+                }
+            )
             for stale_key in ("api_key", "auth_token", "endpoint"):
                 p_data.pop(stale_key, None)
             p_data["source"] = "local_subscription"

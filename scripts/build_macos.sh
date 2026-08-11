@@ -28,6 +28,16 @@ python -m PyInstaller \
   --osx-bundle-identifier io.github.kimNarr.SynapCap \
   main.py
 
+# SynapCap is a menu-bar utility. Keep it out of the Dock and app switcher;
+# the status item remains available through QSystemTrayIcon.
+if ! /usr/libexec/PlistBuddy \
+  -c "Set :LSUIElement true" \
+  dist/SynapCap.app/Contents/Info.plist; then
+  /usr/libexec/PlistBuddy \
+    -c "Add :LSUIElement bool true" \
+    dist/SynapCap.app/Contents/Info.plist
+fi
+
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR"
 cp -R dist/SynapCap.app "$STAGING_DIR/SynapCap.app"

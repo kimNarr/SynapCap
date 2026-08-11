@@ -1,7 +1,10 @@
-from PySide6.QtCore import Signal, QObject
-from PySide6.QtWidgets import QSystemTrayIcon, QMenu
-from .icon import create_app_icon
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QMenu, QSystemTrayIcon
+
 from version import APP_VERSION
+
+from .icon import create_app_icon
+
 
 class SynapCapTray(QObject):
     refresh_requested = Signal()
@@ -15,7 +18,7 @@ class SynapCapTray(QObject):
         super().__init__()
         self.widget = parent_widget
         self.always_on_top = always_on_top
-        
+
         self.tray_icon = QSystemTrayIcon()
         self.init_icon()
         self.init_menu()
@@ -80,7 +83,10 @@ class SynapCapTray(QObject):
         self.tray_icon.setContextMenu(menu)
 
     def _on_activated(self, reason):
-        if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
             self.toggle_widget_requested.emit()
 
     def _on_top_toggled(self, checked: bool):
@@ -89,13 +95,33 @@ class SynapCapTray(QObject):
 
     def set_update_available(self, version: str, url: str):
         self._update_url = url
-        self.update_action.setText(f"업데이트 v{version} 받기")
+        self.update_action.setEnabled(True)
+        self.update_action.setText(f"업데이트 v{version} 설치")
         self.update_action.setVisible(True)
         self.tray_icon.showMessage(
             "SynapCap 업데이트",
             f"새 버전 v{version}을 사용할 수 있습니다.",
             QSystemTrayIcon.MessageIcon.Information,
             5000,
+        )
+
+    def set_update_progress(self, version: str, percent: int):
+        self.update_action.setVisible(True)
+        self.update_action.setEnabled(False)
+        self.update_action.setText(f"v{version} 다운로드 중 · {percent}%")
+
+    def restore_update_available(self, version: str, url: str):
+        self._update_url = url
+        self.update_action.setEnabled(True)
+        self.update_action.setText(f"업데이트 v{version} 설치")
+        self.update_action.setVisible(True)
+
+    def show_update_error(self, message: str):
+        self.tray_icon.showMessage(
+            "SynapCap 업데이트 실패",
+            message,
+            QSystemTrayIcon.MessageIcon.Warning,
+            6000,
         )
 
     def _open_update(self):

@@ -68,6 +68,11 @@ async function loadLatestRelease() {
 
     status.textContent = `${release.tag_name} 다운로드 가능`;
     meta.textContent = `최신 ${release.tag_name} · ${published} 공개 · 누적 다운로드 ${downloads.toLocaleString("ko-KR")}회`;
+    const previewVersion = document.querySelector("#preview-version");
+    if (previewVersion) {
+      previewVersion.textContent = release.tag_name;
+      previewVersion.dataset.tooltip = `현재 버전 ${release.tag_name}`;
+    }
 
     const availableAssets = new Map((release.assets || []).map((item) => [item.name, item.browser_download_url]));
     document.querySelectorAll("[data-asset]").forEach((link) => {
@@ -75,8 +80,8 @@ async function loadLatestRelease() {
       link.href = url || release.html_url || releasePage;
     });
   } catch (error) {
-    status.textContent = "첫 공개 버전 준비 중";
-    meta.textContent = "첫 번째 GitHub Release가 게시되면 자동으로 최신 버전이 연결됩니다.";
+    status.textContent = "최신 공개 버전 확인 중";
+    meta.textContent = "버전 정보를 불러오지 못했습니다. GitHub Release에서 최신 파일을 확인할 수 있습니다.";
   }
 }
 

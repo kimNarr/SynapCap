@@ -1,17 +1,39 @@
 import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from main import (
-    confirm_quit,
+    _launch_windows_installer,
     _provider_query_settings_changed,
     _provider_settings_changed,
     _setting_changed,
+    confirm_quit,
 )
+
+
+class UpdateInstallerTests(unittest.TestCase):
+    @patch("main.ctypes.windll", create=True)
+    def test_windows_installer_uses_elevation_and_silent_flags(self, windll):
+        windll.shell32.ShellExecuteW.return_value = 42
+
+        _launch_windows_installer(r"C:\Temp\SynapCap-Setup.exe")
+
+        call = windll.shell32.ShellExecuteW.call_args.args
+        self.assertEqual(call[1], "open")
+        self.assertEqual(call[2], r"C:\Temp\SynapCap-Setup.exe")
+        self.assertIn("/VERYSILENT", call[3])
+        self.assertIn("/CLOSEAPPLICATIONS", call[3])
+
+    @patch("main.ctypes.windll", create=True)
+    def test_windows_installer_rejection_does_not_quit_app(self, windll):
+        windll.shell32.ShellExecuteW.return_value = 5
+
+        with self.assertRaises(OSError):
+            _launch_windows_installer(r"C:\Temp\SynapCap-Setup.exe")
 
 
 class SettingsChangeTests(unittest.TestCase):
@@ -26,18 +48,14 @@ class SettingsChangeTests(unittest.TestCase):
         }
 
         self.assertFalse(_provider_settings_changed(previous, current))
-        self.assertTrue(
-            _setting_changed(previous, current, "usage_value_bold")
-        )
+        self.assertTrue(_setting_changed(previous, current, "usage_value_bold"))
 
     def test_provider_edit_requires_provider_reload(self):
         previous = {"providers": [{"id": "codex", "type": "codex"}]}
         current = {"providers": [{"id": "codex", "type": "claude"}]}
 
         self.assertTrue(_provider_settings_changed(previous, current))
-        self.assertTrue(
-            _provider_query_settings_changed(previous, current)
-        )
+        self.assertTrue(_provider_query_settings_changed(previous, current))
 
     def test_provider_name_and_order_do_not_require_query(self):
         previous = {
@@ -54,9 +72,7 @@ class SettingsChangeTests(unittest.TestCase):
         }
 
         self.assertTrue(_provider_settings_changed(previous, current))
-        self.assertFalse(
-            _provider_query_settings_changed(previous, current)
-        )
+        self.assertFalse(_provider_query_settings_changed(previous, current))
 
     def test_window_visibility_does_not_require_query(self):
         previous = {
@@ -80,9 +96,7 @@ class SettingsChangeTests(unittest.TestCase):
             ]
         }
 
-        self.assertFalse(
-            _provider_query_settings_changed(previous, current)
-        )
+        self.assertFalse(_provider_query_settings_changed(previous, current))
 
 
 class QuitConfirmationTests(unittest.TestCase):
@@ -102,9 +116,7 @@ class QuitConfirmationTests(unittest.TestCase):
         confirmed = confirm_quit(None, lambda _parent: dialog)
 
         self.assertTrue(confirmed)
-        dialog.setDefaultButton.assert_called_once_with(
-            QMessageBox.StandardButton.No
-        )
+        dialog.setDefaultButton.assert_called_once_with(QMessageBox.StandardButton.No)
 
     def test_cancel_keeps_application_running(self):
         dialog = self._dialog(QMessageBox.StandardButton.No)
@@ -129,6 +141,7 @@ class QuitConfirmationTests(unittest.TestCase):
             dialog.button(QMessageBox.StandardButton.Yes).sizeHint().width(),
             90,
         )
+
 
 if __name__ == "__main__":
     unittest.main()
