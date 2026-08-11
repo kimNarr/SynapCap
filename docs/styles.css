@@ -154,6 +154,10 @@ h1 span { color: var(--blue); }
 .error-grid h3 { margin: 28px 0 10px; font-size: 17px; }
 .error-grid p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; word-break: keep-all; }
 .error-grid code, .restart-note code { color: var(--blue); font-family: "SFMono-Regular", Consolas, monospace; font-size: .92em; }
+.permission-note { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); gap: 24px; align-items: center; margin-top: 18px; padding: 20px 24px; border: 1px solid rgba(249,226,175,.22); border-radius: 15px; background: rgba(249,226,175,.055); }
+.permission-note strong { color: var(--yellow); font-size: 14px; }
+.permission-note p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.permission-note b { color: var(--text); }
 .mac-setup { margin-top: 18px; padding: 30px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(24,24,37,.72); }
 .mac-setup-copy { display: grid; grid-template-columns: .65fr 1fr 1.35fr; align-items: end; gap: 24px; margin-bottom: 24px; }
 .mac-setup-copy .section-kicker { align-self: center; }
@@ -205,6 +209,7 @@ h1 span { color: var(--blue); }
   .compact-card { grid-column: 1 / -1; min-height: 210px; }
   .requirements { grid-template-columns: 1fr; gap: 42px; }
   .error-grid { grid-template-columns: 1fr 1fr; }
+  .permission-note { grid-template-columns: 1fr; gap: 8px; }
   .mac-setup-copy { grid-template-columns: 1fr; gap: 10px; }
   .update-flow { grid-template-columns: 1fr; }
   .privacy { grid-template-columns: 1fr; gap: 42px; }

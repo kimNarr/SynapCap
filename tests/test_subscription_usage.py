@@ -40,6 +40,32 @@ class SubscriptionUsageTests(unittest.TestCase):
                 environment["PATH"].split(os.pathsep),
             )
 
+    def test_macos_cli_search_skips_protected_and_mounted_paths(self):
+        home = Path("/Users/tester")
+        path_value = os.pathsep.join(
+            (
+                "/Volumes/team-tools/bin",
+                "/Users/tester/Music/tools/bin",
+                "/Users/tester/.local/bin",
+                "/opt/homebrew/bin",
+            )
+        )
+
+        with (
+            patch("subscription_usage.Path.home", return_value=home),
+            patch("subscription_usage.sys.platform", "darwin"),
+            patch.dict(os.environ, {"PATH": path_value}),
+        ):
+            directories = [
+                value.replace("\\", "/")
+                for value in _cli_environment()["PATH"].split(os.pathsep)
+            ]
+
+        self.assertNotIn("/Volumes/team-tools/bin", directories)
+        self.assertNotIn("/Users/tester/Music/tools/bin", directories)
+        self.assertIn("/Users/tester/.local/bin", directories)
+        self.assertIn("/opt/homebrew/bin", directories)
+
     @unittest.skipUnless(os.name == "nt", "Windows-specific process flags")
     def test_cli_processes_are_forced_hidden_on_windows(self):
         kwargs = _hidden_process_kwargs()
@@ -102,6 +128,19 @@ class SubscriptionUsageTests(unittest.TestCase):
         self.assertEqual([window.used_percent for window in result.windows], [8.0, 48.0])
         serena_home = run_command.call_args.kwargs["env_overrides"]["SERENA_HOME"]
         self.assertTrue(serena_home.endswith("serena-home"))
+        environment = run_command.call_args.kwargs["env_overrides"]
+        home_variable = "USERPROFILE" if os.name == "nt" else "HOME"
+        isolated_home = environment[home_variable]
+        isolated_mcp = (
+            Path(isolated_home) / ".gemini" / "config" / "mcp_config.json"
+        )
+        self.assertEqual(
+            isolated_mcp.read_text(encoding="utf-8"),
+            '{"mcpServers":{}}\n',
+        )
+        command = run_command.call_args.args[0]
+        self.assertIn("--sandbox", command)
+        self.assertIn("--log-file", command)
         serena_config = Path(serena_home) / "serena_config.yml"
         self.assertIn("projects: []", serena_config.read_text(encoding="utf-8"))
 
@@ -150,6 +189,19 @@ Current week (all models): 50% used · resets Aug 12, 4am (Asia/Seoul)
         command = run_command.call_args.args[0]
         self.assertIn("--safe-mode", command)
         self.assertIn("--no-chrome", command)
+        self.assertIn("--strict-mcp-config", command)
+        self.assertIn("--mcp-config", command)
+        mcp_config = Path(command[command.index("--mcp-config") + 1])
+        self.assertEqual(
+            mcp_config.read_text(encoding="utf-8"),
+            '{"mcpServers":{}}\n',
+        )
+        self.assertEqual(
+            run_command.call_args.kwargs["env_overrides"][
+                "MCP_CONNECTION_NONBLOCKING"
+            ],
+            "true",
+        )
         self.assertEqual(result.used_percent, 50.0)
         self.assertEqual(result.model_name, "Claude Code")
         self.assertIn("주간", result.status_text)
