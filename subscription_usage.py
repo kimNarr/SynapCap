@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
@@ -67,9 +66,7 @@ def _cli_search_directories() -> tuple[Path, ...]:
     for value in os.environ.get("PATH", "").split(os.pathsep):
         if value:
             directory = Path(value).expanduser()
-            if sys.platform != "darwin" or _safe_macos_cli_directory(
-                directory, home
-            ):
+            if sys.platform != "darwin" or _safe_macos_cli_directory(directory, home):
                 directories.append(directory)
 
     directories.extend(
@@ -111,9 +108,7 @@ def _safe_macos_cli_directory(directory: Path, home: Path) -> bool:
         "/Volumes",
         "/net",
     )
-    return not any(
-        path == root or path.startswith(root + "/") for root in protected_roots
-    )
+    return not any(path == root or path.startswith(root + "/") for root in protected_roots)
 
 
 def _cli_search_path() -> str:
@@ -134,9 +129,7 @@ def _usage_probe_path() -> str:
         system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
         directories.extend((system_root / "System32", system_root))
     else:
-        directories.extend(
-            (Path("/usr/bin"), Path("/bin"), Path("/usr/sbin"), Path("/sbin"))
-        )
+        directories.extend((Path("/usr/bin"), Path("/bin"), Path("/usr/sbin"), Path("/sbin")))
 
     unique: list[str] = []
     seen: set[str] = set()
@@ -281,8 +274,7 @@ def _codex_cache_copy(source: Path) -> Path:
         raise SubscriptionUsageError("Codex 실행 파일 접근 실패") from exc
 
     cache_base = Path(
-        os.environ.get("LOCALAPPDATA")
-        or os.path.join(tempfile.gettempdir(), "SynapCap")
+        os.environ.get("LOCALAPPDATA") or os.path.join(tempfile.gettempdir(), "SynapCap")
     )
     cache_dir = cache_base / "SynapCap" / "bin"
     target = cache_dir / f"codex-app-server-{version_key}.exe"
@@ -305,10 +297,7 @@ def _find_codex_command(configured: Optional[str]) -> Path:
     except SubscriptionUsageError:
         pass
 
-    local_app_data = Path(
-        os.environ.get("LOCALAPPDATA")
-        or Path.home() / "AppData" / "Local"
-    )
+    local_app_data = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
     cached = sorted(
         (local_app_data / "SynapCap" / "bin").glob("codex-app-server-*.exe"),
         key=lambda path: path.stat().st_mtime,
@@ -383,11 +372,12 @@ def _read_codex_app_server(executable: Path, timeout_sec: float) -> dict[str, An
         _stop_process(process)
         raise SubscriptionUsageError("Codex App Server 연결 실패")
 
+    stdout = process.stdout
     lines: queue.Queue[Optional[str]] = queue.Queue()
 
     def read_stdout() -> None:
         try:
-            for line in process.stdout:
+            for line in stdout:
                 lines.put(line)
         finally:
             lines.put(None)
@@ -479,9 +469,7 @@ def query_codex_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
         SubscriptionWindow(
             label=_window_label(item.get("windowDurationMins")),
             used_percent=_clamp_percent(float(item.get("usedPercent", 0))),
-            remaining_percent=_clamp_percent(
-                100.0 - float(item.get("usedPercent", 0))
-            ),
+            remaining_percent=_clamp_percent(100.0 - float(item.get("usedPercent", 0))),
             reset_text=_format_epoch_reset(item.get("resetsAt")),
         )
         for item in sorted(
@@ -511,11 +499,15 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     work_dir = Path(tempfile.gettempdir()) / "SynapCap" / "antigravity"
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
-        env_overrides = {"PATH": _usage_probe_path()}
+        env_overrides = {
+            "PATH": _usage_probe_path(),
+            # The CLI otherwise spawns a detached self-updater even for the
+            # short-lived /usage probe.  Besides being unnecessary here, that
+            # child process can briefly flash a console window on Windows.
+            "AGY_CLI_DISABLE_AUTO_UPDATE": "true",
+        }
     except OSError as exc:
-        raise SubscriptionUsageError(
-            "Antigravity 임시 실행 환경 준비 실패"
-        ) from exc
+        raise SubscriptionUsageError("Antigravity 임시 실행 환경 준비 실패") from exc
     output = _run_text_command(
         [
             str(executable),
@@ -567,9 +559,7 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     reset = _format_iso_reset(active["resets_at"])
     display_windows = tuple(
         SubscriptionWindow(
-            label=(
-                "주간" if "weekly" in row["window"].lower() else "5시간"
-            ),
+            label=("주간" if "weekly" in row["window"].lower() else "5시간"),
             used_percent=_clamp_percent(100.0 - row["remaining"]),
             remaining_percent=row["remaining"],
             reset_text=_format_iso_reset(row["resets_at"]),
@@ -642,10 +632,7 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
         work_dir.mkdir(parents=True, exist_ok=True)
         mcp_config = work_dir / "empty-mcp.json"
         mcp_config_text = '{"mcpServers":{}}\n'
-        if (
-            not mcp_config.is_file()
-            or mcp_config.read_text(encoding="utf-8") != mcp_config_text
-        ):
+        if not mcp_config.is_file() or mcp_config.read_text(encoding="utf-8") != mcp_config_text:
             mcp_config.write_text(mcp_config_text, encoding="utf-8")
     except OSError as exc:
         raise SubscriptionUsageError("Claude 임시 실행 환경 준비 실패") from exc
@@ -686,11 +673,7 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
                 {
                     "label": label,
                     "used": _clamp_percent(float(match.group(1))),
-                    "reset": (
-                        _format_claude_reset(match.group(2))
-                        if match.group(2)
-                        else ""
-                    ),
+                    "reset": (_format_claude_reset(match.group(2)) if match.group(2) else ""),
                 }
             )
 

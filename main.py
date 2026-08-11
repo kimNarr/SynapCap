@@ -1,14 +1,17 @@
+import ctypes
+import subprocess
 import sys
+
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from config import load_config, save_config
 from providers import load_providers_from_config
-from workers import UsageWorker
-from ui import SynapCapWidget, SynapCapTray, SettingsDialog, create_app_icon
-from updates import UpdateCheckWorker
+from ui import SettingsDialog, SynapCapTray, SynapCapWidget, create_app_icon
+from updates import UpdateCheckWorker, UpdateDownloadWorker, UpdateInfo
 from version import APP_VERSION
+from workers import UsageWorker
 
 
 def _provider_settings_changed(previous: dict, current: dict) -> bool:
@@ -27,20 +30,14 @@ def _provider_query_signature(config: dict) -> tuple:
     rows = []
     for provider in config.get("providers", []):
         query_settings = tuple(
-            sorted(
-                (key, repr(value))
-                for key, value in provider.items()
-                if key not in ignored_keys
-            )
+            sorted((key, repr(value)) for key, value in provider.items() if key not in ignored_keys)
         )
         rows.append((provider.get("id", ""), query_settings))
     return tuple(sorted(rows))
 
 
 def _provider_query_settings_changed(previous: dict, current: dict) -> bool:
-    return _provider_query_signature(previous) != _provider_query_signature(
-        current
-    )
+    return _provider_query_signature(previous) != _provider_query_signature(current)
 
 
 def _reuse_provider_instances(providers: list, config: dict) -> list:
@@ -70,12 +67,8 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
     dialog.setWindowTitle("SynapCap 종료")
     dialog.setIcon(QMessageBox.Icon.Question)
     dialog.setText("SynapCap을 종료할까요?")
-    dialog.setInformativeText(
-        "종료하면 사용량 확인과 업데이트 알림도 중지됩니다."
-    )
-    dialog.setStandardButtons(
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-    )
+    dialog.setInformativeText("종료하면 사용량 확인과 업데이트 알림도 중지됩니다.")
+    dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
     dialog.setDefaultButton(QMessageBox.StandardButton.No)
     dialog.setEscapeButton(QMessageBox.StandardButton.No)
     dialog.setStyleSheet("""
@@ -116,6 +109,28 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
 
     return dialog.exec() == QMessageBox.StandardButton.Yes
 
+
+def _launch_windows_installer(path: str) -> None:
+    parameters = subprocess.list2cmdline(
+        [
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/CLOSEAPPLICATIONS",
+        ]
+    )
+    result = ctypes.windll.shell32.ShellExecuteW(
+        None,
+        "open",
+        path,
+        parameters,
+        None,
+        1,
+    )
+    if result <= 32:
+        raise OSError(f"installer launch failed ({result})")
+
+
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -140,7 +155,12 @@ def main():
     tray = SynapCapTray(parent_widget=widget, always_on_top=always_on_top)
 
     update_worker = UpdateCheckWorker(APP_VERSION)
+    pending_update: UpdateInfo | None = None
+    download_worker: UpdateDownloadWorker | None = None
+
     def handle_update_available(info):
+        nonlocal pending_update
+        pending_update = info
         tray.set_update_available(info.version, info.url)
         widget.set_update_available(info.version, info.url)
 
@@ -156,31 +176,23 @@ def main():
     # 6. GUI Settings Dialog 오픈 및 Hot-Reload 연결
     def open_settings_dialog():
         dialog = SettingsDialog(config_data, parent=widget)
-        
+
         def handle_config_saved(new_config: dict):
             nonlocal config_data, providers
             previous_config = config_data
-            provider_layout_changed = _provider_settings_changed(
-                previous_config, new_config
-            )
-            provider_query_changed = _provider_query_settings_changed(
-                previous_config, new_config
-            )
-            interval_changed = _setting_changed(
-                previous_config, new_config, "refresh_interval_sec"
-            )
+            provider_layout_changed = _provider_settings_changed(previous_config, new_config)
+            provider_query_changed = _provider_query_settings_changed(previous_config, new_config)
+            interval_changed = _setting_changed(previous_config, new_config, "refresh_interval_sec")
             config_data = new_config
-            
+
             # synapcap.json 저장
             save_config(config_data)
-            
+
             if provider_layout_changed:
                 if provider_query_changed:
                     providers = load_providers_from_config(config_data)
                 else:
-                    providers = _reuse_provider_instances(
-                        providers, config_data
-                    )
+                    providers = _reuse_provider_instances(providers, config_data)
                 worker.set_providers(providers)
 
             widget.rebuild_ui(
@@ -190,18 +202,12 @@ def main():
             )
 
             if interval_changed:
-                worker.set_interval(
-                    config_data.get("settings", {}).get(
-                        "refresh_interval_sec", 30
-                    )
-                )
+                worker.set_interval(config_data.get("settings", {}).get("refresh_interval_sec", 30))
             if provider_query_changed:
                 worker.trigger_manual_refresh()
 
             # Tray Always-on-top 체크박스 동기화
-            new_always_top = config_data.get("settings", {}).get(
-                "always_on_top", True
-            )
+            new_always_top = config_data.get("settings", {}).get("always_on_top", True)
             tray.always_top_action.setChecked(new_always_top)
 
         dialog.config_saved.connect(handle_config_saved)
@@ -238,6 +244,9 @@ def main():
         quit_in_progress = True
         widget.begin_shutdown()
         worker.stop()
+        if download_worker is not None and download_worker.isRunning():
+            download_worker.requestInterruption()
+            download_worker.wait(20000)
         if update_worker.isRunning():
             update_worker.requestInterruption()
             update_worker.wait(6000)
@@ -249,25 +258,99 @@ def main():
         if confirm_quit(widget):
             handle_quit()
 
+    def restore_update_controls():
+        if pending_update is None:
+            return
+        tray.restore_update_available(
+            pending_update.version,
+            pending_update.url,
+        )
+        widget.restore_update_available(
+            pending_update.version,
+            pending_update.url,
+        )
+
+    def handle_update_failed(message: str):
+        restore_update_controls()
+        tray.show_update_error(message)
+        QMessageBox.warning(
+            widget,
+            "SynapCap 업데이트 실패",
+            f"{message}\n\n기존 버전은 변경되지 않았습니다.",
+        )
+
+    def launch_downloaded_update(path: str):
+        if pending_update is None:
+            return
+        try:
+            if sys.platform == "win32":
+                _launch_windows_installer(path)
+                handle_quit()
+                return
+            if sys.platform == "darwin":
+                if not QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
+                    raise OSError("DMG를 열지 못했습니다.")
+                restore_update_controls()
+                QMessageBox.information(
+                    widget,
+                    "SynapCap 업데이트 준비 완료",
+                    "검증된 DMG를 열었습니다. SynapCap을 응용 프로그램 "
+                    "폴더로 드래그해 기존 앱을 교체해 주세요.",
+                )
+                return
+            QDesktopServices.openUrl(QUrl(pending_update.url))
+        except OSError:
+            handle_update_failed("설치 프로그램을 시작하지 못했습니다. 다시 시도해 주세요.")
+
+    def start_one_click_update(_url: str):
+        nonlocal download_worker
+        info = pending_update
+        if info is None:
+            return
+        if download_worker is not None and download_worker.isRunning():
+            return
+        if not info.supports_one_click:
+            QDesktopServices.openUrl(QUrl(info.url))
+            return
+
+        current_download = UpdateDownloadWorker(info)
+        download_worker = current_download
+        current_download.progress.connect(
+            lambda percent: (
+                tray.set_update_progress(info.version, percent),
+                widget.set_update_progress(info.version, percent),
+            )
+        )
+        current_download.failed.connect(handle_update_failed)
+        current_download.ready.connect(launch_downloaded_update)
+
+        def release_download_worker():
+            nonlocal download_worker
+            if download_worker is current_download:
+                download_worker = None
+            current_download.deleteLater()
+
+        current_download.finished.connect(release_download_worker)
+        tray.set_update_progress(info.version, 0)
+        widget.set_update_progress(info.version, 0)
+        current_download.start()
+
     tray.toggle_widget_requested.connect(toggle_widget)
     tray.refresh_requested.connect(worker.trigger_manual_refresh)
     tray.always_on_top_toggled.connect(handle_always_on_top)
     tray.settings_requested.connect(open_settings_dialog)
-    tray.update_requested.connect(
-        lambda url: QDesktopServices.openUrl(QUrl(url))
-    )
+    tray.update_requested.connect(start_one_click_update)
     tray.quit_requested.connect(request_quit)
 
     widget.settings_requested.connect(open_settings_dialog)
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
     widget.view_mode_changed.connect(handle_view_mode_changed)
-    widget.update_requested.connect(
-        lambda url: QDesktopServices.openUrl(QUrl(url))
-    )
+    widget.update_requested.connect(start_one_click_update)
     widget.quit_requested.connect(request_quit)
 
     print("[SynapCap] HUD Application with GUI Settings started successfully.")
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

@@ -24,11 +24,7 @@ class SettingsDialogTests(unittest.TestCase):
         self.app.processEvents()
 
     def _provider_item(self, provider_id: str) -> dict:
-        return next(
-            item
-            for item in self.dialog.provider_widgets
-            if item["id"] == provider_id
-        )
+        return next(item for item in self.dialog.provider_widgets if item["id"] == provider_id)
 
     def test_codex_only_allows_weekly_window(self):
         item = self._provider_item("codex")
@@ -56,15 +52,22 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertIn("설치 및 로컬 로그인 필요", item["connection_label"].text())
 
     def test_settings_window_uses_shared_custom_title_bar(self):
-        self.assertTrue(
-            self.dialog.windowFlags() & Qt.WindowType.FramelessWindowHint
-        )
+        self.assertTrue(self.dialog.windowFlags() & Qt.WindowType.FramelessWindowHint)
         self.assertEqual(self.dialog.title_bar.height(), 38)
         self.assertEqual(self.dialog.title_bar.close_button.text(), "×")
 
         self.dialog.title_bar.close_button.click()
 
         self.assertEqual(self.dialog.result(), QDialog.DialogCode.Rejected)
+
+    def test_settings_window_uses_cross_platform_fusion_controls(self):
+        self.assertEqual(
+            QApplication.instance().style().metaObject().className(),
+            "QFusionStyle",
+        )
+
+        item = self._provider_item("codex")
+        self.assertFalse(item["type_combo"].itemIcon(0).isNull())
 
 
 if __name__ == "__main__":

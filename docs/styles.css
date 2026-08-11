@@ -86,6 +86,7 @@ h1 span { color: var(--blue); }
 .provider { padding: 2px 0; }
 .provider-name { gap: 7px; margin-bottom: 6px; font-size: 13px; }
 .preview-provider-badge { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; font-size: 9px; font-style: normal; font-weight: 850; }
+.preview-provider-badge img { width: 13px; height: 13px; display: block; }
 .codex-badge { background: #252b3f; color: var(--blue); }
 .gemini-badge { background: #26372f; color: var(--green); }
 .claude-badge { background: #3a2b2b; color: #fab387; }
@@ -151,6 +152,7 @@ h1 span { color: var(--blue); }
 .requirement-list > div { min-height: 86px; padding: 0 22px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border); }
 .requirement-list > div:last-child { border-bottom: 0; }
 .service-letter { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; background: rgba(137,180,250,.12); color: var(--blue); font-size: 11px; font-weight: 850; }
+.service-letter img { width: 18px; height: 18px; display: block; }
 .gemini-letter { color: var(--green); background: rgba(166,227,161,.1); }
 .claude-letter { color: #fab387; background: rgba(250,179,135,.1); }
 .claude-letter { color: #fab387; background: rgba(250,179,135,.1); }

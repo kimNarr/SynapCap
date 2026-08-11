@@ -1,22 +1,32 @@
 import re
 from datetime import datetime, timedelta
 
-from PySide6.QtCore import QEvent, Qt, QPoint, QRectF, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame,
-    QPushButton, QToolTip
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QToolTip,
+    QVBoxLayout,
+    QWidget,
 )
-from .icon import (
-    create_app_pixmap,
-    create_refresh_icon,
-    create_usage_view_icon,
-    create_settings_icon,
-    create_close_icon,
-    create_minimize_icon,
-)
+
 from providers import BaseAIProvider, ModelUsage, UsageWindow
 from version import APP_VERSION
+
+from .icon import (
+    create_app_pixmap,
+    create_arrow_down_icon,
+    create_close_icon,
+    create_minimize_icon,
+    create_provider_pixmap,
+    create_refresh_icon,
+    create_settings_icon,
+    create_usage_view_icon,
+)
 
 SIZE_PRESETS = {
     "Small": {
@@ -45,13 +55,7 @@ SIZE_PRESETS = {
         "pbar_height": 10,
         "badge_size": 34,
         "card_padding": 12,
-    }
-}
-
-PROVIDER_BADGES = {
-    "codex": ("Cx", "#89B4FA", "#252B3F"),
-    "antigravity": ("G", "#A6E3A1", "#26372F"),
-    "claude": ("Cl", "#FAB387", "#3A2B2B"),
+    },
 }
 
 
@@ -91,6 +95,7 @@ class UsageRing(QWidget):
 
         painter.end()
 
+
 class SynapCapWidget(QWidget):
     settings_requested = Signal()
     refresh_requested = Signal()
@@ -105,10 +110,11 @@ class SynapCapWidget(QWidget):
         self.drag_position = QPoint()
         self.provider_ui_map = {}
         self._update_url = ""
+        self._update_version = ""
         self._shutdown_in_progress = False
-        configured_view = self.config_data.get("settings", {}).get(
-            "usage_view", "bar"
-        )
+        self.is_compact = False
+        self.compact_ui_map = {}
+        configured_view = self.config_data.get("settings", {}).get("usage_view", "bar")
         self.usage_view = configured_view if configured_view in {"bar", "ring"} else "bar"
         self.latest_usage: list[ModelUsage] = []
         self._fit_timer = QTimer(self)
@@ -120,13 +126,14 @@ class SynapCapWidget(QWidget):
     def init_ui(self):
         # Frameless Window & Translucent Background
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.Window |
-            (
+            Qt.WindowType.FramelessWindowHint
+            |
+            # Tool windows stay out of the Windows taskbar and Alt+Tab list;
+            # SynapCap is controlled from its notification-area tray icon.
+            Qt.WindowType.Tool
+            | (
                 Qt.WindowType.WindowStaysOnTopHint
-                if self.config_data.get("settings", {}).get(
-                    "always_on_top", True
-                )
+                if self.config_data.get("settings", {}).get("always_on_top", True)
                 else Qt.WindowType(0)
             )
         )
@@ -137,6 +144,7 @@ class SynapCapWidget(QWidget):
         preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
 
         width = settings.get("widget_width", preset["width"])
+        self._expanded_width = width
         self.setFixedWidth(width)
 
         # Outer Frame with Rounded Corners & Modern Styling
@@ -153,9 +161,13 @@ class SynapCapWidget(QWidget):
                 background: transparent;
             }
             QFrame#rootFrame {
-                background-color: #1E1E2E;
-                border: 1px solid #313244;
+                background-color: #202033;
+                border: 1px solid #585B70;
                 border-radius: 16px;
+            }
+            QWidget#compactBar {
+                background-color: #242438;
+                border-radius: 9px;
             }
             QFrame#providersFrame {
                 background-color: #181825;
@@ -174,7 +186,9 @@ class SynapCapWidget(QWidget):
         self.frame_layout.setSpacing(10)
 
         # 1. Header (Title & Controls)
-        header_layout = QHBoxLayout()
+        self.header_widget = QWidget()
+        header_layout = QHBoxLayout(self.header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(3)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
@@ -201,9 +215,7 @@ class SynapCapWidget(QWidget):
             self.version_btn,
             f"현재 버전 v{APP_VERSION}",
         )
-        header_layout.addWidget(
-            self.version_btn, 0, Qt.AlignmentFlag.AlignVCenter
-        )
+        header_layout.addWidget(self.version_btn, 0, Qt.AlignmentFlag.AlignVCenter)
 
         header_layout.addStretch()
 
@@ -224,9 +236,7 @@ class SynapCapWidget(QWidget):
         self.view_btn.setStyleSheet(btn_style)
         self.view_btn.clicked.connect(self._toggle_usage_view)
         self._update_view_button()
-        self._enable_instant_tooltip(
-            self.view_btn, self.view_btn.toolTip()
-        )
+        self._enable_instant_tooltip(self.view_btn, self.view_btn.toolTip())
         header_layout.addWidget(self.view_btn)
 
         # 1) 지금 새로고침 버튼 (Refresh Now Vector Icon Button)
@@ -235,9 +245,7 @@ class SynapCapWidget(QWidget):
         self.refresh_btn.setIcon(create_refresh_icon(14, "#89B4FA"))
         self.refresh_btn.setStyleSheet(btn_style)
         self.refresh_btn.clicked.connect(self.refresh_requested.emit)
-        self._enable_instant_tooltip(
-            self.refresh_btn, "지금 새로고침"
-        )
+        self._enable_instant_tooltip(self.refresh_btn, "지금 새로고침")
         header_layout.addWidget(self.refresh_btn)
 
         # 2) Settings Button (⚙ Vector Icon)
@@ -253,10 +261,8 @@ class SynapCapWidget(QWidget):
         self.minimize_btn.setFixedSize(22, 22)
         self.minimize_btn.setIcon(create_minimize_icon(14, "#A6ADC8"))
         self.minimize_btn.setStyleSheet(btn_style)
-        self.minimize_btn.clicked.connect(self.showMinimized)
-        self._enable_instant_tooltip(
-            self.minimize_btn, "작업 표시줄로 최소화"
-        )
+        self.minimize_btn.clicked.connect(self.enter_compact_mode)
+        self._enable_instant_tooltip(self.minimize_btn, "가로 요약으로 접기")
         header_layout.addWidget(self.minimize_btn)
 
         self.close_btn = QPushButton()
@@ -264,12 +270,55 @@ class SynapCapWidget(QWidget):
         self.close_btn.setIcon(create_close_icon(14, "#EBA0AC"))
         self.close_btn.setStyleSheet(btn_style)
         self.close_btn.clicked.connect(self.quit_requested.emit)
-        self._enable_instant_tooltip(
-            self.close_btn, "SynapCap 완전 종료"
-        )
+        self._enable_instant_tooltip(self.close_btn, "SynapCap 완전 종료")
         header_layout.addWidget(self.close_btn)
 
-        self.frame_layout.addLayout(header_layout)
+        self.frame_layout.addWidget(self.header_widget)
+
+        self.compact_bar = QWidget()
+        self.compact_bar.setObjectName("compactBar")
+        compact_layout = QHBoxLayout(self.compact_bar)
+        compact_layout.setContentsMargins(3, 1, 1, 1)
+        compact_layout.setSpacing(8)
+        compact_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        self.compact_logo = QLabel()
+        self.compact_logo.setPixmap(create_app_pixmap(20))
+        self.compact_logo.setFixedSize(20, 20)
+        self.compact_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        compact_layout.addWidget(self.compact_logo)
+
+        self.compact_items_layout = QHBoxLayout()
+        self.compact_items_layout.setContentsMargins(0, 0, 0, 0)
+        self.compact_items_layout.setSpacing(8)
+        compact_layout.addLayout(self.compact_items_layout)
+        compact_layout.addStretch()
+
+        compact_btn_style = """
+            QPushButton {
+                border: none;
+                background: transparent;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #313244; }
+        """
+        self.expand_btn = QPushButton()
+        self.expand_btn.setFixedSize(24, 24)
+        self.expand_btn.setIcon(create_arrow_down_icon(14, "#89B4FA"))
+        self.expand_btn.setStyleSheet(compact_btn_style)
+        self.expand_btn.clicked.connect(self.exit_compact_mode)
+        self._enable_instant_tooltip(self.expand_btn, "전체 위젯 펼치기")
+        compact_layout.addWidget(self.expand_btn)
+
+        self.compact_close_btn = QPushButton()
+        self.compact_close_btn.setFixedSize(24, 24)
+        self.compact_close_btn.setIcon(create_close_icon(14, "#EBA0AC"))
+        self.compact_close_btn.setStyleSheet(compact_btn_style)
+        self.compact_close_btn.clicked.connect(self.quit_requested.emit)
+        self._enable_instant_tooltip(self.compact_close_btn, "SynapCap 완전 종료")
+        compact_layout.addWidget(self.compact_close_btn)
+        self.compact_bar.hide()
+        self.frame_layout.addWidget(self.compact_bar)
 
         # 2. Dynamic Provider Cards Container
         self.cards_frame = QFrame()
@@ -280,10 +329,11 @@ class SynapCapWidget(QWidget):
         self.cards_frame.setLayout(self.cards_layout)
 
         self._build_provider_cards()
+        self._build_compact_items()
 
         self.frame_layout.addWidget(self.cards_frame)
         outer_layout.addWidget(self.frame)
-        
+
         self._schedule_fit_to_content()
 
     def _schedule_fit_to_content(self) -> None:
@@ -302,6 +352,98 @@ class SynapCapWidget(QWidget):
         self.cards_frame.adjustSize()
         self.frame.adjustSize()
         self.adjustSize()
+
+    def _build_compact_items(self) -> None:
+        self.compact_ui_map.clear()
+        while self.compact_items_layout.count():
+            item = self.compact_items_layout.takeAt(0)
+            if item is not None and item.widget() is not None:
+                widget = item.widget()
+                assert widget is not None
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
+
+        for provider in self.providers:
+            provider_type = provider.config.get("type", provider.provider_id)
+            item_widget = QWidget()
+            item_layout = QHBoxLayout(item_widget)
+            item_layout.setContentsMargins(0, 0, 0, 0)
+            item_layout.setSpacing(5)
+            item_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+            icon_label = QLabel()
+            icon_label.setFixedSize(22, 22)
+            icon_label.setPixmap(create_provider_pixmap(provider_type, 22))
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            icon_label.setToolTip(provider.name)
+            item_layout.addWidget(icon_label)
+
+            value_label = QLabel("—")
+            value_label.setMinimumWidth(27)
+            value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            value_label.setStyleSheet("color: #CDD6F4; font-size: 11px; font-weight: 800;")
+            item_layout.addWidget(value_label)
+            self.compact_items_layout.addWidget(item_widget)
+            self.compact_ui_map[provider.provider_id] = {
+                "value": value_label,
+                "item": item_widget,
+                "provider_type": provider_type,
+            }
+
+    def enter_compact_mode(self) -> None:
+        if self.is_compact:
+            return
+        self.is_compact = True
+        self.header_widget.hide()
+        self.cards_frame.hide()
+        self.compact_bar.show()
+        self._expanded_width = self.width()
+        self._apply_compact_width()
+        self.frame_layout.setContentsMargins(8, 8, 7, 8)
+        self.frame_layout.setSpacing(0)
+        self._refresh_compact_values()
+        self._schedule_fit_to_content()
+
+    def exit_compact_mode(self) -> None:
+        if not self.is_compact:
+            return
+        self.is_compact = False
+        self.compact_bar.hide()
+        self.header_widget.show()
+        self.cards_frame.show()
+        self.setFixedWidth(self._expanded_width)
+        self.frame_layout.setContentsMargins(12, 14, 12, 12)
+        self.frame_layout.setSpacing(10)
+        self._schedule_fit_to_content()
+
+    def _apply_compact_width(self) -> None:
+        minimum_width = 112 + (60 * len(self.providers))
+        self.setFixedWidth(max(self._expanded_width, minimum_width))
+
+    def _refresh_compact_values(self) -> None:
+        usage_by_provider = {usage.provider_id: usage for usage in self.latest_usage}
+        for provider_id, compact_ui in self.compact_ui_map.items():
+            usage = usage_by_provider.get(provider_id)
+            value_label = compact_ui["value"]
+            if usage is None:
+                value_label.setText("—")
+                value_label.setStyleSheet("color: #CDD6F4; font-size: 11px; font-weight: 800;")
+                value_label.setToolTip("사용량을 불러오는 중")
+                continue
+            if usage.error:
+                value_label.setText("!")
+                value_label.setStyleSheet("color: #F38BA8; font-size: 12px; font-weight: 800;")
+                value_label.setToolTip(usage.error)
+                continue
+
+            provider_ui = self.provider_ui_map.get(provider_id, {})
+            windows = self._visible_usage_windows(provider_ui, usage.windows or [])
+            used = max((window.used for window in windows), default=usage.used)
+            color = self._usage_color(used)
+            value_label.setText(f"{used:.0f}%")
+            value_label.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: 800;")
+            value_label.setToolTip(f"{usage.provider_name} · {used:.0f}% 사용")
 
     def _update_view_button(self):
         target_view = "ring" if self.usage_view == "bar" else "bar"
@@ -326,11 +468,19 @@ class SynapCapWidget(QWidget):
 
     def set_update_available(self, version: str, url: str) -> None:
         self._update_url = url
+        self._update_version = version
+        self.version_btn.setEnabled(True)
         self.version_btn.setText(f"v{version} ↑")
-        self.version_btn.setToolTip(
-            f"새 버전 v{version} 다운로드 페이지 열기"
-        )
+        self.version_btn.setToolTip(f"새 버전 v{version} 다운로드 및 설치")
         self._set_version_badge_style(True)
+
+    def set_update_progress(self, version: str, percent: int) -> None:
+        self.version_btn.setEnabled(False)
+        self.version_btn.setText(f"↓ {percent}%")
+        self.version_btn.setToolTip(f"v{version} 다운로드 중 · {percent}%")
+
+    def restore_update_available(self, version: str, url: str) -> None:
+        self.set_update_available(version, url)
 
     def _open_update(self):
         if self._update_url:
@@ -362,8 +512,9 @@ class SynapCapWidget(QWidget):
         # Clear existing card widgets in layout
         while self.cards_layout.count():
             item = self.cards_layout.takeAt(0)
-            if item.widget():
+            if item is not None and item.widget() is not None:
                 widget = item.widget()
+                assert widget is not None
                 widget.hide()
                 widget.setParent(None)
                 widget.deleteLater()
@@ -372,9 +523,7 @@ class SynapCapWidget(QWidget):
             card_widget = QWidget()
             c_layout = QVBoxLayout(card_widget)
             card_padding = preset["card_padding"]
-            c_layout.setContentsMargins(
-                card_padding, card_padding, card_padding, card_padding
-            )
+            c_layout.setContentsMargins(card_padding, card_padding, card_padding, card_padding)
             c_layout.setSpacing(7)
 
             # Title Row (LED Status Dot + Provider Name + Usage & Status Text)
@@ -383,20 +532,10 @@ class SynapCapWidget(QWidget):
             title_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
             provider_type = provider.config.get("type", provider.provider_id)
-            badge_text, badge_color, badge_background = PROVIDER_BADGES.get(
-                provider_type,
-                (provider.name[:2], "#CDD6F4", "#313244"),
-            )
-            provider_badge = QLabel(badge_text)
+            provider_badge = QLabel()
             provider_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            provider_badge.setFixedSize(
-                preset["badge_size"], preset["badge_size"]
-            )
-            provider_badge.setStyleSheet(
-                f"background-color: {badge_background}; color: {badge_color}; "
-                f"border-radius: 7px; font-size: {max(9, preset['val_size'])}px; "
-                "font-weight: 800;"
-            )
+            provider_badge.setFixedSize(preset["badge_size"], preset["badge_size"])
+            provider_badge.setPixmap(create_provider_pixmap(provider_type, preset["badge_size"]))
             provider_badge.setToolTip(provider.name)
             title_row.addWidget(provider_badge)
 
@@ -433,22 +572,18 @@ class SynapCapWidget(QWidget):
                 "status": status_label,
                 "windows_layout": windows_layout,
                 "window_rows": [],
-                "show_five_hour": provider.config.get(
-                    "show_five_hour", provider_type != "codex"
-                ),
+                "show_five_hour": provider.config.get("show_five_hour", provider_type != "codex"),
                 "show_weekly": provider.config.get("show_weekly", True),
                 "limit": provider.limit,
-                "unit": provider.unit
+                "unit": provider.unit,
             }
 
             if index < len(self.providers) - 1:
                 separator = QFrame()
                 separator.setFixedHeight(1)
-                separator.setStyleSheet(
-                    "background-color: #313244; border: none;"
-                )
+                separator.setStyleSheet("background-color: #313244; border: none;")
                 self.cards_layout.addWidget(separator)
-            
+
         self._schedule_fit_to_content()
 
     @staticmethod
@@ -457,9 +592,7 @@ class SynapCapWidget(QWidget):
             "waiting": ("#F9E2AF", "#323040"),
             "error": ("#F38BA8", "#3B2735"),
         }
-        foreground, background = colors.get(
-            state, ("#A6E3A1", "#26372F")
-        )
+        foreground, background = colors.get(state, ("#A6E3A1", "#26372F"))
         label.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
             "border-radius: 6px; padding: 3px 7px; "
@@ -487,12 +620,20 @@ class SynapCapWidget(QWidget):
         preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
 
         width = settings.get("widget_width", preset["width"])
+        self._expanded_width = width
         self.setFixedWidth(width)
         self.set_always_on_top(settings.get("always_on_top", True))
 
         self._build_provider_cards()
+        self._build_compact_items()
         if preserved_usage:
             self.update_data(preserved_usage, force=True)
+        if self.is_compact:
+            self.header_widget.hide()
+            self.cards_frame.hide()
+            self.compact_bar.show()
+            self._apply_compact_width()
+            self._refresh_compact_values()
         self._schedule_fit_to_content()
 
     @staticmethod
@@ -530,9 +671,7 @@ class SynapCapWidget(QWidget):
     def eventFilter(self, watched, event):
         if watched.property("instantTooltip"):
             if event.type() == QEvent.Type.Enter:
-                tooltip_position = watched.mapToGlobal(
-                    QPoint(0, watched.height() + 4)
-                )
+                tooltip_position = watched.mapToGlobal(QPoint(0, watched.height() + 4))
                 QToolTip.showText(
                     tooltip_position,
                     watched.toolTip(),
@@ -553,9 +692,7 @@ class SynapCapWidget(QWidget):
         return "#89B4FA"
 
     @staticmethod
-    def _visible_usage_windows(
-        ui: dict, windows: list[UsageWindow]
-    ) -> list[UsageWindow]:
+    def _visible_usage_windows(ui: dict, windows: list[UsageWindow]) -> list[UsageWindow]:
         visible = []
         for window in windows:
             normalized_label = window.label.lower().replace(" ", "")
@@ -630,22 +767,16 @@ class SynapCapWidget(QWidget):
         preset: dict,
     ):
         self._clear_usage_rows(ui)
-        usage_value_bold = self.config_data.get("settings", {}).get(
-            "usage_value_bold", True
-        )
+        usage_value_bold = self.config_data.get("settings", {}).get("usage_value_bold", True)
         usage_value_weight = 700 if usage_value_bold else 400
 
         for window in windows:
             row_widget = QWidget()
             remaining = (
-                window.remaining
-                if window.remaining is not None
-                else max(0.0, 100.0 - window.used)
+                window.remaining if window.remaining is not None else max(0.0, 100.0 - window.used)
             )
             usage_tooltip = f"{window.used:.0f}% 사용 · {remaining:.0f}% 남음"
-            reset_display, reset_tooltip = self._reset_presentation(
-                window.reset_text
-            )
+            reset_display, reset_tooltip = self._reset_presentation(window.reset_text)
             color = self._usage_color(window.used)
 
             if self.usage_view == "ring":
@@ -658,9 +789,7 @@ class SynapCapWidget(QWidget):
                 details_layout.setSpacing(1)
 
                 window_label = QLabel(window.label)
-                window_label.setStyleSheet(
-                    f"color: #CDD6F4; font-size: {preset['val_size']}px;"
-                )
+                window_label.setStyleSheet(f"color: #CDD6F4; font-size: {preset['val_size']}px;")
                 details_layout.addWidget(window_label)
 
                 if not reset_display:
@@ -690,16 +819,10 @@ class SynapCapWidget(QWidget):
                 info_layout.setContentsMargins(0, 0, 0, 0)
                 info_layout.setSpacing(6)
 
-                reset_suffix = (
-                    f" · {reset_display}"
-                    if reset_display
-                    else " · 리셋 시각 미상"
-                )
+                reset_suffix = f" · {reset_display}" if reset_display else " · 리셋 시각 미상"
                 window_label = QLabel(f"{window.label}{reset_suffix}")
                 self._enable_instant_tooltip(window_label, reset_tooltip)
-                window_label.setStyleSheet(
-                    f"color: #A6ADC8; font-size: {preset['val_size']}px;"
-                )
+                window_label.setStyleSheet(f"color: #A6ADC8; font-size: {preset['val_size']}px;")
                 info_layout.addWidget(window_label)
                 info_layout.addStretch()
 
@@ -728,9 +851,7 @@ class SynapCapWidget(QWidget):
         usage_list: list[ModelUsage],
         force: bool = False,
     ):
-        previous_usage = {
-            usage.provider_id: usage for usage in self.latest_usage
-        }
+        previous_usage = {usage.provider_id: usage for usage in self.latest_usage}
         self.latest_usage = list(usage_list)
         settings = self.config_data.get("settings", {})
         size_key = settings.get("widget_size", "Medium")
@@ -769,15 +890,9 @@ class SynapCapWidget(QWidget):
                         label="사용량",
                         used=usage.used,
                         reset_text=(
-                            ""
-                            if usage.status_text in (None, "연결됨")
-                            else usage.status_text
+                            "" if usage.status_text in (None, "연결됨") else usage.status_text
                         ),
-                        remaining=(
-                            max(0.0, 100.0 - usage.used)
-                            if usage.unit == "%"
-                            else None
-                        ),
+                        remaining=(max(0.0, 100.0 - usage.used) if usage.unit == "%" else None),
                     )
                 ]
                 visible_windows = self._visible_usage_windows(ui, windows)
@@ -786,26 +901,25 @@ class SynapCapWidget(QWidget):
                 else:
                     ui["status"].show()
                     ui["status"].setText("한도 정보 없음")
-                    ui["status"].setToolTip(
-                        "선택한 표시 한도를 서비스에서 제공하지 않았습니다."
-                    )
+                    ui["status"].setToolTip("선택한 표시 한도를 서비스에서 제공하지 않았습니다.")
                     self._set_status_badge(ui["status"], "waiting", preset)
                     self._clear_usage_rows(ui)
 
         if not rendered_provider:
+            self._refresh_compact_values()
             return
 
         self.cards_layout.activate()
         self.frame_layout.activate()
-        if self.layout() is not None:
-            self.layout().activate()
+        root_layout = self.layout()
+        if root_layout is not None:
+            root_layout.activate()
+        self._refresh_compact_values()
         self.resize(self.width(), self.frame.sizeHint().height())
 
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
-        currently_enabled = bool(
-            flags & Qt.WindowType.WindowStaysOnTopHint
-        )
+        currently_enabled = bool(flags & Qt.WindowType.WindowStaysOnTopHint)
         if currently_enabled == always_on_top:
             return
         if always_on_top:

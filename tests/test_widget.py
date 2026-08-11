@@ -8,7 +8,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtWidgets import QApplication, QLabel, QProgressBar
 
-from providers import CodexProvider, ModelUsage, UsageWindow
+from providers import (
+    AntigravityProvider,
+    ClaudeProvider,
+    CodexProvider,
+    ModelUsage,
+    UsageWindow,
+)
 from ui.widget import SynapCapWidget, UsageRing
 from version import APP_VERSION
 
@@ -65,9 +71,7 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("49%", labels)
         self.assertNotIn("사용 49%", labels)
         self.assertEqual(len(row.findChildren(QProgressBar)), 1)
-        usage_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "49%"
-        )
+        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
         self.assertIn("font-weight: 700", usage_label.styleSheet())
 
         self.widget._toggle_usage_view()
@@ -79,9 +83,7 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(len(rings), 1)
         self.assertEqual(rings[0].value_text, "49%")
         self.assertEqual(len(self.widget.findChildren(QProgressBar)), 0)
-        self.assertEqual(
-            self.widget.config_data["settings"]["usage_view"], "ring"
-        )
+        self.assertEqual(self.widget.config_data["settings"]["usage_view"], "ring")
 
         self.widget._toggle_usage_view()
         self.app.processEvents()
@@ -93,9 +95,7 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data([self.usage])
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        usage_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "49%"
-        )
+        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
         self.assertIn("font-weight: 400", usage_label.styleSheet())
 
     def test_missing_cli_is_labeled_as_install_required(self):
@@ -122,9 +122,7 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(progress.toolTip(), "49% 사용 · 51% 남음")
         with patch("ui.widget.QToolTip.showText") as show_text:
-            self.widget.eventFilter(
-                progress, QEvent(QEvent.Type.Enter)
-            )
+            self.widget.eventFilter(progress, QEvent(QEvent.Type.Enter))
 
         show_text.assert_called_once()
 
@@ -134,14 +132,10 @@ class WidgetTests(unittest.TestCase):
         )
 
         with patch("ui.widget.QToolTip.showText") as show_text:
-            self.widget.eventFilter(
-                self.widget.version_btn, QEvent(QEvent.Type.Enter)
-            )
+            self.widget.eventFilter(self.widget.version_btn, QEvent(QEvent.Type.Enter))
 
         self.assertEqual(show_text.call_args.args[0], expected_position)
-        self.assertEqual(
-            show_text.call_args.args[1], f"현재 버전 v{APP_VERSION}"
-        )
+        self.assertEqual(show_text.call_args.args[1], f"현재 버전 v{APP_VERSION}")
 
     def test_usage_windows_can_be_filtered_per_provider(self):
         ui = {"show_five_hour": False, "show_weekly": True}
@@ -171,19 +165,83 @@ class WidgetTests(unittest.TestCase):
             ["https://github.com/kimNarr/SynapCap/releases/tag/v0.1.1"],
         )
 
-    def test_header_uses_minimize_and_exit_controls(self):
+    def test_version_badge_shows_download_progress_and_recovers(self):
+        url = "https://github.com/kimNarr/SynapCap/releases/tag/v0.2.0"
+        self.widget.set_update_available("0.2.0", url)
+
+        self.widget.set_update_progress("0.2.0", 42)
+
+        self.assertEqual(self.widget.version_btn.text(), "↓ 42%")
+        self.assertFalse(self.widget.version_btn.isEnabled())
+
+        self.widget.restore_update_available("0.2.0", url)
+
+        self.assertEqual(self.widget.version_btn.text(), "v0.2.0 ↑")
+        self.assertTrue(self.widget.version_btn.isEnabled())
+
+    def test_header_uses_compact_and_exit_controls(self):
         quit_requests = []
         self.widget.quit_requested.connect(lambda: quit_requests.append(True))
 
-        self.assertEqual(self.widget.windowType(), Qt.WindowType.Window)
+        self.assertEqual(self.widget.windowType(), Qt.WindowType.Tool)
+        self.assertTrue(self.widget.windowFlags() & Qt.WindowType.Tool)
         self.assertEqual(self.widget.version_btn.height(), 20)
         self.widget.minimize_btn.click()
         self.app.processEvents()
-        self.assertTrue(self.widget.isMinimized())
+        self.assertTrue(self.widget.is_compact)
+        self.assertTrue(self.widget.compact_bar.isVisible())
+        self.assertFalse(self.widget.cards_frame.isVisible())
+        self.assertFalse(self.widget.isMinimized())
 
-        self.widget.showNormal()
+        self.widget.expand_btn.click()
+        self.app.processEvents()
+        self.assertFalse(self.widget.is_compact)
+        self.assertTrue(self.widget.cards_frame.isVisible())
         self.widget.close_btn.click()
         self.assertEqual(quit_requests, [True])
+
+    def test_compact_bar_shows_latest_provider_usage(self):
+        self.widget.update_data([self.usage])
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        compact_value = self.widget.compact_ui_map["codex"]["value"]
+        self.assertEqual(compact_value.text(), "49%")
+        self.assertIn("Codex", compact_value.toolTip())
+        self.assertIn("font-size: 11px", compact_value.styleSheet())
+        self.assertEqual(self.widget.compact_logo.size().width(), 20)
+        self.assertEqual(self.widget.expand_btn.height(), 24)
+        self.assertGreaterEqual(self.widget.frame.height(), 40)
+        self.assertIn("border: 1px solid #585B70", self.widget.frame.styleSheet())
+
+    def test_compact_bar_expands_small_width_for_three_providers(self):
+        widget = SynapCapWidget(
+            {
+                "settings": {
+                    "widget_size": "Small",
+                    "widget_width": 260,
+                    "always_on_top": False,
+                    "usage_view": "bar",
+                }
+            },
+            [
+                CodexProvider({"id": "codex", "name": "Codex"}),
+                AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+                ClaudeProvider({"id": "claude", "name": "Claude"}),
+            ],
+        )
+        widget.show()
+        self.app.processEvents()
+
+        widget.enter_compact_mode()
+        self.app.processEvents()
+
+        self.assertGreaterEqual(widget.width(), 292)
+        widget.exit_compact_mode()
+        self.app.processEvents()
+        self.assertEqual(widget.width(), 260)
+        widget.close()
+        widget.deleteLater()
 
     def test_confirmed_shutdown_does_not_request_quit_again(self):
         quit_requests = []
@@ -232,9 +290,7 @@ class WidgetTests(unittest.TestCase):
         )
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        usage_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "49%"
-        )
+        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
         self.assertIn("font-weight: 400", usage_label.styleSheet())
 
     def test_rebuild_shrinks_after_provider_is_removed(self):
