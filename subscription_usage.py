@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import queue
 import re
 import shutil
@@ -65,7 +66,11 @@ def _cli_search_directories() -> tuple[Path, ...]:
 
     for value in os.environ.get("PATH", "").split(os.pathsep):
         if value:
-            directories.append(Path(value).expanduser())
+            directory = Path(value).expanduser()
+            if sys.platform != "darwin" or _safe_macos_cli_directory(
+                directory, home
+            ):
+                directories.append(directory)
 
     directories.extend(
         (
@@ -89,6 +94,26 @@ def _cli_search_directories() -> tuple[Path, ...]:
             seen.add(key)
             unique.append(directory)
     return tuple(unique)
+
+
+def _safe_macos_cli_directory(directory: Path, home: Path) -> bool:
+    """Avoid probing protected folders and mounted volumes while locating CLIs."""
+    path = posixpath.abspath(str(directory).replace("\\", "/"))
+    home_path = posixpath.abspath(str(home).replace("\\", "/"))
+    protected_roots = (
+        posixpath.join(home_path, "Desktop"),
+        posixpath.join(home_path, "Documents"),
+        posixpath.join(home_path, "Downloads"),
+        posixpath.join(home_path, "Movies"),
+        posixpath.join(home_path, "Music"),
+        posixpath.join(home_path, "Pictures"),
+        "/Network",
+        "/Volumes",
+        "/net",
+    )
+    return not any(
+        path == root or path.startswith(root + "/") for root in protected_roots
+    )
 
 
 def _cli_search_path() -> str:
@@ -464,6 +489,21 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     work_dir = Path(tempfile.gettempdir()) / "SynapCap" / "antigravity"
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
+        isolated_cli_home = work_dir / "cli-home"
+        isolated_mcp_dir = isolated_cli_home / ".gemini" / "config"
+        isolated_mcp_dir.mkdir(parents=True, exist_ok=True)
+        isolated_mcp_config = isolated_mcp_dir / "mcp_config.json"
+        isolated_mcp_text = '{"mcpServers":{}}\n'
+        if (
+            not isolated_mcp_config.is_file()
+            or isolated_mcp_config.read_text(encoding="utf-8")
+            != isolated_mcp_text
+        ):
+            isolated_mcp_config.write_text(
+                isolated_mcp_text,
+                encoding="utf-8",
+            )
+
         serena_home = work_dir / "serena-home"
         serena_home.mkdir(parents=True, exist_ok=True)
         serena_config = serena_home / "serena_config.yml"
@@ -483,6 +523,23 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
             )
 
         env_overrides = {"SERENA_HOME": str(serena_home)}
+        if os.name == "nt":
+            env_overrides.update(
+                {
+                    "USERPROFILE": str(isolated_cli_home),
+                    "APPDATA": str(isolated_cli_home / "AppData" / "Roaming"),
+                    "LOCALAPPDATA": str(isolated_cli_home / "AppData" / "Local"),
+                }
+            )
+        else:
+            env_overrides.update(
+                {
+                    "HOME": str(isolated_cli_home),
+                    "XDG_CONFIG_HOME": str(isolated_cli_home / ".config"),
+                    "XDG_DATA_HOME": str(isolated_cli_home / ".local" / "share"),
+                    "XDG_CACHE_HOME": str(isolated_cli_home / ".cache"),
+                }
+            )
         serena_command = shutil.which("serena", path=_cli_search_path())
         if serena_command and '"' not in serena_command:
             wrapper_dir = work_dir / "hidden-tools"
@@ -523,7 +580,16 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
             "Antigravity 임시 실행 환경 준비 실패"
         ) from exc
     output = _run_text_command(
-        [str(executable), "--print", "/usage", "--print-timeout", "25s"],
+        [
+            str(executable),
+            "--sandbox",
+            "--log-file",
+            str(work_dir / "agy.log"),
+            "--print",
+            "/usage",
+            "--print-timeout",
+            "25s",
+        ],
         float(config.get("timeout_sec", 35)),
         cwd=work_dir,
         env_overrides=env_overrides,
@@ -634,11 +700,27 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             *installed_versions,
         ),
     )
+    work_dir = Path(tempfile.gettempdir()) / "SynapCap" / "claude"
+    try:
+        work_dir.mkdir(parents=True, exist_ok=True)
+        mcp_config = work_dir / "empty-mcp.json"
+        mcp_config_text = '{"mcpServers":{}}\n'
+        if (
+            not mcp_config.is_file()
+            or mcp_config.read_text(encoding="utf-8") != mcp_config_text
+        ):
+            mcp_config.write_text(mcp_config_text, encoding="utf-8")
+    except OSError as exc:
+        raise SubscriptionUsageError("Claude 임시 실행 환경 준비 실패") from exc
+
     output = _run_text_command(
         [
             str(executable),
             "--safe-mode",
             "--no-chrome",
+            "--strict-mcp-config",
+            "--mcp-config",
+            str(mcp_config),
             "-p",
             "/usage",
             "--output-format",
@@ -648,6 +730,8 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             "--no-session-persistence",
         ],
         float(config.get("timeout_sec", 25)),
+        cwd=work_dir,
+        env_overrides={"MCP_CONNECTION_NONBLOCKING": "true"},
     )
 
     patterns = (
