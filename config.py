@@ -52,6 +52,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "enabled": True,
             "source": "local_subscription",
             "cache_ttl_sec": 60,
+            "show_five_hour": False,
+            "show_weekly": True,
             "limit": 100.0,
             "unit": "%"
         },
@@ -63,6 +65,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "source": "local_subscription",
             "quota_group": "Gemini Models",
             "cache_ttl_sec": 120,
+            "show_five_hour": True,
+            "show_weekly": True,
             "limit": 100.0,
             "unit": "%"
         },
@@ -73,6 +77,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "enabled": True,
             "source": "local_subscription",
             "cache_ttl_sec": 60,
+            "show_five_hour": True,
+            "show_weekly": True,
             "limit": 100.0,
             "unit": "%"
         }
@@ -116,6 +122,18 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
             data["settings"] = settings
             if "providers" not in data or not data["providers"]:
                 data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])
+            for provider in data["providers"]:
+                provider_type = provider.get("type", "codex")
+                if provider_type == "codex":
+                    provider["show_five_hour"] = False
+                    provider["show_weekly"] = True
+                    continue
+                show_five_hour = provider.get("show_five_hour", True)
+                show_weekly = provider.get("show_weekly", True)
+                provider["show_five_hour"] = bool(show_five_hour)
+                provider["show_weekly"] = bool(show_weekly)
+                if not provider["show_five_hour"] and not provider["show_weekly"]:
+                    provider["show_weekly"] = True
             if source_path != requested_path:
                 save_config(data, str(requested_path))
             return data

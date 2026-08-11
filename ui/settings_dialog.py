@@ -497,6 +497,54 @@ class SettingsDialog(QDialog):
         connection_label.setStyleSheet("color: #A6E3A1; font-size: 11px;")
         g_layout.addRow("연결 방식:", connection_label)
 
+        window_options = QWidget()
+        window_options_layout = QHBoxLayout(window_options)
+        window_options_layout.setContentsMargins(0, 0, 0, 0)
+        window_options_layout.setSpacing(14)
+        five_hour_check = QCheckBox("5시간")
+        weekly_check = QCheckBox("주간")
+        five_hour_check.setChecked(p_data.get("show_five_hour", True))
+        weekly_check.setChecked(p_data.get("show_weekly", True))
+        window_options_layout.addWidget(five_hour_check)
+        window_options_layout.addWidget(weekly_check)
+        window_options_layout.addStretch()
+        g_layout.addRow("표시할 한도:", window_options)
+
+        updating_window_options = False
+
+        def update_window_options(_checked=None):
+            nonlocal updating_window_options
+            if updating_window_options:
+                return
+            updating_window_options = True
+            try:
+                selected_type = type_combo.currentData() or "codex"
+                if selected_type == "codex":
+                    five_hour_check.setChecked(False)
+                    weekly_check.setChecked(True)
+                    five_hour_check.setEnabled(False)
+                    weekly_check.setEnabled(False)
+                    five_hour_check.setToolTip(
+                        "Codex는 현재 주간 한도만 제공합니다."
+                    )
+                    weekly_check.setToolTip(
+                        "Codex에서 제공하는 유일한 한도입니다."
+                    )
+                    return
+
+                if not five_hour_check.isChecked() and not weekly_check.isChecked():
+                    weekly_check.setChecked(True)
+                five_hour_check.setEnabled(weekly_check.isChecked())
+                weekly_check.setEnabled(five_hour_check.isChecked())
+                five_hour_check.setToolTip(
+                    "둘 중 하나 이상의 한도는 표시해야 합니다."
+                )
+                weekly_check.setToolTip(
+                    "둘 중 하나 이상의 한도는 표시해야 합니다."
+                )
+            finally:
+                updating_window_options = False
+
         def update_connection_mode(_index=None):
             selected_type = type_combo.currentData() or "codex"
             cli_name = {
@@ -507,8 +555,11 @@ class SettingsDialog(QDialog):
             connection_label.setText(
                 f"{cli_name}의 로컬 로그인 사용 · API 키 불필요"
             )
+            update_window_options()
 
         type_combo.currentIndexChanged.connect(update_connection_mode)
+        five_hour_check.toggled.connect(update_window_options)
+        weekly_check.toggled.connect(update_window_options)
         update_connection_mode()
 
         g_main_layout.addLayout(g_layout)
@@ -521,6 +572,8 @@ class SettingsDialog(QDialog):
             "type_combo": type_combo,
             "enabled_check": enabled_check,
             "name_edit": name_edit,
+            "five_hour_check": five_hour_check,
+            "weekly_check": weekly_check,
             "original_data": dict(p_data),
         }
 
@@ -592,6 +645,8 @@ class SettingsDialog(QDialog):
                 "name": pw["name_edit"].text().strip() or "AI Provider",
                 "type": selected_type_val,
                 "enabled": pw["enabled_check"].isChecked(),
+                "show_five_hour": pw["five_hour_check"].isChecked(),
+                "show_weekly": pw["weekly_check"].isChecked(),
                 "limit": 100.0,
                 "unit": "%",
             })

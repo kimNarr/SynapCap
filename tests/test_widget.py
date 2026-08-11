@@ -110,7 +110,19 @@ class WidgetTests(unittest.TestCase):
 
         show_text.assert_called_once()
 
+    def test_usage_windows_can_be_filtered_per_provider(self):
+        ui = {"show_five_hour": False, "show_weekly": True}
+        windows = [
+            UsageWindow("5시간", 10, "", 90),
+            UsageWindow("주간", 50, "", 50),
+        ]
+
+        visible = self.widget._visible_usage_windows(ui, windows)
+
+        self.assertEqual([window.label for window in visible], ["주간"])
+
     def test_missing_reset_is_shown_explicitly(self):
+        self.widget.provider_ui_map["codex"]["show_five_hour"] = True
         self.usage.windows = [UsageWindow("5시간", 0, "", 100)]
         self.widget.update_data([self.usage])
 

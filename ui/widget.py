@@ -362,6 +362,10 @@ class SynapCapWidget(QWidget):
                 "status": status_label,
                 "windows_layout": windows_layout,
                 "window_rows": [],
+                "show_five_hour": provider.config.get(
+                    "show_five_hour", provider_type != "codex"
+                ),
+                "show_weekly": provider.config.get("show_weekly", True),
                 "limit": provider.limit,
                 "unit": provider.unit
             }
@@ -473,6 +477,23 @@ class SynapCapWidget(QWidget):
         if used >= 60:
             return "#F9E2AF"
         return "#89B4FA"
+
+    @staticmethod
+    def _visible_usage_windows(
+        ui: dict, windows: list[UsageWindow]
+    ) -> list[UsageWindow]:
+        visible = []
+        for window in windows:
+            normalized_label = window.label.lower().replace(" ", "")
+            if "5시간" in normalized_label or "5hour" in normalized_label:
+                if ui["show_five_hour"]:
+                    visible.append(window)
+            elif "주간" in normalized_label or "week" in normalized_label:
+                if ui["show_weekly"]:
+                    visible.append(window)
+            else:
+                visible.append(window)
+        return visible
 
     @staticmethod
     def _reset_presentation(
@@ -666,7 +687,17 @@ class SynapCapWidget(QWidget):
                         ),
                     )
                 ]
-                self._render_usage_rows(ui, windows, preset)
+                visible_windows = self._visible_usage_windows(ui, windows)
+                if visible_windows:
+                    self._render_usage_rows(ui, visible_windows, preset)
+                else:
+                    ui["status"].show()
+                    ui["status"].setText("한도 정보 없음")
+                    ui["status"].setToolTip(
+                        "선택한 표시 한도를 서비스에서 제공하지 않았습니다."
+                    )
+                    self._set_status_badge(ui["status"], "waiting", preset)
+                    self._clear_usage_rows(ui)
 
         self.cards_layout.activate()
         self.frame_layout.activate()

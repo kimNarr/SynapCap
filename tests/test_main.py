@@ -51,6 +51,32 @@ class SettingsChangeTests(unittest.TestCase):
             _provider_query_settings_changed(previous, current)
         )
 
+    def test_window_visibility_does_not_require_query(self):
+        previous = {
+            "providers": [
+                {
+                    "id": "claude",
+                    "type": "claude",
+                    "show_five_hour": True,
+                    "show_weekly": True,
+                }
+            ]
+        }
+        current = {
+            "providers": [
+                {
+                    "id": "claude",
+                    "type": "claude",
+                    "show_five_hour": False,
+                    "show_weekly": True,
+                }
+            ]
+        }
+
+        self.assertFalse(
+            _provider_query_settings_changed(previous, current)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

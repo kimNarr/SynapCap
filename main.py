@@ -16,7 +16,14 @@ def _provider_settings_changed(previous: dict, current: dict) -> bool:
 
 
 def _provider_query_signature(config: dict) -> tuple:
-    ignored_keys = {"name", "limit", "unit", "source"}
+    ignored_keys = {
+        "name",
+        "limit",
+        "unit",
+        "source",
+        "show_five_hour",
+        "show_weekly",
+    }
     rows = []
     for provider in config.get("providers", []):
         query_settings = tuple(

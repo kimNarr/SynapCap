@@ -50,6 +50,38 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(settings["usage_view"], "bar")
             self.assertTrue(settings["usage_value_bold"])
 
+    def test_provider_window_visibility_is_normalized(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "providers": [
+                            {
+                                "id": "codex",
+                                "type": "codex",
+                                "show_five_hour": True,
+                                "show_weekly": False,
+                            },
+                            {
+                                "id": "claude",
+                                "type": "claude",
+                                "show_five_hour": False,
+                                "show_weekly": False,
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            providers = load_config(str(path))["providers"]
+
+            self.assertFalse(providers[0]["show_five_hour"])
+            self.assertTrue(providers[0]["show_weekly"])
+            self.assertFalse(providers[1]["show_five_hour"])
+            self.assertTrue(providers[1]["show_weekly"])
+
 
 if __name__ == "__main__":
     unittest.main()
