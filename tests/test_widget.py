@@ -167,6 +167,17 @@ class WidgetTests(unittest.TestCase):
         self.widget.close_btn.click()
         self.assertEqual(quit_requests, [True])
 
+    def test_confirmed_shutdown_does_not_request_quit_again(self):
+        quit_requests = []
+        self.widget.quit_requested.connect(lambda: quit_requests.append(True))
+
+        self.widget.begin_shutdown()
+        self.assertTrue(self.widget.close())
+        self.app.processEvents()
+
+        self.assertEqual(quit_requests, [])
+        self.assertFalse(self.widget.isVisible())
+
     def test_missing_reset_is_shown_explicitly(self):
         self.widget.provider_ui_map["codex"]["show_five_hour"] = True
         self.usage.windows = [UsageWindow("5시간", 0, "", 100)]

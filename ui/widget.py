@@ -105,6 +105,7 @@ class SynapCapWidget(QWidget):
         self.drag_position = QPoint()
         self.provider_ui_map = {}
         self._update_url = ""
+        self._shutdown_in_progress = False
         configured_view = self.config_data.get("settings", {}).get(
             "usage_view", "bar"
         )
@@ -772,8 +773,15 @@ class SynapCapWidget(QWidget):
 
     def closeEvent(self, event):
         """Taskbar/OS close requests follow the header × exit behavior."""
+        if self._shutdown_in_progress:
+            event.accept()
+            return
         self.quit_requested.emit()
         event.ignore()
+
+    def begin_shutdown(self):
+        """Allow the confirmed application shutdown to close this window."""
+        self._shutdown_in_progress = True
 
     # Drag-and-Drop Mouse Events
     def mousePressEvent(self, event):

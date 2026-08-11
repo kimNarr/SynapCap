@@ -229,7 +229,14 @@ def main():
         config_data.setdefault("settings", {})["usage_view"] = mode
         save_config(config_data)
 
+    quit_in_progress = False
+
     def handle_quit():
+        nonlocal quit_in_progress
+        if quit_in_progress:
+            return
+        quit_in_progress = True
+        widget.begin_shutdown()
         worker.stop()
         if update_worker.isRunning():
             update_worker.requestInterruption()
@@ -237,6 +244,8 @@ def main():
         app.quit()
 
     def request_quit():
+        if quit_in_progress:
+            return
         if confirm_quit(widget):
             handle_quit()
 
