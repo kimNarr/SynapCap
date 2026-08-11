@@ -123,7 +123,7 @@ python scripts/manage_version.py current
 Windows 실행 번들:
 
 ```powershell
-.\scripts\build_windows.ps1 -Version 0.1.0 -SkipInstaller
+.\scripts\build_windows.ps1 -Version 0.1.1 -SkipInstaller
 ```
 
 저장소의 주요 구성은 다음과 같습니다.
