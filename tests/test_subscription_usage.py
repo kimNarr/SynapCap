@@ -24,6 +24,7 @@ class SubscriptionUsageTests(unittest.TestCase):
             executable = home / ".local" / "bin" / "claude"
             executable.parent.mkdir(parents=True)
             executable.write_text("#!/bin/sh\n", encoding="utf-8")
+            executable.chmod(0o700)
 
             with (
                 patch("subscription_usage.Path.home", return_value=home),
