@@ -99,7 +99,7 @@ h1 span { color: var(--blue); }
 .stage-caption::before { content: ""; position: absolute; right: 20px; top: -5px; width: 8px; height: 8px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); background: #11111b; transform: rotate(45deg); }
 .stage-caption span { display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--blue); }
 
-.features, .download-section, .requirements, .updates, .privacy { padding: 110px 0; }
+.features, .download-section, .requirements, .troubleshooting, .updates, .privacy { padding: 110px 0; }
 .section-heading { margin-bottom: 42px; }
 .section-heading.centered { text-align: center; }
 .section-kicker { margin: 0 0 12px; color: var(--blue); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; }
@@ -145,6 +145,29 @@ h1 span { color: var(--blue); }
 .requirement-list small { margin-top: 4px; color: var(--muted); }
 .requirement-list b { padding: 5px 8px; border-radius: 7px; background: rgba(166,227,161,.1); color: var(--green); font-size: 10px; white-space: nowrap; }
 
+.troubleshooting { border-top: 1px solid rgba(49,50,68,.55); }
+.error-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.error-grid article { min-height: 210px; padding: 23px; border: 1px solid var(--border); border-radius: 18px; background: linear-gradient(145deg, rgba(30,30,46,.85), rgba(24,24,37,.62)); }
+.error-badge { display: inline-flex; padding: 6px 9px; border-radius: 8px; background: rgba(243,139,168,.14); color: var(--red); font-size: 10px; font-weight: 800; }
+.error-badge.warning { background: rgba(249,226,175,.12); color: var(--yellow); }
+.error-badge.muted { background: rgba(147,153,178,.12); color: var(--muted); }
+.error-grid h3 { margin: 28px 0 10px; font-size: 17px; }
+.error-grid p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; word-break: keep-all; }
+.error-grid code, .restart-note code { color: var(--blue); font-family: "SFMono-Regular", Consolas, monospace; font-size: .92em; }
+.mac-setup { margin-top: 18px; padding: 30px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(24,24,37,.72); }
+.mac-setup-copy { display: grid; grid-template-columns: .65fr 1fr 1.35fr; align-items: end; gap: 24px; margin-bottom: 24px; }
+.mac-setup-copy .section-kicker { align-self: center; }
+.mac-setup-copy h3 { margin: 0; font-size: 23px; letter-spacing: -.03em; }
+.mac-setup-copy > p:last-child { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.command-list { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: #11111b; }
+.command-list > div { min-height: 58px; padding: 10px 14px; display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); }
+.command-list > div:last-child { border-bottom: 0; }
+.command-list span { color: var(--text); font-size: 12px; font-weight: 750; }
+.command-list code { overflow-x: auto; padding: 7px 9px; border-radius: 7px; background: #181825; color: var(--green); font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; white-space: nowrap; }
+.command-list a { color: var(--blue); font-size: 10px; font-weight: 750; white-space: nowrap; }
+.restart-note { margin: 18px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.restart-note strong { color: var(--text); }
+
 .updates { border-top: 1px solid rgba(49,50,68,.55); }
 .update-flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .update-flow article { min-height: 220px; padding: 26px; border: 1px solid var(--border); border-radius: var(--radius); background: linear-gradient(145deg, rgba(30,30,46,.86), rgba(24,24,37,.62)); }
@@ -181,6 +204,8 @@ h1 span { color: var(--blue); }
   .download-grid { grid-template-columns: 1fr 1fr; }
   .compact-card { grid-column: 1 / -1; min-height: 210px; }
   .requirements { grid-template-columns: 1fr; gap: 42px; }
+  .error-grid { grid-template-columns: 1fr 1fr; }
+  .mac-setup-copy { grid-template-columns: 1fr; gap: 10px; }
   .update-flow { grid-template-columns: 1fr; }
   .privacy { grid-template-columns: 1fr; gap: 42px; }
   .site-footer { flex-wrap: wrap; gap: 20px; }
@@ -197,11 +222,16 @@ h1 span { color: var(--blue); }
   .hero-actions .button { width: 100%; }
   .product-stage { min-height: 390px; }
   .stage-caption { right: 8px; bottom: -22px; }
-  .features, .download-section, .requirements, .updates, .privacy { padding: 78px 0; }
+  .features, .download-section, .requirements, .troubleshooting, .updates, .privacy { padding: 78px 0; }
   .feature-grid, .download-grid { grid-template-columns: 1fr; }
   .feature-grid article { min-height: 190px; }
   .compact-card { grid-column: auto; min-height: 240px; }
   .download-support { flex-direction: column; gap: 10px; }
+  .error-grid { grid-template-columns: 1fr; }
+  .error-grid article { min-height: 175px; }
+  .mac-setup { padding: 20px; }
+  .command-list > div { grid-template-columns: 1fr; gap: 7px; padding: 14px; }
+  .command-list code { width: 100%; }
   .update-flow article { min-height: 190px; }
   .final-cta { margin-top: 40px; padding: 65px 18px; }
   .site-footer { padding: 35px 0; flex-direction: column; justify-content: center; gap: 12px; }

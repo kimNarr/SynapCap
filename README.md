@@ -64,6 +64,42 @@ SynapCap은 웹 채팅 페이지를 읽지 않습니다. 각 서비스의 로컬
 
 `Cx`, `G`, `Cl` 배지는 각각 Codex, Gemini, Claude를 의미합니다. 조회에 실패하면 카드에 `설치 필요`, `로그인 필요`, `시간 초과` 또는 `조회 오류`가 표시되며 마우스를 올려 상세 원인을 확인할 수 있습니다. macOS 설치본은 Finder에서 실행해도 Homebrew와 사용자 로컬 CLI 경로를 자동 탐색합니다. 사용량 막대와 리셋 정보의 툴팁은 마우스를 올리는 즉시 해당 요소 바로 아래에 표시됩니다. 리셋 툴팁은 `8/12 15:09 초기화` 형식을 사용합니다.
 
+## 오류 해결
+
+| 앱 표시 | 의미 | 확인 및 조치 |
+| --- | --- | --- |
+| `설치 필요` | 해당 로컬 CLI 실행 파일을 찾지 못함 | 아래 설치 명령을 실행하고 `--version`으로 확인한 뒤 CLI를 한 번 실행해 로그인합니다. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다. |
+| `로그인 필요` | CLI는 있지만 구독 계정 인증이 없거나 만료됨 | 터미널에서 `codex`, `agy` 또는 `claude`를 직접 실행하고 브라우저 로그인 절차를 완료합니다. |
+| `시간 초과` | CLI가 제한 시간 안에 응답하지 않음 | 네트워크를 확인하고 실행 중인 CLI를 종료한 뒤 SynapCap에서 다시 새로고침합니다. 반복되면 해당 CLI를 직접 실행해 표시되는 오류를 확인합니다. |
+| `조회 오류` | 출력 형식 변경 등 그 밖의 오류 | 상태 배지에 마우스를 올려 상세 메시지를 확인하고 SynapCap과 CLI를 최신 버전으로 업데이트합니다. 계속되면 상세 메시지와 운영체제를 GitHub Issue에 남깁니다. |
+
+macOS에서 세 서비스가 모두 `설치 필요`로 표시되면 터미널에서 필요한 CLI만 설치합니다. Codex 앱과 웹 채팅 로그인만으로는 macOS 사용량을 조회할 수 없습니다.
+
+```bash
+# Codex CLI
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+
+# Antigravity CLI
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+
+# Claude Code CLI
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+설치 후 경로와 버전을 확인하고 각 CLI를 한 번 실행해 로그인합니다.
+
+```bash
+codex --version
+agy --version
+claude --version
+
+codex
+agy
+claude
+```
+
+로그인을 마치면 SynapCap을 완전히 종료했다가 다시 실행하고 새로고침합니다. `v0.1.1` 이상은 macOS Finder에서 실행해도 Homebrew, `~/.local/bin`, npm·pnpm·Bun·Volta·asdf·nvm 경로를 자동 탐색합니다. 자세한 설치 방법은 [Codex CLI](https://learn.chatgpt.com/docs/codex/cli), [Antigravity CLI](https://codelabs.developers.google.com/antigravity-cli-hands-on), [Claude Code](https://code.claude.com/docs/en/getting-started) 공식 문서를 참고하세요.
+
 ## 데이터와 개인정보
 
 - API 키를 입력하거나 SynapCap 서버로 전송하지 않습니다.

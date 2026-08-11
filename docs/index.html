@@ -28,6 +28,7 @@
       <a href="#download">다운로드</a>
       <a href="#features">기능</a>
       <a href="#requirements">연동 조건</a>
+      <a href="#troubleshooting">오류 해결</a>
       <a href="#updates">업데이트</a>
       <a class="github-link" href="https://github.com/kimNarr/SynapCap" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
@@ -137,6 +138,33 @@
         <div><span class="service-letter">Cx</span><p><strong>Codex</strong><small>Codex CLI · Windows는 Codex 앱도 지원</small></p><b>설치·로그인 필요</b></div>
         <div><span class="service-letter gemini-letter">G</span><p><strong>Gemini</strong><small>Antigravity CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
         <div><span class="service-letter claude-letter">Cl</span><p><strong>Claude</strong><small>Claude Code CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
+      </div>
+    </section>
+
+    <section id="troubleshooting" class="troubleshooting section-shell">
+      <div class="section-heading centered">
+        <p class="section-kicker">Troubleshooting</p>
+        <h2>오류 문구에서 바로 해결까지</h2>
+        <p>카드에 표시되는 상태를 확인하고 필요한 조치만 진행하세요. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다.</p>
+      </div>
+      <div class="error-grid">
+        <article><span class="error-badge">설치 필요</span><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다.</p></article>
+        <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행하고 브라우저 로그인 절차를 완료합니다.</p></article>
+        <article><span class="error-badge warning">시간 초과</span><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
+        <article><span class="error-badge muted">조회 오류</span><h3>상세 메시지를 확인하세요</h3><p>상태 배지에 마우스를 올려 원인을 확인하고 앱과 CLI를 업데이트합니다.</p></article>
+      </div>
+      <div class="mac-setup">
+        <div class="mac-setup-copy">
+          <p class="section-kicker">macOS quick setup</p>
+          <h3>세 카드가 모두 `설치 필요`라면</h3>
+          <p>macOS에서는 앱이나 웹 로그인만으로 사용량을 읽을 수 없습니다. 사용하는 서비스의 CLI만 설치하세요.</p>
+        </div>
+        <div class="command-list" aria-label="macOS CLI 설치 명령">
+          <div><span>Codex</span><code>curl -fsSL https://chatgpt.com/codex/install.sh | sh</code><a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer" aria-label="Codex CLI 공식 설치 문서">공식 안내 ↗</a></div>
+          <div><span>Gemini</span><code>curl -fsSL https://antigravity.google/cli/install.sh | bash</code><a href="https://codelabs.developers.google.com/antigravity-cli-hands-on" target="_blank" rel="noreferrer" aria-label="Antigravity CLI 공식 설치 문서">공식 안내 ↗</a></div>
+          <div><span>Claude</span><code>curl -fsSL https://claude.ai/install.sh | bash</code><a href="https://code.claude.com/docs/en/getting-started" target="_blank" rel="noreferrer" aria-label="Claude Code 공식 설치 문서">공식 안내 ↗</a></div>
+        </div>
+        <p class="restart-note"><strong>설치 다음:</strong> <code>codex --version</code>, <code>agy --version</code>, <code>claude --version</code>으로 확인 → 각 CLI 최초 로그인 → SynapCap 완전 종료 후 다시 실행</p>
       </div>
     </section>
 
