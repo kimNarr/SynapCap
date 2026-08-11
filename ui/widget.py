@@ -550,7 +550,7 @@ class SynapCapWidget(QWidget):
         if not reset_text:
             return "", ""
 
-        tooltip = f"정확한 리셋: {reset_text}"
+        tooltip = f"{reset_text} 초기화"
         match = re.fullmatch(
             r"(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{2})",
             reset_text.strip(),

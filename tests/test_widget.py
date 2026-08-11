@@ -55,7 +55,7 @@ class WidgetTests(unittest.TestCase):
         )
 
         self.assertEqual(relative, "1일 16시간 후")
-        self.assertEqual(tooltip, "정확한 리셋: 8/12 09:49")
+        self.assertEqual(tooltip, "8/12 09:49 초기화")
 
     def test_bar_and_ring_views_can_be_toggled(self):
         self.widget.update_data([self.usage])
