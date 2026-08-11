@@ -237,6 +237,29 @@ class WidgetTests(unittest.TestCase):
         )
         self.assertIn("font-weight: 400", usage_label.styleSheet())
 
+    def test_rebuild_shrinks_after_provider_is_removed(self):
+        providers = [
+            CodexProvider({"id": provider_id, "name": provider_id.title()})
+            for provider_id in ("first", "second", "third")
+        ]
+        self.widget.rebuild_ui(
+            self.widget.config_data,
+            providers,
+            preserve_usage=False,
+        )
+        self.app.processEvents()
+        expanded_height = self.widget.height()
+
+        self.widget.rebuild_ui(
+            self.widget.config_data,
+            providers[:2],
+            preserve_usage=False,
+        )
+        self.app.processEvents()
+
+        self.assertLess(self.widget.height(), expanded_height)
+        self.assertEqual(self.widget.cards_layout.count(), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

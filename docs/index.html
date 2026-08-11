@@ -125,7 +125,7 @@
         <a class="checksum-link" data-asset="SHA256SUMS.txt" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SHA256SUMS.txt">SHA-256 체크섬 받기</a>
         <a href="https://github.com/kimNarr/SynapCap/releases/latest" target="_blank" rel="noreferrer">릴리스 노트 보기 <span aria-hidden="true">↗</span></a>
       </div>
-      <p class="signing-note">초기 버전은 코드 서명 전이므로 운영체제의 보안 경고가 표시될 수 있습니다. 설치 파일은 이 페이지가 연결하는 공식 GitHub Release에서만 받으세요.</p>
+      <p class="signing-note"><strong>Windows에서 “일반적으로 다운로드되지 않음”이 표시되나요?</strong> 악성 파일 판정이 아니라 아직 코드 서명과 다운로드 평판이 없는 새 파일에 표시되는 경고입니다. 공식 GitHub Release에서 받은 파일인지 확인하고 SHA-256 체크섬과 GitHub 빌드 출처 증명을 검증한 뒤에만 Edge 다운로드 패널의 <b>유지 → 더 보기 → 그래도 계속</b>을 선택하세요. 출처나 해시가 다르면 파일을 삭제하세요.</p>
     </section>
 
     <section id="requirements" class="requirements section-shell">
@@ -153,6 +153,10 @@
         <article><span class="error-badge warning">시간 초과</span><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
         <article><span class="error-badge muted">조회 오류</span><h3>상세 메시지를 확인하세요</h3><p>상태 배지에 마우스를 올려 원인을 확인하고 앱과 CLI를 업데이트합니다.</p></article>
       </div>
+      <aside class="permission-note" aria-label="Windows 다운로드 평판 경고 안내">
+        <strong>Windows 다운로드 평판 경고</strong>
+        <p>코드 서명 전 초기 릴리스는 새 버전마다 Edge·SmartScreen 경고가 나타날 수 있습니다. Release의 <code>SHA256SUMS.txt</code>와 <code>gh attestation verify 파일명 -R kimNarr/SynapCap</code>으로 무결성과 빌드 출처를 확인할 수 있습니다. 경고를 근본적으로 없애려면 추후 Microsoft Store 또는 신원 확인 코드 서명이 필요합니다.</p>
+      </aside>
       <aside class="permission-note" aria-label="macOS 권한 요청 안내">
         <strong>Apple Music이나 볼륨 접근을 요청하나요?</strong>
         <p>SynapCap에는 Apple Music, 다른 앱의 데이터, 네트워크·외장 볼륨 권한이 필요하지 않습니다. <b>허용하지 않음</b>을 선택하고 MCP 격리 기능이 포함된 최신 버전으로 업데이트하세요.</p>
