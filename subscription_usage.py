@@ -6,6 +6,7 @@ import queue
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -57,6 +58,50 @@ def _clamp_percent(value: float) -> float:
     return max(0.0, min(100.0, round(float(value), 1)))
 
 
+def _cli_search_directories() -> tuple[Path, ...]:
+    """Return CLI locations that GUI apps do not inherit from the login shell."""
+    home = Path.home()
+    directories: list[Path] = []
+
+    for value in os.environ.get("PATH", "").split(os.pathsep):
+        if value:
+            directories.append(Path(value).expanduser())
+
+    directories.extend(
+        (
+            home / ".local" / "bin",
+            home / ".npm-global" / "bin",
+            home / ".local" / "share" / "pnpm",
+            home / ".bun" / "bin",
+            home / ".volta" / "bin",
+            home / ".asdf" / "shims",
+        )
+    )
+    if sys.platform == "darwin":
+        directories.extend((Path("/opt/homebrew/bin"), Path("/usr/local/bin")))
+        directories.extend((home / ".nvm" / "versions" / "node").glob("*/bin"))
+
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for directory in directories:
+        key = os.path.normcase(str(directory))
+        if key not in seen:
+            seen.add(key)
+            unique.append(directory)
+    return tuple(unique)
+
+
+def _cli_search_path() -> str:
+    return os.pathsep.join(str(path) for path in _cli_search_directories())
+
+
+def _cli_environment() -> dict[str, str]:
+    env = os.environ.copy()
+    env["PATH"] = _cli_search_path()
+    env.update({"NO_COLOR": "1", "TERM": "dumb", "LANG": "en_US.UTF-8"})
+    return env
+
+
 def _command_path(
     configured: Optional[str],
     executable_name: str,
@@ -66,7 +111,7 @@ def _command_path(
     if configured:
         candidates.append(Path(os.path.expandvars(configured)).expanduser())
 
-    discovered = shutil.which(executable_name)
+    discovered = shutil.which(executable_name, path=_cli_search_path())
     if discovered:
         candidates.append(Path(discovered))
 
@@ -87,8 +132,7 @@ def _run_text_command(
     cwd: Optional[Path] = None,
     env_overrides: Optional[dict[str, str]] = None,
 ) -> str:
-    env = os.environ.copy()
-    env.update({"NO_COLOR": "1", "TERM": "dumb", "LANG": "en_US.UTF-8"})
+    env = _cli_environment()
     if env_overrides:
         env.update(env_overrides)
     process: Optional[subprocess.Popen[str]] = None
@@ -255,7 +299,9 @@ def _find_codex_command(configured: Optional[str]) -> Path:
             except (OSError, subprocess.TimeoutExpired):
                 pass
 
-    raise SubscriptionUsageError("Codex 앱 또는 CLI를 찾을 수 없음")
+    if sys.platform == "win32":
+        raise SubscriptionUsageError("Codex 앱 또는 CLI를 찾을 수 없음")
+    raise SubscriptionUsageError("Codex CLI를 찾을 수 없음")
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
@@ -280,6 +326,7 @@ def _read_codex_app_server(executable: Path, timeout_sec: float) -> dict[str, An
             encoding="utf-8",
             errors="replace",
             bufsize=1,
+            env=_cli_environment(),
             **_hidden_process_kwargs(),
         )
     except OSError as exc:
@@ -409,7 +456,10 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     executable = _command_path(
         config.get("command"),
         "agy",
-        (local_app_data / "agy" / "bin" / "agy.exe",),
+        (
+            home / ".local" / "bin" / "agy",
+            local_app_data / "agy" / "bin" / "agy.exe",
+        ),
     )
     work_dir = Path(tempfile.gettempdir()) / "SynapCap" / "antigravity"
     try:
@@ -433,7 +483,7 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
             )
 
         env_overrides = {"SERENA_HOME": str(serena_home)}
-        serena_command = shutil.which("serena")
+        serena_command = shutil.which("serena", path=_cli_search_path())
         if serena_command and '"' not in serena_command:
             wrapper_dir = work_dir / "hidden-tools"
             wrapper_dir.mkdir(parents=True, exist_ok=True)
@@ -466,7 +516,7 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
             env_overrides["PATH"] = (
                 str(wrapper_dir)
                 + os.pathsep
-                + os.environ.get("PATH", "")
+                + _cli_search_path()
             )
     except OSError as exc:
         raise SubscriptionUsageError(
@@ -578,7 +628,11 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
     executable = _command_path(
         config.get("command"),
         "claude",
-        (home / ".local" / "bin" / "claude.exe", *installed_versions),
+        (
+            home / ".local" / "bin" / "claude",
+            home / ".local" / "bin" / "claude.exe",
+            *installed_versions,
+        ),
     )
     output = _run_text_command(
         [
