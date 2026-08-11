@@ -166,7 +166,7 @@ class SynapCapWidget(QWidget):
         """)
 
         self.frame_layout = QVBoxLayout(self.frame)
-        self.frame_layout.setContentsMargins(12, 11, 12, 12)
+        self.frame_layout.setContentsMargins(12, 14, 12, 12)
         self.frame_layout.setSpacing(10)
 
         # 1. Header (Title & Controls)
