@@ -18,21 +18,35 @@ function detectPlatform() {
 function configurePrimaryDownload() {
   const platform = detectPlatform();
   const button = document.querySelector("#primary-download");
+  const buttonTitle = document.querySelector("#primary-download-label");
   const label = document.querySelector("#primary-platform");
+  const alternate = document.querySelector("#alternate-download");
 
   if (platform === "windows") {
     button.href = `${releaseBase}/${assets.windows}`;
     button.dataset.asset = assets.windows;
+    buttonTitle.textContent = "Windows 최신 버전";
     label.textContent = "Windows 10/11 · 64비트";
+    alternate.href = "#download";
+    delete alternate.dataset.asset;
+    alternate.textContent = "macOS 버전 선택";
     document.querySelector('[data-platform-card="windows"]').classList.add("recommended");
   } else if (platform === "mac") {
     button.href = "#download";
     delete button.dataset.asset;
+    buttonTitle.textContent = "macOS 버전 선택";
     label.textContent = "macOS · Apple Silicon 또는 Intel 선택";
+    alternate.href = `${releaseBase}/${assets.windows}`;
+    alternate.dataset.asset = assets.windows;
+    alternate.textContent = "Windows 최신 버전";
   } else {
     button.href = "#download";
     delete button.dataset.asset;
+    buttonTitle.textContent = "설치 파일 선택";
     label.textContent = "Windows 및 macOS";
+    alternate.href = `https://github.com/${repository}`;
+    delete alternate.dataset.asset;
+    alternate.textContent = "소스 보기";
   }
 }
 
