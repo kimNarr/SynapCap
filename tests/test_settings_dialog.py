@@ -3,7 +3,8 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QFormLayout
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QDialog, QFormLayout
 
 from config import get_default_config
 from ui.settings_dialog import SettingsDialog
@@ -53,6 +54,17 @@ class SettingsDialogTests(unittest.TestCase):
             QFormLayout.RowWrapPolicy.WrapLongRows,
         )
         self.assertIn("설치 및 로컬 로그인 필요", item["connection_label"].text())
+
+    def test_settings_window_uses_shared_custom_title_bar(self):
+        self.assertTrue(
+            self.dialog.windowFlags() & Qt.WindowType.FramelessWindowHint
+        )
+        self.assertEqual(self.dialog.title_bar.height(), 38)
+        self.assertEqual(self.dialog.title_bar.close_button.text(), "×")
+
+        self.dialog.title_bar.close_button.click()
+
+        self.assertEqual(self.dialog.result(), QDialog.DialogCode.Rejected)
 
 
 if __name__ == "__main__":
