@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta
 
-from PySide6.QtCore import QEvent, Qt, QPoint, QRectF, Signal
+from PySide6.QtCore import QEvent, Qt, QPoint, QRectF, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame,
@@ -111,6 +111,9 @@ class SynapCapWidget(QWidget):
         )
         self.usage_view = configured_view if configured_view in {"bar", "ring"} else "bar"
         self.latest_usage: list[ModelUsage] = []
+        self._fit_timer = QTimer(self)
+        self._fit_timer.setSingleShot(True)
+        self._fit_timer.timeout.connect(self._fit_to_content)
 
         self.init_ui()
 
@@ -281,6 +284,23 @@ class SynapCapWidget(QWidget):
         self.frame_layout.addWidget(self.cards_frame)
         outer_layout.addWidget(self.frame)
         
+        self._schedule_fit_to_content()
+
+    def _schedule_fit_to_content(self) -> None:
+        """Resize after Qt has applied deferred child/layout removals."""
+        self._fit_timer.start(0)
+
+    def _fit_to_content(self) -> None:
+        for layout in (
+            self.cards_layout,
+            self.frame_layout,
+            self.layout(),
+        ):
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+        self.cards_frame.adjustSize()
+        self.frame.adjustSize()
         self.adjustSize()
 
     def _update_view_button(self):
@@ -429,7 +449,7 @@ class SynapCapWidget(QWidget):
                 )
                 self.cards_layout.addWidget(separator)
             
-        self.adjustSize()
+        self._schedule_fit_to_content()
 
     @staticmethod
     def _set_status_badge(label: QLabel, state: str, preset: dict) -> None:
@@ -473,7 +493,7 @@ class SynapCapWidget(QWidget):
         self._build_provider_cards()
         if preserved_usage:
             self.update_data(preserved_usage, force=True)
-        self.adjustSize()
+        self._schedule_fit_to_content()
 
     @staticmethod
     def _progress_style(color: str) -> str:

@@ -42,6 +42,25 @@ SynapCap은 로컬에 로그인된 AI 도구의 구독 한도와 리셋 시각�
 
 초기 버전은 코드 서명 전이므로 Windows SmartScreen 또는 macOS Gatekeeper 경고가 표시될 수 있습니다. 설치 파일과 함께 제공되는 `SHA256SUMS.txt`로 파일 무결성을 확인할 수 있습니다.
 
+### Windows 다운로드 경고
+
+Edge의 `일반적으로 다운로드되지 않습니다` 표시는 악성 파일 판정이 아니라 아직 코드 서명과 다운로드 평판이 없는 새 설치 파일이라는 의미입니다. 공식 GitHub Release가 아닌 곳에서 받은 파일은 실행하지 마세요.
+
+공식 Release에서 설치 파일과 `SHA256SUMS.txt`를 받은 다음 PowerShell에서 해시를 확인할 수 있습니다.
+
+```powershell
+Get-FileHash .\SynapCap-Windows-x64-Setup.exe -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
+```
+
+두 SHA-256 값이 일치하는지 확인합니다. `v0.1.4` 이상은 GitHub CLI로 빌드 출처도 검증할 수 있습니다.
+
+```powershell
+gh attestation verify .\SynapCap-Windows-x64-Setup.exe -R kimNarr/SynapCap
+```
+
+출처와 해시가 모두 맞을 때만 Edge 다운로드 패널에서 파일의 `…` 메뉴를 열어 `유지` → `더 보기` → `그래도 계속`을 선택하세요. 출처나 해시가 다르면 파일을 삭제합니다. 경고 자체를 근본적으로 제거하려면 Microsoft Store 배포 또는 신원 확인을 거친 코드 서명이 필요합니다.
+
 ## 연동 조건
 
 SynapCap은 웹 채팅 페이지를 읽지 않습니다. 각 서비스의 로컬 도구가 설치되고 같은 사용자 계정으로 로그인돼 있어야 합니다.
