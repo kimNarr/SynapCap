@@ -1,10 +1,11 @@
 import re
 from datetime import datetime, timedelta
 
-from PySide6.QtCore import Qt, QPoint, QRectF, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtCore import QEvent, Qt, QPoint, QRectF, Signal
+from PySide6.QtGui import QColor, QCursor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QPushButton
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame,
+    QPushButton, QToolTip
 )
 from .icon import (
     create_app_pixmap,
@@ -444,6 +445,27 @@ class SynapCapWidget(QWidget):
                 widget.deleteLater()
         ui["window_rows"] = []
 
+    def _enable_instant_tooltip(self, widget: QWidget, text: str) -> None:
+        if not text:
+            return
+        widget.setToolTip(text)
+        widget.setProperty("instantTooltip", True)
+        widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if watched.property("instantTooltip"):
+            if event.type() == QEvent.Type.Enter:
+                QToolTip.showText(
+                    QCursor.pos() + QPoint(12, 16),
+                    watched.toolTip(),
+                    watched,
+                )
+            elif event.type() == QEvent.Type.Leave:
+                QToolTip.hideText()
+            elif event.type() == QEvent.Type.ToolTip:
+                return True
+        return super().eventFilter(watched, event)
+
     @staticmethod
     def _usage_color(used: float) -> str:
         if used >= 80:
@@ -553,7 +575,7 @@ class SynapCapWidget(QWidget):
                 else:
                     reset_caption = f"{reset_display} 리셋"
                 reset_label = QLabel(reset_caption)
-                reset_label.setToolTip(reset_tooltip)
+                self._enable_instant_tooltip(reset_label, reset_tooltip)
                 reset_label.setStyleSheet(
                     f"color: #6C7086; font-size: {max(8, preset['val_size'] - 1)}px;"
                 )
@@ -562,7 +584,7 @@ class SynapCapWidget(QWidget):
                 row_layout.addStretch()
 
                 ring = UsageRing(window.used, color, usage_value_bold)
-                ring.setToolTip(usage_tooltip)
+                self._enable_instant_tooltip(ring, usage_tooltip)
                 row_layout.addWidget(ring)
             else:
                 row_layout = QVBoxLayout(row_widget)
@@ -579,15 +601,14 @@ class SynapCapWidget(QWidget):
                     else " · 리셋 시각 미상"
                 )
                 window_label = QLabel(f"{window.label}{reset_suffix}")
-                window_label.setToolTip(reset_tooltip)
+                self._enable_instant_tooltip(window_label, reset_tooltip)
                 window_label.setStyleSheet(
                     f"color: #A6ADC8; font-size: {preset['val_size']}px;"
                 )
                 info_layout.addWidget(window_label)
                 info_layout.addStretch()
 
-                value_label = QLabel(f"사용 {window.used:.0f}%")
-                value_label.setToolTip(usage_tooltip)
+                value_label = QLabel(f"{window.used:.0f}%")
                 value_label.setStyleSheet(
                     f"color: {color}; font-size: {preset['val_size']}px; "
                     f"font-weight: {usage_value_weight};"
@@ -600,7 +621,7 @@ class SynapCapWidget(QWidget):
                 pbar.setRange(0, 100)
                 pbar.setValue(round(window.used))
                 pbar.setTextVisible(False)
-                pbar.setToolTip(usage_tooltip)
+                self._enable_instant_tooltip(pbar, usage_tooltip)
                 pbar.setStyleSheet(self._progress_style(color))
                 row_layout.addWidget(pbar)
 

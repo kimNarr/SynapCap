@@ -1,9 +1,11 @@
 import os
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication, QLabel, QProgressBar
 
 from providers import CodexProvider, ModelUsage, UsageWindow
@@ -59,10 +61,11 @@ class WidgetTests(unittest.TestCase):
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
 
-        self.assertIn("사용 49%", labels)
+        self.assertIn("49%", labels)
+        self.assertNotIn("사용 49%", labels)
         self.assertEqual(len(row.findChildren(QProgressBar)), 1)
         usage_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "사용 49%"
+            label for label in row.findChildren(QLabel) if label.text() == "49%"
         )
         self.assertIn("font-weight: 700", usage_label.styleSheet())
 
@@ -90,9 +93,22 @@ class WidgetTests(unittest.TestCase):
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         usage_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "사용 49%"
+            label for label in row.findChildren(QLabel) if label.text() == "49%"
         )
         self.assertIn("font-weight: 400", usage_label.styleSheet())
+
+    def test_progress_tooltip_is_shown_on_enter(self):
+        self.widget.update_data([self.usage])
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        progress = row.findChild(QProgressBar)
+
+        self.assertEqual(progress.toolTip(), "49% 사용 · 51% 남음")
+        with patch("ui.widget.QToolTip.showText") as show_text:
+            self.widget.eventFilter(
+                progress, QEvent(QEvent.Type.Enter)
+            )
+
+        show_text.assert_called_once()
 
     def test_missing_reset_is_shown_explicitly(self):
         self.usage.windows = [UsageWindow("5시간", 0, "", 100)]
@@ -121,7 +137,7 @@ class WidgetTests(unittest.TestCase):
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         usage_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "사용 49%"
+            label for label in row.findChildren(QLabel) if label.text() == "49%"
         )
         self.assertIn("font-weight: 400", usage_label.styleSheet())
 
