@@ -1,4 +1,5 @@
 import copy
+import sys
 import uuid
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPolygon
@@ -466,6 +467,10 @@ class SettingsDialog(QDialog):
         # Form Layout
         g_layout = QFormLayout()
         g_layout.setSpacing(12)
+        g_layout.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        g_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
 
         # Provider Type Selection Combo (NoWheelComboBox 적용)
         type_combo = NoWheelComboBox()
@@ -548,12 +553,14 @@ class SettingsDialog(QDialog):
         def update_connection_mode(_index=None):
             selected_type = type_combo.currentData() or "codex"
             cli_name = {
-                "codex": "Codex 앱/CLI",
+                "codex": (
+                    "Codex 앱/CLI" if sys.platform == "win32" else "Codex CLI"
+                ),
                 "antigravity": "Antigravity CLI",
                 "claude": "Claude Code CLI",
             }[selected_type]
             connection_label.setText(
-                f"{cli_name}의 로컬 로그인 사용 · API 키 불필요"
+                f"{cli_name} 설치 및 로컬 로그인 필요 · API 키 불필요"
             )
             update_window_options()
 
@@ -572,6 +579,8 @@ class SettingsDialog(QDialog):
             "type_combo": type_combo,
             "enabled_check": enabled_check,
             "name_edit": name_edit,
+            "form_layout": g_layout,
+            "connection_label": connection_label,
             "five_hour_check": five_hour_check,
             "weekly_check": weekly_check,
             "original_data": dict(p_data),

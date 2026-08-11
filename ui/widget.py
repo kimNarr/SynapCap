@@ -729,7 +729,15 @@ class SynapCapWidget(QWidget):
             if usage.error:
                 ui["badge"].setToolTip(f"조회 실패: {usage.error}")
                 ui["status"].show()
-                ui["status"].setText("조회 오류")
+                if "찾을 수 없음" in usage.error:
+                    error_label = "설치 필요"
+                elif "로그인" in usage.error:
+                    error_label = "로그인 필요"
+                elif "시간 초과" in usage.error:
+                    error_label = "시간 초과"
+                else:
+                    error_label = "조회 오류"
+                ui["status"].setText(error_label)
                 ui["status"].setToolTip(usage.error)
                 self._set_status_badge(ui["status"], "error", preset)
                 self._clear_usage_rows(ui)

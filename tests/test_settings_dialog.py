@@ -3,7 +3,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QFormLayout
 
 from config import get_default_config
 from ui.settings_dialog import SettingsDialog
@@ -44,6 +44,15 @@ class SettingsDialogTests(unittest.TestCase):
 
         self.assertFalse(item["five_hour_check"].isChecked())
         self.assertTrue(item["weekly_check"].isChecked())
+
+    def test_provider_form_wraps_long_rows(self):
+        item = self._provider_item("codex")
+
+        self.assertEqual(
+            item["form_layout"].rowWrapPolicy(),
+            QFormLayout.RowWrapPolicy.WrapLongRows,
+        )
+        self.assertIn("설치 및 로컬 로그인 필요", item["connection_label"].text())
 
 
 if __name__ == "__main__":

@@ -98,6 +98,23 @@ class WidgetTests(unittest.TestCase):
         )
         self.assertIn("font-weight: 400", usage_label.styleSheet())
 
+    def test_missing_cli_is_labeled_as_install_required(self):
+        usage = ModelUsage(
+            "codex",
+            "Codex",
+            "Codex",
+            0,
+            100,
+            "%",
+            error="codex CLI를 찾을 수 없음",
+        )
+
+        self.widget.update_data([usage])
+
+        status = self.widget.provider_ui_map["codex"]["status"]
+        self.assertEqual(status.text(), "설치 필요")
+        self.assertEqual(status.toolTip(), usage.error)
+
     def test_progress_tooltip_is_shown_on_enter(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]

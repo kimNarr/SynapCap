@@ -8,6 +8,8 @@ from unittest.mock import patch
 from subscription_usage import (
     SubscriptionSnapshot,
     SubscriptionWindow,
+    _cli_environment,
+    _command_path,
     _hidden_process_kwargs,
     query_antigravity_subscription,
     query_claude_subscription,
@@ -16,6 +18,28 @@ from subscription_usage import (
 
 
 class SubscriptionUsageTests(unittest.TestCase):
+    def test_macos_gui_finds_cli_in_user_local_bin(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home = Path(temp_dir)
+            executable = home / ".local" / "bin" / "claude"
+            executable.parent.mkdir(parents=True)
+            executable.write_text("#!/bin/sh\n", encoding="utf-8")
+            executable.chmod(0o700)
+
+            with (
+                patch("subscription_usage.Path.home", return_value=home),
+                patch("subscription_usage.sys.platform", "darwin"),
+                patch.dict(os.environ, {"PATH": ""}),
+            ):
+                result = _command_path(None, "claude")
+                environment = _cli_environment()
+
+            self.assertEqual(result, executable.resolve())
+            self.assertIn(
+                str(executable.parent),
+                environment["PATH"].split(os.pathsep),
+            )
+
     @unittest.skipUnless(os.name == "nt", "Windows-specific process flags")
     def test_cli_processes_are_forced_hidden_on_windows(self):
         kwargs = _hidden_process_kwargs()

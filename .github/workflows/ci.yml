@@ -25,6 +25,7 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
+          - macos-15
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
