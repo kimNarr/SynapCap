@@ -1,10 +1,12 @@
 import copy
 import uuid
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen, QPolygon
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QCheckBox, QComboBox, QLineEdit, QPushButton, QTabWidget, QWidget,
-    QGroupBox, QFormLayout, QScrollArea, QMessageBox
+    QGroupBox, QFormLayout, QScrollArea, QMessageBox, QStyle,
+    QStyleOptionComboBox, QStyleOptionSpinBox
 )
 from .icon import (
     create_app_icon,
@@ -20,6 +22,58 @@ class NoWheelComboBox(QComboBox):
     """마우스 휠 스크롤 시 선택 항목이 실수로 변경되지 않도록 휠 이벤트를 무시하는 콤보박스"""
     def wheelEvent(self, event):
         event.ignore()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        option = QStyleOptionComboBox()
+        self.initStyleOption(option)
+        arrow_rect = self.style().subControlRect(
+            QStyle.ComplexControl.CC_ComboBox,
+            option,
+            QStyle.SubControl.SC_ComboBoxArrow,
+            self,
+        )
+        _draw_chevron(self, arrow_rect, "down")
+
+
+class VisibleSpinBox(QSpinBox):
+    """테마와 무관하게 증감 화살표가 선명하게 보이는 숫자 입력 위젯."""
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        option = QStyleOptionSpinBox()
+        self.initStyleOption(option)
+        for control, direction in (
+            (QStyle.SubControl.SC_SpinBoxUp, "up"),
+            (QStyle.SubControl.SC_SpinBoxDown, "down"),
+        ):
+            button_rect = self.style().subControlRect(
+                QStyle.ComplexControl.CC_SpinBox,
+                option,
+                control,
+                self,
+            )
+            _draw_chevron(self, button_rect, direction)
+
+
+def _draw_chevron(widget: QWidget, rect, direction: str) -> None:
+    """Draw a compact chevron over a Qt complex-control subcontrol."""
+    if rect.isEmpty():
+        return
+    center = rect.center()
+    offset = 2 if direction == "down" else -2
+    points = QPolygon(
+        [
+            QPoint(center.x() - 4, center.y() - offset),
+            QPoint(center.x(), center.y() + offset),
+            QPoint(center.x() + 4, center.y() - offset),
+        ]
+    )
+    painter = QPainter(widget)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QPen(QColor("#CDD6F4"), 1.6))
+    painter.drawPolyline(points)
+    painter.end()
 
 class SettingsDialog(QDialog):
     config_saved = Signal(dict)
@@ -98,41 +152,49 @@ class SettingsDialog(QDialog):
             QComboBox::drop-down {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
-                width: 26px;
-                border-left-width: 0px;
+                width: 30px;
+                background-color: #313244;
+                border-left: 1px solid #45475A;
                 border-top-right-radius: 8px;
                 border-bottom-right-radius: 8px;
             }
-            QComboBox::down-arrow {
-                image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5 l3 3 l3 -3' fill='none' stroke='%23A6ADC8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-                width: 10px;
-                height: 10px;
+            QComboBox::drop-down:hover {
+                background-color: #45475A;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #181825;
+                color: #CDD6F4;
+                border: 1px solid #45475A;
+                selection-background-color: #45475A;
+                selection-color: #FFFFFF;
+                outline: 0;
+                padding: 4px;
+            }
+            QSpinBox {
+                padding: 7px 34px 7px 12px;
             }
             QSpinBox::up-button {
-                subcontrol-origin: padding;
+                subcontrol-origin: border;
                 subcontrol-position: top right;
-                width: 20px;
-                height: 12px;
-                margin-right: 18px;
-                margin-top: 3px;
+                width: 28px;
                 background-color: #313244;
-                border-radius: 3px;
+                border-left: 1px solid #45475A;
+                border-bottom: 1px solid #45475A;
+                border-top-right-radius: 7px;
             }
             QSpinBox::up-button:hover {
-                background-color: #89B4FA;
+                background-color: #45475A;
             }
             QSpinBox::down-button {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 20px;
-                height: 12px;
-                margin-right: 2px;
-                margin-top: 3px;
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 28px;
                 background-color: #313244;
-                border-radius: 3px;
+                border-left: 1px solid #45475A;
+                border-bottom-right-radius: 7px;
             }
             QSpinBox::down-button:hover {
-                background-color: #89B4FA;
+                background-color: #45475A;
             }
             QCheckBox {
                 color: #CDD6F4;
@@ -264,7 +326,7 @@ class SettingsDialog(QDialog):
         settings = self.config_data.get("settings", {})
 
         # Refresh Interval (새로고침 주기)
-        self.interval_spin = QSpinBox()
+        self.interval_spin = VisibleSpinBox()
         self.interval_spin.setRange(5, 3600)
         self.interval_spin.setSuffix(" 초")
         self.interval_spin.setValue(settings.get("refresh_interval_sec", 30))
@@ -288,8 +350,12 @@ class SettingsDialog(QDialog):
             self.size_combo.setCurrentIndex(idx)
         form.addRow("위젯 및 폰트 크기 (Size):", self.size_combo)
 
+        self.usage_bold_check = QCheckBox("사용량 수치를 굵게 표시")
+        self.usage_bold_check.setChecked(settings.get("usage_value_bold", True))
+        form.addRow("사용량 글꼴:", self.usage_bold_check)
+
         # Widget Width (위젯 너비)
-        self.width_spin = QSpinBox()
+        self.width_spin = VisibleSpinBox()
         self.width_spin.setRange(200, 800)
         self.width_spin.setSuffix(" px")
         self.width_spin.setValue(settings.get("widget_width", 300))
@@ -318,7 +384,35 @@ class SettingsDialog(QDialog):
         self.scroll = QScrollArea(self.providers_tab)  # type: ignore
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self.scroll.setStyleSheet("""
+            QScrollArea, QScrollArea > QWidget > QWidget {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 9px;
+                margin: 2px 0;
+                border: none;
+                background: #181825;
+            }
+            QScrollBar::handle:vertical {
+                min-height: 32px;
+                border-radius: 4px;
+                background: #45475A;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #585B70;
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 0;
+                background: transparent;
+            }
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {
+                background: transparent;
+            }
+        """)
         
         self.container = QWidget()
         self.container_layout = QVBoxLayout(self.container)  # type: ignore
@@ -485,6 +579,7 @@ class SettingsDialog(QDialog):
         self.config_data["settings"]["always_on_top"] = self.always_top_check.isChecked()
         self.config_data["settings"]["check_updates"] = self.update_check.isChecked()
         self.config_data["settings"]["widget_size"] = self.size_combo.currentText()
+        self.config_data["settings"]["usage_value_bold"] = self.usage_bold_check.isChecked()
         self.config_data["settings"]["widget_width"] = self.width_spin.value()
 
         updated_providers = []

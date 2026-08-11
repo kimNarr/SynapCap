@@ -43,10 +43,11 @@ SIZE_PRESETS = {
 
 
 class UsageRing(QWidget):
-    def __init__(self, used: float, color: str, parent=None):
+    def __init__(self, used: float, color: str, bold: bool = True, parent=None):
         super().__init__(parent)
         self.used = max(0.0, min(100.0, float(used)))
         self.color = QColor(color)
+        self.bold = bold
         self.setFixedSize(42, 42)
 
     def paintEvent(self, event):
@@ -68,7 +69,8 @@ class UsageRing(QWidget):
         painter.setFont(QFont("Segoe UI", 6))
         painter.drawText(QRectF(5, 8, 32, 11), Qt.AlignmentFlag.AlignCenter, "사용")
         painter.setPen(QColor("#CDD6F4"))
-        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        value_weight = QFont.Weight.Bold if self.bold else QFont.Weight.Normal
+        painter.setFont(QFont("Segoe UI", 7, value_weight))
         painter.drawText(
             QRectF(4, 18, 34, 14),
             Qt.AlignmentFlag.AlignCenter,
@@ -429,6 +431,10 @@ class SynapCapWidget(QWidget):
         preset: dict,
     ):
         self._clear_usage_rows(ui)
+        usage_value_bold = self.config_data.get("settings", {}).get(
+            "usage_value_bold", True
+        )
+        usage_value_weight = 700 if usage_value_bold else 400
 
         for window in windows:
             row_widget = QWidget()
@@ -473,7 +479,7 @@ class SynapCapWidget(QWidget):
                 row_layout.addLayout(details_layout)
                 row_layout.addStretch()
 
-                ring = UsageRing(window.used, color)
+                ring = UsageRing(window.used, color, usage_value_bold)
                 ring.setToolTip(usage_tooltip)
                 row_layout.addWidget(ring)
             else:
@@ -497,7 +503,8 @@ class SynapCapWidget(QWidget):
                 value_label = QLabel(f"사용 {window.used:.0f}%")
                 value_label.setToolTip(usage_tooltip)
                 value_label.setStyleSheet(
-                    f"color: {color}; font-size: {preset['val_size']}px;"
+                    f"color: {color}; font-size: {preset['val_size']}px; "
+                    f"font-weight: {usage_value_weight};"
                 )
                 info_layout.addWidget(value_label)
                 row_layout.addLayout(info_layout)

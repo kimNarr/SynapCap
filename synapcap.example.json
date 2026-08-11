@@ -5,6 +5,7 @@
     "widget_width": 300,
     "widget_size": "Medium",
     "usage_view": "bar",
+    "usage_value_bold": true,
     "check_updates": true,
     "theme": "dark"
   },

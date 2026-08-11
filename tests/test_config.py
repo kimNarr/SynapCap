@@ -48,6 +48,7 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(settings["always_on_top"])
             self.assertTrue(settings["check_updates"])
             self.assertEqual(settings["usage_view"], "bar")
+            self.assertTrue(settings["usage_value_bold"])
 
 
 if __name__ == "__main__":

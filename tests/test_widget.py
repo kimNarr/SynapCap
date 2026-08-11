@@ -61,6 +61,10 @@ class WidgetTests(unittest.TestCase):
 
         self.assertIn("사용 49%", labels)
         self.assertEqual(len(row.findChildren(QProgressBar)), 1)
+        usage_label = next(
+            label for label in row.findChildren(QLabel) if label.text() == "사용 49%"
+        )
+        self.assertIn("font-weight: 700", usage_label.styleSheet())
 
         self.widget._toggle_usage_view()
         self.app.processEvents()
@@ -77,6 +81,16 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
         self.assertEqual(self.widget.usage_view, "bar")
         self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
+
+    def test_usage_value_bold_can_be_disabled(self):
+        self.widget.config_data["settings"]["usage_value_bold"] = False
+        self.widget.update_data([self.usage])
+
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        usage_label = next(
+            label for label in row.findChildren(QLabel) if label.text() == "사용 49%"
+        )
+        self.assertIn("font-weight: 400", usage_label.styleSheet())
 
 
 if __name__ == "__main__":

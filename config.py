@@ -40,6 +40,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "widget_width": 300,
         "widget_size": "Medium",
         "usage_view": "bar",
+        "usage_value_bold": True,
         "check_updates": True,
         "theme": "dark"
     },
@@ -110,6 +111,8 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
             settings.update(loaded_settings)
             if settings.get("usage_view") not in {"bar", "ring"}:
                 settings["usage_view"] = "bar"
+            if not isinstance(settings.get("usage_value_bold"), bool):
+                settings["usage_value_bold"] = True
             data["settings"] = settings
             if "providers" not in data or not data["providers"]:
                 data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])
