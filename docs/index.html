@@ -149,7 +149,7 @@
       </div>
       <div class="error-grid">
         <article><span class="error-badge">설치 필요</span><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다.</p></article>
-        <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행하고 브라우저 로그인 절차를 완료합니다.</p></article>
+        <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행합니다. Antigravity 인증 코드는 복사해서 <code>agy</code>가 기다리는 터미널에 붙여 넣고 Enter를 누릅니다.</p></article>
         <article><span class="error-badge warning">시간 초과</span><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
         <article><span class="error-badge muted">조회 오류</span><h3>상세 메시지를 확인하세요</h3><p>상태 배지에 마우스를 올려 원인을 확인하고 앱과 CLI를 업데이트합니다.</p></article>
       </div>
@@ -165,10 +165,10 @@
         </div>
         <div class="command-list" aria-label="macOS CLI 설치 명령">
           <div><span>Codex</span><code>curl -fsSL https://chatgpt.com/codex/install.sh | sh</code><a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer" aria-label="Codex CLI 공식 설치 문서">공식 안내 ↗</a></div>
-          <div><span>Gemini</span><code>curl -fsSL https://antigravity.google/cli/install.sh | bash</code><a href="https://codelabs.developers.google.com/antigravity-cli-hands-on" target="_blank" rel="noreferrer" aria-label="Antigravity CLI 공식 설치 문서">공식 안내 ↗</a></div>
+          <div><span>Gemini</span><code>curl -fsSL https://antigravity.google/cli/install.sh | bash</code><a href="https://antigravity.google/docs/cli-install" target="_blank" rel="noreferrer" aria-label="Antigravity CLI 공식 설치 문서">공식 안내 ↗</a></div>
           <div><span>Claude</span><code>curl -fsSL https://claude.ai/install.sh | bash</code><a href="https://code.claude.com/docs/en/getting-started" target="_blank" rel="noreferrer" aria-label="Claude Code 공식 설치 문서">공식 안내 ↗</a></div>
         </div>
-        <p class="restart-note"><strong>설치 다음:</strong> <code>codex --version</code>, <code>agy --version</code>, <code>claude --version</code>으로 확인 → 각 CLI 최초 로그인 → SynapCap 완전 종료 후 다시 실행</p>
+        <p class="restart-note"><strong>설치 다음:</strong> <code>codex --version</code>, <code>agy --version</code>, <code>claude --version</code>으로 확인 → 각 CLI 최초 로그인 → Antigravity는 브라우저의 인증 코드를 <code>agy</code> 터미널에 붙여 넣기 → SynapCap 완전 종료 후 다시 실행. 계속 실패하면 키체인 접근에서 <code>Antigravity CLI</code>가 <code>agy</code>를 허용하는지 확인하세요.</p>
       </div>
     </section>
 
