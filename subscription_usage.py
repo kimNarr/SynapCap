@@ -127,6 +127,28 @@ def _cli_environment() -> dict[str, str]:
     return env
 
 
+def _usage_probe_path() -> str:
+    """Keep only OS tools available to the isolated usage subprocess."""
+    directories: list[Path] = []
+    if os.name == "nt":
+        system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        directories.extend((system_root / "System32", system_root))
+    else:
+        directories.extend(
+            (Path("/usr/bin"), Path("/bin"), Path("/usr/sbin"), Path("/sbin"))
+        )
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for directory in directories:
+        value = str(directory)
+        key = os.path.normcase(value)
+        if key not in seen:
+            seen.add(key)
+            unique.append(value)
+    return os.pathsep.join(unique)
+
+
 def _command_path(
     configured: Optional[str],
     executable_name: str,
@@ -489,92 +511,7 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     work_dir = Path(tempfile.gettempdir()) / "SynapCap" / "antigravity"
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
-        isolated_cli_home = work_dir / "cli-home"
-        isolated_mcp_dir = isolated_cli_home / ".gemini" / "config"
-        isolated_mcp_dir.mkdir(parents=True, exist_ok=True)
-        isolated_mcp_config = isolated_mcp_dir / "mcp_config.json"
-        isolated_mcp_text = '{"mcpServers":{}}\n'
-        if (
-            not isolated_mcp_config.is_file()
-            or isolated_mcp_config.read_text(encoding="utf-8")
-            != isolated_mcp_text
-        ):
-            isolated_mcp_config.write_text(
-                isolated_mcp_text,
-                encoding="utf-8",
-            )
-
-        serena_home = work_dir / "serena-home"
-        serena_home.mkdir(parents=True, exist_ok=True)
-        serena_config = serena_home / "serena_config.yml"
-        serena_config_text = (
-            "projects: []\n"
-            "gui_log_window: false\n"
-            "web_dashboard: false\n"
-            "web_dashboard_open_on_launch: false\n"
-        )
-        if (
-            not serena_config.is_file()
-            or serena_config.read_text(encoding="utf-8") != serena_config_text
-        ):
-            serena_config.write_text(
-                serena_config_text,
-                encoding="utf-8",
-            )
-
-        env_overrides = {"SERENA_HOME": str(serena_home)}
-        if os.name == "nt":
-            env_overrides.update(
-                {
-                    "USERPROFILE": str(isolated_cli_home),
-                    "APPDATA": str(isolated_cli_home / "AppData" / "Roaming"),
-                    "LOCALAPPDATA": str(isolated_cli_home / "AppData" / "Local"),
-                }
-            )
-        else:
-            env_overrides.update(
-                {
-                    "HOME": str(isolated_cli_home),
-                    "XDG_CONFIG_HOME": str(isolated_cli_home / ".config"),
-                    "XDG_DATA_HOME": str(isolated_cli_home / ".local" / "share"),
-                    "XDG_CACHE_HOME": str(isolated_cli_home / ".cache"),
-                }
-            )
-        serena_command = shutil.which("serena", path=_cli_search_path())
-        if serena_command and '"' not in serena_command:
-            wrapper_dir = work_dir / "hidden-tools"
-            wrapper_dir.mkdir(parents=True, exist_ok=True)
-            resolved_serena = Path(serena_command).resolve()
-            if os.name == "nt":
-                serena_wrapper = wrapper_dir / "serena.cmd"
-                wrapper_text = (
-                    "@echo off\r\n"
-                    f'"{resolved_serena}" %* '
-                    "--enable-web-dashboard false "
-                    "--enable-gui-log-window false "
-                    "--open-web-dashboard false\r\n"
-                )
-            else:
-                serena_wrapper = wrapper_dir / "serena"
-                wrapper_text = (
-                    "#!/bin/sh\n"
-                    f'exec "{resolved_serena}" "$@" '
-                    "--enable-web-dashboard false "
-                    "--enable-gui-log-window false "
-                    "--open-web-dashboard false\n"
-                )
-            if (
-                not serena_wrapper.is_file()
-                or serena_wrapper.read_text(encoding="utf-8") != wrapper_text
-            ):
-                serena_wrapper.write_text(wrapper_text, encoding="utf-8")
-            if os.name != "nt":
-                serena_wrapper.chmod(0o700)
-            env_overrides["PATH"] = (
-                str(wrapper_dir)
-                + os.pathsep
-                + _cli_search_path()
-            )
+        env_overrides = {"PATH": _usage_probe_path()}
     except OSError as exc:
         raise SubscriptionUsageError(
             "Antigravity 임시 실행 환경 준비 실패"

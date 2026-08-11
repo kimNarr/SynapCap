@@ -69,7 +69,7 @@ SynapCap은 웹 채팅 페이지를 읽지 않습니다. 각 서비스의 로컬
 | 앱 표시 | 의미 | 확인 및 조치 |
 | --- | --- | --- |
 | `설치 필요` | 해당 로컬 CLI 실행 파일을 찾지 못함 | 아래 설치 명령을 실행하고 `--version`으로 확인한 뒤 CLI를 한 번 실행해 로그인합니다. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다. |
-| `로그인 필요` | CLI는 있지만 구독 계정 인증이 없거나 만료됨 | 터미널에서 `codex`, `agy` 또는 `claude`를 직접 실행하고 브라우저 로그인 절차를 완료합니다. |
+| `로그인 필요` | CLI는 있지만 구독 계정 인증이 없거나 만료됨 | 터미널에서 `codex`, `agy` 또는 `claude`를 직접 실행하고 브라우저 로그인 절차를 완료합니다. Antigravity가 인증 코드를 보여 주면 복사한 뒤 `agy`가 기다리는 터미널 입력란에 붙여 넣고 Enter를 누릅니다. |
 | `시간 초과` | CLI가 제한 시간 안에 응답하지 않음 | 네트워크를 확인하고 실행 중인 CLI를 종료한 뒤 SynapCap에서 다시 새로고침합니다. 반복되면 해당 CLI를 직접 실행해 표시되는 오류를 확인합니다. |
 | `조회 오류` | 출력 형식 변경 등 그 밖의 오류 | 상태 배지에 마우스를 올려 상세 메시지를 확인하고 SynapCap과 CLI를 최신 버전으로 업데이트합니다. 계속되면 상세 메시지와 운영체제를 GitHub Issue에 남깁니다. |
 
@@ -101,7 +101,7 @@ agy
 claude
 ```
 
-로그인을 마치면 SynapCap을 완전히 종료했다가 다시 실행하고 새로고침합니다. `v0.1.1` 이상은 macOS Finder에서 실행해도 Homebrew, `~/.local/bin`, npm·pnpm·Bun·Volta·asdf·nvm 경로를 자동 탐색합니다. 자세한 설치 방법은 [Codex CLI](https://learn.chatgpt.com/docs/codex/cli), [Antigravity CLI](https://codelabs.developers.google.com/antigravity-cli-hands-on), [Claude Code](https://code.claude.com/docs/en/getting-started) 공식 문서를 참고하세요.
+로그인을 마치면 SynapCap을 완전히 종료했다가 다시 실행하고 새로고침합니다. 로그인 후에도 Antigravity만 실패하면 macOS의 **키체인 접근** 앱에서 `Antigravity CLI` 항목의 접근 제어 목록에 `agy`가 허용되어 있는지 확인합니다. `v0.1.1` 이상은 macOS Finder에서 실행해도 Homebrew, `~/.local/bin`, npm·pnpm·Bun·Volta·asdf·nvm 경로를 자동 탐색합니다. 자세한 설치 방법은 [Codex CLI](https://learn.chatgpt.com/docs/codex/cli), [Antigravity CLI](https://antigravity.google/docs/cli-install), [Claude Code](https://code.claude.com/docs/en/getting-started) 공식 문서를 참고하세요.
 
 ## 데이터와 개인정보
 
@@ -109,9 +109,9 @@ claude
 - 구독 사용량은 설치된 로컬 CLI 프로세스에서 읽습니다.
 - 설정은 사용자 컴퓨터에만 저장됩니다.
 - 업데이트 확인은 시작 시 GitHub의 최신 Release 정보만 조회하며 설정에서 끌 수 있습니다. 새 버전은 상단 버전 배지, 운영체제 알림과 트레이 메뉴에 표시됩니다.
-- SynapCap은 사용자의 MCP 설정을 삭제하거나 일괄 비활성화하지 않으며, 사용량 조회용 CLI는 별도의 빈 MCP 환경에서 실행합니다.
+- SynapCap은 사용자의 MCP 설정을 삭제하거나 일괄 비활성화하지 않습니다. Claude 조회는 빈 MCP 구성으로, Antigravity 조회는 기존 CLI 로그인 상태를 유지하면서 MCP 실행 도구가 제외된 제한 경로와 샌드박스로 실행합니다.
 
-Windows에서 일반 CLI 콘솔은 숨김 처리합니다. Claude는 공식 엄격 MCP 설정으로, Antigravity는 별도의 CLI 설정 루트와 빈 MCP 설정 및 샌드박스로 실행합니다. macOS에서는 CLI 탐색 중 Music 같은 보호 폴더나 네트워크·외장 볼륨도 조회하지 않습니다.
+Windows에서 일반 CLI 콘솔은 숨김 처리합니다. Claude는 공식 엄격 MCP 설정으로 실행하며 Antigravity는 macOS Keychain을 포함한 기존 사용자 인증을 그대로 사용합니다. macOS에서는 CLI 탐색 중 Music 같은 보호 폴더나 네트워크·외장 볼륨도 조회하지 않습니다.
 
 ## 소스에서 실행
 

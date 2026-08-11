@@ -126,52 +126,35 @@ class SubscriptionUsageTests(unittest.TestCase):
         self.assertIn("주간 52% 남음", result.status_text)
         self.assertEqual([window.label for window in result.windows], ["5시간", "주간"])
         self.assertEqual([window.used_percent for window in result.windows], [8.0, 48.0])
-        serena_home = run_command.call_args.kwargs["env_overrides"]["SERENA_HOME"]
-        self.assertTrue(serena_home.endswith("serena-home"))
         environment = run_command.call_args.kwargs["env_overrides"]
-        home_variable = "USERPROFILE" if os.name == "nt" else "HOME"
-        isolated_home = environment[home_variable]
-        isolated_mcp = (
-            Path(isolated_home) / ".gemini" / "config" / "mcp_config.json"
-        )
-        self.assertEqual(
-            isolated_mcp.read_text(encoding="utf-8"),
-            '{"mcpServers":{}}\n',
-        )
+        self.assertIn("PATH", environment)
+        self.assertNotIn("HOME", environment)
+        self.assertNotIn("USERPROFILE", environment)
+        self.assertNotIn(".local", environment["PATH"])
+        self.assertNotIn("agy", environment["PATH"].lower())
         command = run_command.call_args.args[0]
         self.assertIn("--sandbox", command)
         self.assertIn("--log-file", command)
-        serena_config = Path(serena_home) / "serena_config.yml"
-        self.assertIn("projects: []", serena_config.read_text(encoding="utf-8"))
 
     @patch("subscription_usage._run_text_command")
     @patch("subscription_usage._command_path")
-    def test_antigravity_repairs_stale_serena_config(self, command_path, run_command):
+    def test_antigravity_keeps_real_user_home_for_keyring(self, command_path, run_command):
         command_path.return_value = "agy.exe"
         run_command.return_value = (
             "Gemini Models\tWeekly Limit Remaining\t52%\t2026-08-12T00:49:11Z"
         )
-        with tempfile.TemporaryDirectory() as temp_dir:
-            serena_home = Path(temp_dir) / "SynapCap" / "antigravity" / "serena-home"
-            serena_home.mkdir(parents=True)
-            serena_config = serena_home / "serena_config.yml"
-            serena_config.write_text(
-                "gui_log_window: false\nweb_dashboard: false\n",
-                encoding="utf-8",
-            )
 
-            with patch(
-                "subscription_usage.tempfile.gettempdir", return_value=temp_dir
-            ):
-                query_antigravity_subscription({"quota_group": "Gemini Models"})
+        query_antigravity_subscription({"quota_group": "Gemini Models"})
 
-            self.assertEqual(
-                serena_config.read_text(encoding="utf-8"),
-                "projects: []\n"
-                "gui_log_window: false\n"
-                "web_dashboard: false\n"
-                "web_dashboard_open_on_launch: false\n",
-            )
+        environment = run_command.call_args.kwargs["env_overrides"]
+        for variable in (
+            "HOME",
+            "USERPROFILE",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "XDG_CONFIG_HOME",
+        ):
+            self.assertNotIn(variable, environment)
 
     @patch("subscription_usage._run_text_command")
     @patch("subscription_usage._command_path")
