@@ -110,6 +110,8 @@ python main.py
 
 전체 형식은 [synapcap.example.json](synapcap.example.json)을 참고하세요. 실제 설정 파일은 토큰이나 로컬 정보가 섞일 가능성에 대비해 Git에서 제외됩니다.
 
+예정된 수정과 개선 항목은 [수정 및 개선 목록](docs/ROADMAP.md)에서 관리합니다.
+
 ## 개발과 테스트
 
 ```bash
