@@ -123,6 +123,9 @@ Current week (all models): 50% used · resets Aug 12, 4am (Asia/Seoul)
 
         result = query_claude_subscription({})
 
+        command = run_command.call_args.args[0]
+        self.assertIn("--safe-mode", command)
+        self.assertIn("--no-chrome", command)
         self.assertEqual(result.used_percent, 50.0)
         self.assertEqual(result.model_name, "Claude Code")
         self.assertIn("주간", result.status_text)

@@ -30,6 +30,15 @@ jobs:
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
+      - name: Check repository hygiene
+        shell: pwsh
+        run: |
+          $blockedPattern = '(^|/)(synapcap\.json|\.venv|build|dist|artifacts|__pycache__)(/|$)|\.log$|\.spec$|^assets/synapcap\.(png|ico|icns)$'
+          $blocked = git ls-files | Where-Object { $_ -match $blockedPattern }
+          if ($blocked) {
+            Write-Error "Local or generated files must not be merged:`n$($blocked -join "`n")"
+            exit 1
+          }
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

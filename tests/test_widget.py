@@ -159,6 +159,7 @@ class WidgetTests(unittest.TestCase):
         self.widget.quit_requested.connect(lambda: quit_requests.append(True))
 
         self.assertEqual(self.widget.windowType(), Qt.WindowType.Window)
+        self.assertEqual(self.widget.version_btn.height(), 20)
         self.widget.minimize_btn.click()
         self.app.processEvents()
         self.assertTrue(self.widget.isMinimized())
@@ -177,6 +178,15 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(quit_requests, [])
         self.assertFalse(self.widget.isVisible())
+
+    def test_cached_usage_does_not_rebuild_existing_rows(self):
+        self.widget.update_data([self.usage])
+        original_row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+
+        self.widget.update_data([self.usage])
+
+        current_row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        self.assertIs(current_row, original_row)
 
     def test_missing_reset_is_shown_explicitly(self):
         self.widget.provider_ui_map["codex"]["show_five_hour"] = True

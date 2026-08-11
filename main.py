@@ -87,13 +87,13 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
         }
         QMessageBox QLabel#qt_msgbox_label,
         QMessageBox QLabel#qt_msgbox_informativelabel {
-            min-width: 280px;
+            min-width: 240px;
         }
         QMessageBox QPushButton {
-            min-width: 76px;
-            padding: 7px 14px;
+            min-width: 60px;
+            padding: 5px 10px;
             border: 1px solid #45475A;
-            border-radius: 7px;
+            border-radius: 6px;
             background-color: #313244;
             color: #CDD6F4;
         }

@@ -124,7 +124,11 @@ class QuitConfirmationTests(unittest.TestCase):
         icon_label = dialog.findChild(QLabel, "qt_msgboxex_icon_label")
         self.assertIsNotNone(icon_label)
         self.assertLess(icon_label.minimumWidth(), 100)
-        self.assertLess(dialog.sizeHint().width(), 500)
+        self.assertLess(dialog.sizeHint().width(), 420)
+        self.assertLess(
+            dialog.button(QMessageBox.StandardButton.Yes).sizeHint().width(),
+            90,
+        )
 
 if __name__ == "__main__":
     unittest.main()

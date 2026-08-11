@@ -583,6 +583,8 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
     output = _run_text_command(
         [
             str(executable),
+            "--safe-mode",
+            "--no-chrome",
             "-p",
             "/usage",
             "--output-format",

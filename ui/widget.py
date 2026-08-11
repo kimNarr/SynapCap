@@ -190,6 +190,7 @@ class SynapCapWidget(QWidget):
         header_layout.addWidget(self.title_label)
 
         self.version_btn = QPushButton(f"v{APP_VERSION}")
+        self.version_btn.setFixedHeight(20)
         self.version_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.version_btn.clicked.connect(self._open_update)
         self._set_version_badge_style(False)
@@ -197,7 +198,9 @@ class SynapCapWidget(QWidget):
             self.version_btn,
             f"현재 버전 v{APP_VERSION}",
         )
-        header_layout.addWidget(self.version_btn)
+        header_layout.addWidget(
+            self.version_btn, 0, Qt.AlignmentFlag.AlignVCenter
+        )
 
         header_layout.addStretch()
 
@@ -298,7 +301,7 @@ class SynapCapWidget(QWidget):
         self.version_btn.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
             f"border: 1px solid {border}; border-radius: 5px; "
-            "padding: 2px 5px; font-size: 8px; font-weight: 700;"
+            "padding: 0 6px; font-size: 8px; font-weight: 700;"
         )
 
     def set_update_available(self, version: str, url: str) -> None:
@@ -319,7 +322,7 @@ class SynapCapWidget(QWidget):
         self._update_view_button()
         self.view_mode_changed.emit(self.usage_view)
         if self.latest_usage:
-            self.update_data(self.latest_usage)
+            self.update_data(self.latest_usage, force=True)
 
     def _build_provider_cards(self):
         self.provider_ui_map.clear()
@@ -469,7 +472,7 @@ class SynapCapWidget(QWidget):
 
         self._build_provider_cards()
         if preserved_usage:
-            self.update_data(preserved_usage)
+            self.update_data(preserved_usage, force=True)
         self.adjustSize()
 
     @staticmethod
@@ -700,16 +703,27 @@ class SynapCapWidget(QWidget):
             ui["windows_layout"].addWidget(row_widget)
             ui["window_rows"].append(row_widget)
 
-    def update_data(self, usage_list: list[ModelUsage]):
+    def update_data(
+        self,
+        usage_list: list[ModelUsage],
+        force: bool = False,
+    ):
+        previous_usage = {
+            usage.provider_id: usage for usage in self.latest_usage
+        }
         self.latest_usage = list(usage_list)
         settings = self.config_data.get("settings", {})
         size_key = settings.get("widget_size", "Medium")
         preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
+        rendered_provider = False
 
         for usage in usage_list:
             if usage.provider_id not in self.provider_ui_map:
                 continue
+            if not force and previous_usage.get(usage.provider_id) is usage:
+                continue
 
+            rendered_provider = True
             ui = self.provider_ui_map[usage.provider_id]
 
             if usage.error:
@@ -749,6 +763,9 @@ class SynapCapWidget(QWidget):
                     )
                     self._set_status_badge(ui["status"], "waiting", preset)
                     self._clear_usage_rows(ui)
+
+        if not rendered_provider:
+            return
 
         self.cards_layout.activate()
         self.frame_layout.activate()
