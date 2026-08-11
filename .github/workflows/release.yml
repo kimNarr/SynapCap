@@ -1,0 +1,117 @@
+name: Build and publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Linux Qt runtime libraries
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Validate tag and app version
+        run: python scripts/manage_version.py check "${GITHUB_REF_NAME}"
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests -v
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Python dependencies
+        run: pip install -r requirements-build.txt
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          ./scripts/build_windows.ps1 -Version $version
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: artifacts/SynapCap-Windows-x64-Setup.exe
+          if-no-files-found: error
+
+  macos:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements-build.txt
+      - name: Build macOS disk image
+        run: |
+          chmod +x scripts/build_macos.sh
+          scripts/build_macos.sh "${GITHUB_REF_NAME#v}" "${{ matrix.architecture }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-${{ matrix.architecture }}
+          path: artifacts/SynapCap-macOS-${{ matrix.architecture }}.dmg
+          if-no-files-found: error
+
+  release:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: artifacts
+        run: sha256sum * > SHA256SUMS.txt
+      - name: Prepare release notes
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: python scripts/manage_version.py notes "$TAG_NAME" > release-notes.md
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" artifacts/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "SynapCap $TAG_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag

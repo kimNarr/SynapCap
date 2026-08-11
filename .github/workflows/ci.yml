@@ -1,0 +1,54 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check repository hygiene
+        shell: pwsh
+        run: |
+          $blockedPattern = '(^|/)(synapcap\.json|\.venv|build|dist|artifacts|__pycache__)(/|$)|\.log$|\.spec$|^assets/synapcap\.(png|ico|icns)$'
+          $blocked = git ls-files | Where-Object { $_ -match $blockedPattern }
+          if ($blocked) {
+            Write-Error "Local or generated files must not be merged:`n$($blocked -join "`n")"
+            exit 1
+          }
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Linux Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Check version metadata
+        run: python scripts/manage_version.py current
+      - name: Run tests
+        run: python -m unittest discover -s tests -v

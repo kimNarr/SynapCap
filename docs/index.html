@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="API 키 없이 Codex, Gemini, Claude의 5시간·주간 구독 사용량을 확인하는 데스크톱 위젯 SynapCap을 다운로드하세요.">
+  <meta name="theme-color" content="#11111b">
+  <meta property="og:title" content="SynapCap — AI 사용량을 한눈에">
+  <meta property="og:description" content="API 키 없이 Codex, Gemini, Claude의 5시간·주간 한도를 보여주는 가벼운 데스크톱 위젯">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kimNarr.github.io/SynapCap/">
+  <link rel="canonical" href="https://kimNarr.github.io/SynapCap/">
+  <title>SynapCap — AI 사용량 위젯</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="SynapCap 홈">
+      <img src="assets/logo.svg" alt="" width="34" height="34">
+      <span>SynapCap</span>
+    </a>
+    <nav aria-label="주요 메뉴">
+      <a href="#download">다운로드</a>
+      <a href="#features">기능</a>
+      <a href="#requirements">연동 조건</a>
+      <a href="#updates">업데이트</a>
+      <a class="github-link" href="https://github.com/kimNarr/SynapCap" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero section-shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="live-dot"></span><span id="release-status" aria-live="polite">첫 공개 버전 준비 중</span></div>
+        <h1>AI 한도,<br><span>작게 띄워두고</span><br>한눈에.</h1>
+        <p class="hero-description">Codex, Gemini, Claude의 5시간·주간 구독 사용량과 리셋 시간을 하나의 가벼운 데스크톱 위젯에서 확인하세요.</p>
+        <div class="hero-actions">
+          <a id="primary-download" class="button button-primary" href="https://github.com/kimNarr/SynapCap/releases/latest">
+            <span class="button-os" aria-hidden="true">↓</span>
+            <span><strong id="primary-download-label">최신 버전 다운로드</strong><small id="primary-platform">운영체제 자동 확인</small></span>
+          </a>
+          <a id="alternate-download" class="button button-secondary" href="#download">다른 운영체제 선택</a>
+        </div>
+        <p class="microcopy">무료 · 오픈소스 · API 키 불필요 · 사용량은 로컬 도구에서 조회</p>
+      </div>
+
+      <div class="product-stage" aria-label="SynapCap 위젯 미리보기">
+        <div class="stage-glow"></div>
+        <div class="widget-preview">
+          <div class="widget-header">
+            <div class="widget-brand"><img src="assets/logo.svg" alt="" width="22" height="22"><strong>SynapCap</strong><span class="preview-version preview-tooltip" tabindex="0" data-tooltip="현재 버전 v0.1.0">v0.1.0</span></div>
+            <div class="widget-tools" aria-hidden="true"><span>◉</span><span>↻</span><span>⚙</span><span>—</span><span>×</span></div>
+          </div>
+          <div class="provider">
+            <div class="provider-name"><span class="preview-provider-badge codex-badge">Cx</span><strong>Codex</strong></div>
+            <div class="quota-label"><span class="reset-hint" tabindex="0" data-tooltip="8/17 09:30 초기화">주간 · 6일 17시간 후</span><b>11%</b></div>
+            <div class="track"><span style="width:11%"></span></div>
+          </div>
+          <div class="divider"></div>
+          <div class="provider">
+            <div class="provider-name"><span class="preview-provider-badge gemini-badge">G</span><strong>Gemini</strong></div>
+            <div class="quota-label"><span class="reset-hint" tabindex="0" data-tooltip="8/10 20:00 초기화">5시간 · 2시간 49분 후</span><b>15%</b></div>
+            <div class="track"><span style="width:15%"></span></div>
+            <div class="quota-label second"><span class="reset-hint" tabindex="0" data-tooltip="8/12 09:49 초기화">주간 · 1일 16시간 후</span><b>49%</b></div>
+            <div class="track"><span style="width:49%"></span></div>
+          </div>
+          <div class="divider"></div>
+          <div class="provider">
+            <div class="provider-name"><span class="preview-provider-badge claude-badge">Cl</span><strong>Claude</strong></div>
+            <div class="quota-label"><span class="reset-hint" tabindex="0" data-tooltip="8/10 19:29 초기화">5시간 · 2시간 18분 후</span><b>30%</b></div>
+            <div class="track"><span style="width:30%"></span></div>
+            <div class="quota-label second"><span class="reset-hint" tabindex="0" data-tooltip="8/12 04:00 초기화">주간 · 2일 11시간 후</span><b>52%</b></div>
+            <div class="track"><span style="width:52%"></span></div>
+          </div>
+          <div class="stage-caption"><span></span>막대형과 링형 보기를 자유롭게 전환</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features section-shell">
+      <div class="section-heading">
+        <p class="section-kicker">필요한 정보만</p>
+        <h2>작지만 충분한 위젯</h2>
+      </div>
+      <div class="feature-grid">
+        <article><div class="feature-icon">01</div><h3>기준을 하나로</h3><p>서비스마다 다른 표시 방식을 모두 사용량 기준으로 통일합니다.</p></article>
+        <article><div class="feature-icon">02</div><h3>한도를 내 방식대로</h3><p>5시간·주간 한도를 함께 보거나 프로바이더별로 필요한 항목만 남깁니다.</p></article>
+        <article><div class="feature-icon">03</div><h3>리셋까지 바로</h3><p>남은 시간을 먼저 보여주고 마우스를 올리면 <code>8/12 15:09 초기화</code>처럼 정확한 시각을 즉시 표시합니다.</p></article>
+        <article><div class="feature-icon">04</div><h3>로컬 우선</h3><p>API 키를 서버로 보내지 않고 로그인된 로컬 클라이언트에서 조회합니다.</p></article>
+        <article><div class="feature-icon">05</div><h3>익숙한 창 제어</h3><p>작업 표시줄로 최소화하고 종료 전 확인하며 트레이에서도 위젯을 제어합니다.</p></article>
+        <article><div class="feature-icon">06</div><h3>놓치지 않는 업데이트</h3><p>상단 버전 배지, 운영체제 알림과 트레이 메뉴에서 새 Release를 안내합니다.</p></article>
+      </div>
+    </section>
+
+    <section id="download" class="download-section section-shell">
+      <div class="section-heading centered">
+        <p class="section-kicker">Download</p>
+        <h2>내 운영체제에 맞게 설치</h2>
+        <p id="release-meta" aria-live="polite">첫 번째 GitHub Release가 게시되면 자동으로 최신 버전이 연결됩니다.</p>
+      </div>
+      <div class="download-grid">
+        <article class="download-card" data-platform-card="windows">
+          <div class="os-mark windows-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <div><h3>Windows</h3><p>Windows 10/11 · 64비트</p></div>
+          <a class="download-link" data-asset="SynapCap-Windows-x64-Setup.exe" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SynapCap-Windows-x64-Setup.exe">설치 파일 받기 <span>↓</span></a>
+        </article>
+        <article class="download-card" data-platform-card="mac">
+          <div class="os-mark apple-mark" aria-hidden="true">●</div>
+          <div><h3>macOS</h3><p>Apple Silicon · M1 이상</p></div>
+          <a class="download-link" data-asset="SynapCap-macOS-arm64.dmg" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SynapCap-macOS-arm64.dmg">Apple Silicon 받기 <span>↓</span></a>
+        </article>
+        <article class="download-card compact-card" data-platform-card="mac-intel">
+          <div class="os-mark intel-mark" aria-hidden="true">x64</div>
+          <div><h3>macOS Intel</h3><p>Intel 기반 Mac</p></div>
+          <a class="download-link" data-asset="SynapCap-macOS-x64.dmg" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SynapCap-macOS-x64.dmg">Intel 버전 받기 <span>↓</span></a>
+        </article>
+      </div>
+      <div class="download-support">
+        <a class="checksum-link" data-asset="SHA256SUMS.txt" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SHA256SUMS.txt">SHA-256 체크섬 받기</a>
+        <a href="https://github.com/kimNarr/SynapCap/releases/latest" target="_blank" rel="noreferrer">릴리스 노트 보기 <span aria-hidden="true">↗</span></a>
+      </div>
+      <p class="signing-note">초기 버전은 코드 서명 전이므로 운영체제의 보안 경고가 표시될 수 있습니다. 설치 파일은 이 페이지가 연결하는 공식 GitHub Release에서만 받으세요.</p>
+    </section>
+
+    <section id="requirements" class="requirements section-shell">
+      <div class="requirement-copy">
+        <p class="section-kicker">Before installing</p>
+        <h2>웹 채팅이 아닌<br>로컬 로그인 기준</h2>
+        <p>SynapCap은 각 서비스의 로컬 앱 또는 CLI가 제공하는 구독 한도를 읽습니다. 웹 채팅만 사용하는 계정의 사용량은 조회하지 않으며 별도의 유료 API를 호출하지 않습니다.</p>
+      </div>
+      <div class="requirement-list">
+        <div><span class="service-letter">Cx</span><p><strong>Codex</strong><small>Codex CLI · Windows는 Codex 앱도 지원</small></p><b>로그인 필요</b></div>
+        <div><span class="service-letter gemini-letter">G</span><p><strong>Gemini</strong><small>Antigravity CLI 설치 및 로그인</small></p><b>로그인 필요</b></div>
+        <div><span class="service-letter claude-letter">Cl</span><p><strong>Claude</strong><small>Claude Code CLI 설치 및 로그인</small></p><b>로그인 필요</b></div>
+      </div>
+    </section>
+
+    <section id="updates" class="updates section-shell">
+      <div class="section-heading centered">
+        <p class="section-kicker">Safe updates</p>
+        <h2>패치는 알리고, 설치는 사용자가</h2>
+        <p>서명되지 않은 초기 버전에서는 백그라운드 자동 설치 대신 확인 가능한 업데이트 흐름을 사용합니다.</p>
+      </div>
+      <div class="update-flow">
+        <article><span>1</span><h3>새 버전 확인</h3><p>앱 시작 시 GitHub의 최신 공개 버전 번호만 확인합니다. 설정에서 끌 수 있습니다.</p></article>
+        <article><span>2</span><h3>공식 Release 이동</h3><p>상단 업데이트 배지나 트레이 메뉴를 눌러 공식 GitHub Release에서 운영체제별 파일을 선택합니다.</p></article>
+        <article><span>3</span><h3>변경·무결성 확인</h3><p>CHANGELOG 기반 릴리스 노트와 SHA-256 체크섬으로 수정 내용과 파일을 확인합니다.</p></article>
+      </div>
+      <div class="document-links">
+        <a href="https://github.com/kimNarr/SynapCap/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">변경 기록</a>
+        <a href="https://github.com/kimNarr/SynapCap/blob/main/SECURITY.md" target="_blank" rel="noreferrer">보안 정책</a>
+        <a href="https://github.com/kimNarr/SynapCap/blob/main/docs/RELEASING.md" target="_blank" rel="noreferrer">패치 관리 방식</a>
+      </div>
+    </section>
+
+    <section class="privacy section-shell">
+      <div>
+        <p class="section-kicker">Local by design</p>
+        <h2>계정 정보는<br>내 컴퓨터에</h2>
+      </div>
+      <div class="privacy-points">
+        <p><strong>API 키 수집 없음</strong><span>기존 로컬 CLI 로그인 상태를 사용하며 SynapCap 서버는 없습니다.</span></p>
+        <p><strong>설정도 로컬 저장</strong><span>프로바이더 선택과 위젯 환경설정은 사용자 컴퓨터에만 저장됩니다.</span></p>
+        <p><strong>MCP 설정 보존</strong><span>사용자의 MCP 설정을 삭제하거나 일괄 비활성화하지 않습니다.</span></p>
+      </div>
+    </section>
+
+    <section class="final-cta section-shell">
+      <img src="assets/logo.svg" alt="" width="54" height="54">
+      <h2>사용량 확인은 SynapCap에 맡기고,<br>작업에 집중하세요.</h2>
+      <a href="#download" class="button button-primary">다운로드 선택하기</a>
+    </section>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div class="brand"><img src="assets/logo.svg" alt="" width="28" height="28"><span>SynapCap</span></div>
+    <div class="footer-links"><a href="https://github.com/kimNarr/SynapCap#readme">README</a><a href="https://github.com/kimNarr/SynapCap/releases">Releases</a><a href="https://github.com/kimNarr/SynapCap/blob/main/LICENSE">MIT License</a></div>
+    <p>Made by <a href="https://github.com/kimNarr">kimNarr</a></p>
+  </footer>
+</body>
+</html>

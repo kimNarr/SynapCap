@@ -1,0 +1,51 @@
+{
+  "settings": {
+    "refresh_interval_sec": 30,
+    "always_on_top": true,
+    "widget_width": 300,
+    "widget_size": "Medium",
+    "usage_view": "bar",
+    "usage_value_bold": true,
+    "check_updates": true,
+    "theme": "dark"
+  },
+  "providers": [
+    {
+      "id": "codex",
+      "name": "Codex",
+      "type": "codex",
+      "enabled": true,
+      "source": "local_subscription",
+      "cache_ttl_sec": 60,
+      "show_five_hour": false,
+      "show_weekly": true,
+      "limit": 100.0,
+      "unit": "%"
+    },
+    {
+      "id": "antigravity",
+      "name": "Gemini",
+      "type": "antigravity",
+      "enabled": true,
+      "source": "local_subscription",
+      "quota_group": "Gemini Models",
+      "cache_ttl_sec": 120,
+      "show_five_hour": true,
+      "show_weekly": true,
+      "limit": 100.0,
+      "unit": "%"
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "type": "claude",
+      "enabled": true,
+      "source": "local_subscription",
+      "cache_ttl_sec": 60,
+      "show_five_hour": true,
+      "show_weekly": true,
+      "limit": 100.0,
+      "unit": "%"
+    }
+  ]
+}

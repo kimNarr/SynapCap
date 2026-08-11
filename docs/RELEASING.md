@@ -1,0 +1,59 @@
+# 릴리스와 패치 관리
+
+SynapCap은 `MAJOR.MINOR.PATCH` 형식으로 버전을 관리합니다.
+
+- `PATCH`: 오류·보안 수정 (`0.1.0 → 0.1.1`)
+- `MINOR`: 하위 호환 기능 추가 (`0.1.1 → 0.2.0`)
+- `MAJOR`: 호환되지 않는 변경 (`0.2.0 → 1.0.0`)
+
+## 패치 릴리스 절차
+
+1. `CHANGELOG.md`의 `[Unreleased]` 아래에 변경 내용을 작성합니다.
+2. 아래 수동 테스트 목록을 확인합니다.
+3. 자동 테스트를 실행합니다.
+4. 버전을 올립니다.
+
+```bash
+python scripts/manage_version.py bump patch
+python -m unittest discover -s tests -v
+```
+
+5. 변경을 `dev`에 커밋하고 `main`으로 병합합니다.
+6. 병합된 커밋에 버전 태그를 생성해 푸시합니다.
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+GitHub Actions는 태그와 `APP_VERSION`이 같은지 확인한 후 Windows 설치 파일, Apple Silicon 및 Intel macOS DMG, SHA-256 체크섬을 게시합니다. Release 설명은 해당 버전의 `CHANGELOG.md`에서 가져옵니다.
+
+## 배포 전 수동 테스트
+
+- Codex, Gemini, Claude가 로그인 상태에서 사용량을 정상 조회하는지 확인
+- Gemini와 Claude의 5시간·주간 표시 옵션 및 둘 다 끄기 방지가 동작하는지 확인
+- Codex가 주간 한도만 고정 표시하는지 확인
+- 막대형·링형 전환과 글꼴 굵기가 정상인지 확인
+- 툴팁이 대상 바로 아래에 즉시 표시되고 리셋 시각이 `8/12 15:09 초기화` 형식인지 확인
+- 화면 설정 저장 시 CLI를 다시 실행하거나 `대기 중`으로 돌아가지 않는지 확인
+- 최소화 후 작업 표시줄/Dock과 트레이에서 정상 복원되는지 확인
+- `×`, 작업 표시줄 닫기, 트레이 종료에서 확인창의 취소·종료가 각각 동작하는지 확인
+- 새 버전이 있을 때 상단 배지, 운영체제 알림과 트레이 메뉴가 표시되는지 확인
+- Windows에서 CLI 또는 MCP 콘솔 창이 순간적으로 나타나지 않는지 확인
+- 앱 재시작 후 설정과 프로바이더 순서가 유지되는지 확인
+
+## 로컬 확인 명령
+
+```bash
+python scripts/manage_version.py current
+python scripts/manage_version.py check v0.1.1
+python scripts/manage_version.py notes v0.1.1
+```
+
+Windows 로컬 번들 확인:
+
+```powershell
+.\scripts\build_windows.ps1 -Version 0.1.1 -SkipInstaller
+```
+
+서명과 공증이 도입되기 전까지 앱은 새 버전을 자동 설치하지 않습니다. 사용자는 상단 업데이트 배지나 트레이 메뉴에서 공식 GitHub Release 페이지로 이동해 설치 파일을 받습니다.
