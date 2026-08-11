@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
 )
 from .icon import (
     create_app_pixmap,
-    create_status_dot_pixmap,
     create_power_icon,
     create_refresh_icon,
     create_usage_view_icon,
@@ -23,22 +22,34 @@ SIZE_PRESETS = {
         "title_size": 11,
         "name_size": 11,
         "val_size": 10,
-        "pbar_height": 6
+        "pbar_height": 6,
+        "badge_size": 26,
+        "card_padding": 8,
     },
     "Medium": {
         "width": 300,
         "title_size": 13,
         "name_size": 12,
         "val_size": 11,
-        "pbar_height": 8
+        "pbar_height": 8,
+        "badge_size": 30,
+        "card_padding": 10,
     },
     "Large": {
         "width": 350,
         "title_size": 15,
         "name_size": 14,
         "val_size": 12,
-        "pbar_height": 10
+        "pbar_height": 10,
+        "badge_size": 34,
+        "card_padding": 12,
     }
+}
+
+PROVIDER_BADGES = {
+    "codex": ("Cx", "#89B4FA", "#252B3F"),
+    "antigravity": ("G", "#A6E3A1", "#26372F"),
+    "claude": ("Cl", "#FAB387", "#3A2B2B"),
 }
 
 
@@ -104,7 +115,13 @@ class SynapCapWidget(QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.SubWindow |
-            (Qt.WindowType.WindowStaysOnTopHint if self.config_data.get("settings", {}).get("always_on_top", True) else Qt.WindowType(0))
+            (
+                Qt.WindowType.WindowStaysOnTopHint
+                if self.config_data.get("settings", {}).get(
+                    "always_on_top", True
+                )
+                else Qt.WindowType(0)
+            )
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -121,16 +138,22 @@ class SynapCapWidget(QWidget):
         outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.frame = QFrame()
+        self.frame.setObjectName("rootFrame")
         self.frame.setStyleSheet("""
             QWidget {
                 border: none;
                 outline: none;
                 background: transparent;
             }
-            QFrame {
+            QFrame#rootFrame {
                 background-color: #1E1E2E;
                 border: 1px solid #313244;
-                border-radius: 12px;
+                border-radius: 16px;
+            }
+            QFrame#providersFrame {
+                background-color: #181825;
+                border: 1px solid #313244;
+                border-radius: 11px;
             }
             QLabel {
                 border: none;
@@ -140,8 +163,8 @@ class SynapCapWidget(QWidget):
         """)
 
         self.frame_layout = QVBoxLayout(self.frame)
-        self.frame_layout.setContentsMargins(12, 10, 12, 12)
-        self.frame_layout.setSpacing(8)
+        self.frame_layout.setContentsMargins(12, 11, 12, 12)
+        self.frame_layout.setSpacing(10)
 
         # 1. Header (Title & Controls)
         header_layout = QHBoxLayout()
@@ -155,7 +178,11 @@ class SynapCapWidget(QWidget):
 
         # Title Label
         self.title_label = QLabel("SynapCap")
-        self.title_label.setStyleSheet(f"color: #CDD6F4; font-weight: bold; font-size: {preset['title_size']}px; font-family: 'Segoe UI', sans-serif;")
+        self.title_label.setStyleSheet(
+            "color: #CDD6F4; font-weight: bold; "
+            f"font-size: {preset['title_size']}px; "
+            "font-family: 'Segoe UI', sans-serif;"
+        )
         header_layout.addWidget(self.title_label)
 
         header_layout.addStretch()
@@ -218,12 +245,16 @@ class SynapCapWidget(QWidget):
         self.frame_layout.addLayout(header_layout)
 
         # 2. Dynamic Provider Cards Container
+        self.cards_frame = QFrame()
+        self.cards_frame.setObjectName("providersFrame")
         self.cards_layout = QVBoxLayout()
-        self.cards_layout.setSpacing(5)
+        self.cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.cards_layout.setSpacing(0)
+        self.cards_frame.setLayout(self.cards_layout)
 
         self._build_provider_cards()
 
-        self.frame_layout.addLayout(self.cards_layout)
+        self.frame_layout.addWidget(self.cards_frame)
         outer_layout.addWidget(self.frame)
         
         self.adjustSize()
@@ -251,7 +282,11 @@ class SynapCapWidget(QWidget):
 
         # Update title font size dynamically
         if hasattr(self, "title_label"):
-            self.title_label.setStyleSheet(f"color: #CDD6F4; font-weight: bold; font-size: {preset['title_size']}px; font-family: 'Segoe UI', sans-serif;")
+            self.title_label.setStyleSheet(
+                "color: #CDD6F4; font-weight: bold; "
+                f"font-size: {preset['title_size']}px; "
+                "font-family: 'Segoe UI', sans-serif;"
+            )
 
         # Clear existing card widgets in layout
         while self.cards_layout.count():
@@ -265,30 +300,51 @@ class SynapCapWidget(QWidget):
         for index, provider in enumerate(self.providers):
             card_widget = QWidget()
             c_layout = QVBoxLayout(card_widget)
-            c_layout.setContentsMargins(0, 0, 0, 0)
-            c_layout.setSpacing(4)
+            card_padding = preset["card_padding"]
+            c_layout.setContentsMargins(
+                card_padding, card_padding, card_padding, card_padding
+            )
+            c_layout.setSpacing(7)
 
             # Title Row (LED Status Dot + Provider Name + Usage & Status Text)
             title_row = QHBoxLayout()
-            title_row.setSpacing(6)
+            title_row.setSpacing(9)
             title_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-            # LED Dot Label
-            dot_label = QLabel()
-            dot_label.setPixmap(create_status_dot_pixmap("warning", 12))
-            title_row.addWidget(dot_label)
+            provider_type = provider.config.get("type", provider.provider_id)
+            badge_text, badge_color, badge_background = PROVIDER_BADGES.get(
+                provider_type,
+                (provider.name[:2], "#CDD6F4", "#313244"),
+            )
+            provider_badge = QLabel(badge_text)
+            provider_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            provider_badge.setFixedSize(
+                preset["badge_size"], preset["badge_size"]
+            )
+            provider_badge.setStyleSheet(
+                f"background-color: {badge_background}; color: {badge_color}; "
+                f"border-radius: 7px; font-size: {max(9, preset['val_size'])}px; "
+                "font-weight: 800;"
+            )
+            provider_badge.setToolTip(provider.name)
+            title_row.addWidget(provider_badge)
 
             # Provider Name
             name_label = QLabel(provider.name)
-            name_label.setStyleSheet(f"color: #CDD6F4; font-weight: bold; font-size: {preset['name_size']}px; font-family: 'Segoe UI', sans-serif;")
+            name_label.setStyleSheet(
+                "color: #CDD6F4; font-weight: bold; "
+                f"font-size: {preset['name_size']}px; "
+                "font-family: 'Segoe UI', sans-serif;"
+            )
             title_row.addWidget(name_label)
 
             title_row.addStretch()
 
             # Waiting/error summary. Successful usage is rendered below.
-            val_label = QLabel("대기 중")
-            val_label.setStyleSheet(f"color: #A6ADC8; font-size: {preset['val_size']}px;")
-            title_row.addWidget(val_label)
+            status_label = QLabel("대기 중")
+            status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._set_status_badge(status_label, "waiting", preset)
+            title_row.addWidget(status_label)
 
             c_layout.addLayout(title_row)
 
@@ -301,9 +357,9 @@ class SynapCapWidget(QWidget):
 
             # Save UI elements for dynamic updates
             self.provider_ui_map[provider.provider_id] = {
-                "dot": dot_label,
+                "badge": provider_badge,
                 "name": name_label,
-                "val": val_label,
+                "status": status_label,
                 "windows_layout": windows_layout,
                 "window_rows": [],
                 "limit": provider.limit,
@@ -313,14 +369,39 @@ class SynapCapWidget(QWidget):
             if index < len(self.providers) - 1:
                 separator = QFrame()
                 separator.setFixedHeight(1)
-                separator.setStyleSheet("background-color: #313244; border: none;")
+                separator.setStyleSheet(
+                    "background-color: #313244; border: none;"
+                )
                 self.cards_layout.addWidget(separator)
             
         self.adjustSize()
 
-    def rebuild_ui(self, config_data: dict, providers: list[BaseAIProvider]):
+    @staticmethod
+    def _set_status_badge(label: QLabel, state: str, preset: dict) -> None:
+        colors = {
+            "waiting": ("#F9E2AF", "#323040"),
+            "error": ("#F38BA8", "#3B2735"),
+        }
+        foreground, background = colors.get(
+            state, ("#A6E3A1", "#26372F")
+        )
+        label.setStyleSheet(
+            f"color: {foreground}; background-color: {background}; "
+            "border-radius: 6px; padding: 3px 7px; "
+            f"font-size: {max(9, preset['val_size'] - 1)}px; font-weight: 700;"
+        )
+
+    def rebuild_ui(
+        self,
+        config_data: dict,
+        providers: list[BaseAIProvider],
+        preserve_usage: bool = True,
+    ):
+        preserved_usage = list(self.latest_usage) if preserve_usage else []
         self.config_data = config_data
         self.providers = providers
+        if not preserve_usage:
+            self.latest_usage = []
 
         settings = self.config_data.get("settings", {})
         configured_view = settings.get("usage_view", self.usage_view)
@@ -335,6 +416,8 @@ class SynapCapWidget(QWidget):
         self.set_always_on_top(settings.get("always_on_top", True))
 
         self._build_provider_cards()
+        if preserved_usage:
+            self.update_data(preserved_usage)
         self.adjustSize()
 
     @staticmethod
@@ -491,7 +574,11 @@ class SynapCapWidget(QWidget):
                 info_layout.setContentsMargins(0, 0, 0, 0)
                 info_layout.setSpacing(6)
 
-                reset_suffix = f" · {reset_display}" if reset_display else ""
+                reset_suffix = (
+                    f" · {reset_display}"
+                    if reset_display
+                    else " · 리셋 시각 미상"
+                )
                 window_label = QLabel(f"{window.label}{reset_suffix}")
                 window_label.setToolTip(reset_tooltip)
                 window_label.setStyleSheet(
@@ -526,7 +613,6 @@ class SynapCapWidget(QWidget):
         settings = self.config_data.get("settings", {})
         size_key = settings.get("widget_size", "Medium")
         preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
-        v_size = preset["val_size"]
 
         for usage in usage_list:
             if usage.provider_id not in self.provider_ui_map:
@@ -535,17 +621,15 @@ class SynapCapWidget(QWidget):
             ui = self.provider_ui_map[usage.provider_id]
 
             if usage.error:
-                ui["dot"].setPixmap(create_status_dot_pixmap("error", 12))
-                ui["dot"].setToolTip(f"조회 실패: {usage.error}")
-                ui["val"].show()
-                ui["val"].setText("조회 오류")
-                ui["val"].setToolTip(usage.error)
-                ui["val"].setStyleSheet(f"color: #F38BA8; font-size: {v_size}px; border: none; background: transparent;")
+                ui["badge"].setToolTip(f"조회 실패: {usage.error}")
+                ui["status"].show()
+                ui["status"].setText("조회 오류")
+                ui["status"].setToolTip(usage.error)
+                self._set_status_badge(ui["status"], "error", preset)
                 self._clear_usage_rows(ui)
             else:
-                ui["dot"].setPixmap(create_status_dot_pixmap("connected", 12))
-                ui["dot"].setToolTip("정상 조회 · 최신 데이터")
-                ui["val"].hide()
+                ui["badge"].setToolTip("정상 조회 · 최신 데이터")
+                ui["status"].hide()
                 windows = usage.windows or [
                     UsageWindow(
                         label="사용량",
@@ -572,6 +656,11 @@ class SynapCapWidget(QWidget):
 
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
+        currently_enabled = bool(
+            flags & Qt.WindowType.WindowStaysOnTopHint
+        )
+        if currently_enabled == always_on_top:
+            return
         if always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
         else:

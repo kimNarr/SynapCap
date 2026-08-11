@@ -130,6 +130,23 @@ Current week (all models): 50% used · resets Aug 12, 4am (Asia/Seoul)
         self.assertEqual([window.label for window in result.windows], ["5시간", "주간"])
         self.assertEqual([window.used_percent for window in result.windows], [6.0, 50.0])
 
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path")
+    def test_claude_keeps_zero_session_without_reset(self, command_path, run_command):
+        command_path.return_value = "claude.exe"
+        run_command.return_value = """
+You are currently using your subscription to power your Claude Code usage
+
+Current session: 0% used
+Current week (all models): 55% used · resets Aug 12, 4am (Asia/Seoul)
+""".strip()
+
+        result = query_claude_subscription({})
+
+        self.assertEqual([window.label for window in result.windows], ["5시간", "주간"])
+        self.assertEqual([window.used_percent for window in result.windows], [0.0, 55.0])
+        self.assertEqual(result.windows[0].reset_text, "")
+
 
 class ProviderCacheTests(unittest.TestCase):
     @patch("providers.query_codex_subscription")

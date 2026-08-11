@@ -595,7 +595,10 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
     )
 
     patterns = (
-        ("5시간", r"Current session:\s*([0-9.]+)% used\s*[·-]\s*resets\s*(.+)$"),
+        (
+            "5시간",
+            r"Current session:\s*([0-9.]+)% used(?:\s*[·-]\s*resets\s*(.+))?$",
+        ),
         ("주간", r"Current week(?:\s*\([^)]*\))?:\s*([0-9.]+)% used\s*[·-]\s*resets\s*(.+)$"),
     )
     windows: list[dict[str, Any]] = []
@@ -606,7 +609,11 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
                 {
                     "label": label,
                     "used": _clamp_percent(float(match.group(1))),
-                    "reset": _format_claude_reset(match.group(2)),
+                    "reset": (
+                        _format_claude_reset(match.group(2))
+                        if match.group(2)
+                        else ""
+                    ),
                 }
             )
 

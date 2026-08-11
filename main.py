@@ -10,6 +10,52 @@ from ui import SynapCapWidget, SynapCapTray, SettingsDialog, create_app_icon
 from updates import UpdateCheckWorker
 from version import APP_VERSION
 
+
+def _provider_settings_changed(previous: dict, current: dict) -> bool:
+    return previous.get("providers", []) != current.get("providers", [])
+
+
+def _provider_query_signature(config: dict) -> tuple:
+    ignored_keys = {"name", "limit", "unit", "source"}
+    rows = []
+    for provider in config.get("providers", []):
+        query_settings = tuple(
+            sorted(
+                (key, repr(value))
+                for key, value in provider.items()
+                if key not in ignored_keys
+            )
+        )
+        rows.append((provider.get("id", ""), query_settings))
+    return tuple(sorted(rows))
+
+
+def _provider_query_settings_changed(previous: dict, current: dict) -> bool:
+    return _provider_query_signature(previous) != _provider_query_signature(
+        current
+    )
+
+
+def _reuse_provider_instances(providers: list, config: dict) -> list:
+    existing = {provider.provider_id: provider for provider in providers}
+    reordered = []
+    for provider_config in config.get("providers", []):
+        if not provider_config.get("enabled", True):
+            continue
+        provider = existing.get(provider_config.get("id", ""))
+        if provider is None:
+            continue
+        provider.config = dict(provider_config)
+        provider.name = provider_config.get("name", provider.name)
+        reordered.append(provider)
+    return reordered
+
+
+def _setting_changed(previous: dict, current: dict, key: str) -> bool:
+    previous_settings = previous.get("settings", {})
+    current_settings = current.get("settings", {})
+    return previous_settings.get(key) != current_settings.get(key)
+
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -50,22 +96,50 @@ def main():
         dialog = SettingsDialog(config_data, parent=widget)
         
         def handle_config_saved(new_config: dict):
-            nonlocal config_data
+            nonlocal config_data, providers
+            previous_config = config_data
+            provider_layout_changed = _provider_settings_changed(
+                previous_config, new_config
+            )
+            provider_query_changed = _provider_query_settings_changed(
+                previous_config, new_config
+            )
+            interval_changed = _setting_changed(
+                previous_config, new_config, "refresh_interval_sec"
+            )
             config_data = new_config
             
             # synapcap.json 저장
             save_config(config_data)
             
-            # Providers & Worker Hot-Reload
-            new_providers = load_providers_from_config(config_data)
-            widget.rebuild_ui(config_data, new_providers)
-            
-            worker.set_providers(new_providers)
-            worker.set_interval(config_data.get("settings", {}).get("refresh_interval_sec", 30))
-            worker.trigger_manual_refresh()
+            if provider_layout_changed:
+                if provider_query_changed:
+                    providers = load_providers_from_config(config_data)
+                else:
+                    providers = _reuse_provider_instances(
+                        providers, config_data
+                    )
+                worker.set_providers(providers)
+
+            widget.rebuild_ui(
+                config_data,
+                providers,
+                preserve_usage=not provider_query_changed,
+            )
+
+            if interval_changed:
+                worker.set_interval(
+                    config_data.get("settings", {}).get(
+                        "refresh_interval_sec", 30
+                    )
+                )
+            if provider_query_changed:
+                worker.trigger_manual_refresh()
 
             # Tray Always-on-top 체크박스 동기화
-            new_always_top = config_data.get("settings", {}).get("always_on_top", True)
+            new_always_top = config_data.get("settings", {}).get(
+                "always_on_top", True
+            )
             tray.always_top_action.setChecked(new_always_top)
 
         dialog.config_saved.connect(handle_config_saved)

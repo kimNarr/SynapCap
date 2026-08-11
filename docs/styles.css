@@ -128,13 +128,14 @@ h1 span { color: var(--blue); }
 .requirement-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: rgba(24,24,37,.7); }
 .requirement-list > div { min-height: 86px; padding: 0 22px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border); }
 .requirement-list > div:last-child { border-bottom: 0; }
-.service-letter { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; background: rgba(137,180,250,.12); color: var(--blue); font-weight: 850; }
+.service-letter { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; background: rgba(137,180,250,.12); color: var(--blue); font-size: 11px; font-weight: 850; }
 .gemini-letter { color: var(--green); background: rgba(166,227,161,.1); }
+.claude-letter { color: #fab387; background: rgba(250,179,135,.1); }
 .claude-letter { color: #fab387; background: rgba(250,179,135,.1); }
 .requirement-list p { margin: 0; flex: 1; }
 .requirement-list strong, .requirement-list small { display: block; }
 .requirement-list small { margin-top: 4px; color: var(--muted); }
-.requirement-list b { padding: 5px 8px; border-radius: 7px; background: rgba(166,227,161,.1); color: var(--green); font-size: 10px; }
+.requirement-list b { padding: 5px 8px; border-radius: 7px; background: rgba(166,227,161,.1); color: var(--green); font-size: 10px; white-space: nowrap; }
 
 .updates { border-top: 1px solid rgba(49,50,68,.55); }
 .update-flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }

@@ -92,6 +92,37 @@ class WidgetTests(unittest.TestCase):
         )
         self.assertIn("font-weight: 400", usage_label.styleSheet())
 
+    def test_missing_reset_is_shown_explicitly(self):
+        self.usage.windows = [UsageWindow("5시간", 0, "", 100)]
+        self.widget.update_data([self.usage])
+
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        labels = [label.text() for label in row.findChildren(QLabel)]
+        self.assertIn("5시간 · 리셋 시각 미상", labels)
+
+    def test_visual_rebuild_reuses_latest_usage(self):
+        self.widget.update_data([self.usage])
+        new_config = {
+            "settings": {
+                "widget_size": "Large",
+                "widget_width": 350,
+                "always_on_top": False,
+                "usage_view": "bar",
+                "usage_value_bold": False,
+            }
+        }
+
+        self.widget.rebuild_ui(
+            new_config,
+            [CodexProvider({"id": "codex", "name": "Codex"})],
+        )
+
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        usage_label = next(
+            label for label in row.findChildren(QLabel) if label.text() == "사용 49%"
+        )
+        self.assertIn("font-weight: 400", usage_label.styleSheet())
+
 
 if __name__ == "__main__":
     unittest.main()
