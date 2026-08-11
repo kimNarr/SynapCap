@@ -84,6 +84,9 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
         }
         QMessageBox QLabel {
             color: #CDD6F4;
+        }
+        QMessageBox QLabel#qt_msgbox_label,
+        QMessageBox QLabel#qt_msgbox_informativelabel {
             min-width: 280px;
         }
         QMessageBox QPushButton {

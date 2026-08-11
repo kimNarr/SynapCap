@@ -1,7 +1,10 @@
+import os
 import unittest
 from unittest.mock import MagicMock
 
-from PySide6.QtWidgets import QMessageBox
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from main import (
     confirm_quit,
@@ -83,6 +86,10 @@ class SettingsChangeTests(unittest.TestCase):
 
 
 class QuitConfirmationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
     def _dialog(self, result):
         dialog = MagicMock()
         dialog.exec.return_value = result
@@ -103,6 +110,21 @@ class QuitConfirmationTests(unittest.TestCase):
         dialog = self._dialog(QMessageBox.StandardButton.No)
 
         self.assertFalse(confirm_quit(None, lambda _parent: dialog))
+
+    def test_confirmation_does_not_stretch_the_icon_column(self):
+        class NonBlockingMessageBox(QMessageBox):
+            def exec(self):
+                return QMessageBox.StandardButton.No
+
+        dialog = NonBlockingMessageBox()
+        self.assertFalse(confirm_quit(None, lambda _parent: dialog))
+        dialog.ensurePolished()
+        dialog.adjustSize()
+
+        icon_label = dialog.findChild(QLabel, "qt_msgboxex_icon_label")
+        self.assertIsNotNone(icon_label)
+        self.assertLess(icon_label.minimumWidth(), 100)
+        self.assertLess(dialog.sizeHint().width(), 500)
 
 if __name__ == "__main__":
     unittest.main()
