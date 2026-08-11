@@ -7,6 +7,7 @@ OUTPUT_DIR="${3:-artifacts}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ARTIFACT_DIR="$REPO_ROOT/$OUTPUT_DIR"
 STAGING_DIR="$REPO_ROOT/build/dmg-$ARCH_NAME"
+APP_BUNDLE="$REPO_ROOT/dist/SynapCap.app"
 
 cd "$REPO_ROOT"
 mkdir -p "$ARTIFACT_DIR"
@@ -32,15 +33,22 @@ python -m PyInstaller \
 # the status item remains available through QSystemTrayIcon.
 if ! /usr/libexec/PlistBuddy \
   -c "Set :LSUIElement true" \
-  dist/SynapCap.app/Contents/Info.plist; then
+  "$APP_BUNDLE/Contents/Info.plist"; then
   /usr/libexec/PlistBuddy \
     -c "Add :LSUIElement bool true" \
-    dist/SynapCap.app/Contents/Info.plist
+    "$APP_BUNDLE/Contents/Info.plist"
 fi
+
+# PyInstaller ad-hoc signs the bundle during creation. Changing Info.plist
+# invalidates that signature, so sign and validate the final bundle before it
+# is copied into the disk image.
+plutil -lint "$APP_BUNDLE/Contents/Info.plist"
+codesign --force --deep --sign - "$APP_BUNDLE"
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR"
-cp -R dist/SynapCap.app "$STAGING_DIR/SynapCap.app"
+cp -R "$APP_BUNDLE" "$STAGING_DIR/SynapCap.app"
 ln -s /Applications "$STAGING_DIR/Applications"
 cp LICENSE "$STAGING_DIR/LICENSE.txt"
 
@@ -53,5 +61,4 @@ hdiutil create \
   -format UDZO \
   "$DMG_PATH"
 
-codesign --verify --deep --strict dist/SynapCap.app
 echo "Created $DMG_PATH"

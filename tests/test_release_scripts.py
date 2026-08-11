@@ -1,0 +1,29 @@
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class ReleaseScriptTests(unittest.TestCase):
+    def test_macos_bundle_is_resigned_before_disk_image_creation(self):
+        script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
+
+        plist_update = script.index('if ! /usr/libexec/PlistBuddy')
+        plist_validation = script.index('plutil -lint "$APP_BUNDLE/Contents/Info.plist"')
+        bundle_signing = script.index('codesign --force --deep --sign - "$APP_BUNDLE"')
+        signature_validation = script.index(
+            'codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"'
+        )
+        bundle_staging = script.index('cp -R "$APP_BUNDLE" "$STAGING_DIR/SynapCap.app"')
+        disk_image_creation = script.index("hdiutil create")
+
+        self.assertLess(plist_update, plist_validation)
+        self.assertLess(plist_validation, bundle_signing)
+        self.assertLess(bundle_signing, signature_validation)
+        self.assertLess(signature_validation, bundle_staging)
+        self.assertLess(bundle_staging, disk_image_creation)
+
+
+if __name__ == "__main__":
+    unittest.main()
