@@ -194,8 +194,11 @@ def load_providers_from_config(config_data: dict) -> List[BaseAIProvider]:
         p_type = p_cfg.get("type", "").lower()
         provider_cls = PROVIDER_REGISTRY.get(p_type)
         if provider_cls is None:
+            safe_type = (p_type or "unknown").encode(
+                "ascii", errors="backslashreplace"
+            ).decode("ascii")
             print(
-                f"[SynapCap] 지원하지 않는 프로바이더를 건너뜀: {p_type or 'unknown'}"
+                f"[SynapCap] Skipping unsupported provider: {safe_type}"
             )
             continue
         providers.append(provider_cls(p_cfg))
