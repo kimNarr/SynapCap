@@ -71,7 +71,9 @@ class WidgetTests(unittest.TestCase):
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
 
         self.assertEqual(self.widget.usage_view, "ring")
-        self.assertEqual(len(row.findChildren(UsageRing)), 1)
+        rings = row.findChildren(UsageRing)
+        self.assertEqual(len(rings), 1)
+        self.assertEqual(rings[0].value_text, "49%")
         self.assertEqual(len(self.widget.findChildren(QProgressBar)), 0)
         self.assertEqual(
             self.widget.config_data["settings"]["usage_view"], "ring"

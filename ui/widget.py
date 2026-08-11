@@ -59,6 +59,7 @@ class UsageRing(QWidget):
         self.used = max(0.0, min(100.0, float(used)))
         self.color = QColor(color)
         self.bold = bold
+        self.value_text = f"{self.used:.0f}%"
         self.setFixedSize(42, 42)
 
     def paintEvent(self, event):
@@ -76,16 +77,14 @@ class UsageRing(QWidget):
         painter.setPen(usage_pen)
         painter.drawArc(ring_rect, 90 * 16, round(-360 * 16 * self.used / 100))
 
-        painter.setPen(QColor("#A6ADC8"))
-        painter.setFont(QFont("Segoe UI", 6))
-        painter.drawText(QRectF(5, 8, 32, 11), Qt.AlignmentFlag.AlignCenter, "사용")
         painter.setPen(QColor("#CDD6F4"))
         value_weight = QFont.Weight.Bold if self.bold else QFont.Weight.Normal
-        painter.setFont(QFont("Segoe UI", 7, value_weight))
+        value_size = 8 if self.used >= 99.5 else 10
+        painter.setFont(QFont("Segoe UI", value_size, value_weight))
         painter.drawText(
-            QRectF(4, 18, 34, 14),
+            QRectF(4, 4, 34, 34),
             Qt.AlignmentFlag.AlignCenter,
-            f"{self.used:.0f}%",
+            self.value_text,
         )
 
         painter.end()
