@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from config import load_config, save_config
 from providers import load_providers_from_config
@@ -63,6 +63,56 @@ def _setting_changed(previous: dict, current: dict, key: str) -> bool:
     current_settings = current.get("settings", {})
     return previous_settings.get(key) != current_settings.get(key)
 
+
+def confirm_quit(parent=None, dialog_factory=None) -> bool:
+    factory = dialog_factory or QMessageBox
+    dialog = factory(parent)
+    dialog.setWindowTitle("SynapCap 종료")
+    dialog.setIcon(QMessageBox.Icon.Question)
+    dialog.setText("SynapCap을 종료할까요?")
+    dialog.setInformativeText(
+        "종료하면 사용량 확인과 업데이트 알림도 중지됩니다."
+    )
+    dialog.setStandardButtons(
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+    )
+    dialog.setDefaultButton(QMessageBox.StandardButton.No)
+    dialog.setEscapeButton(QMessageBox.StandardButton.No)
+    dialog.setStyleSheet("""
+        QMessageBox {
+            background-color: #1E1E2E;
+        }
+        QMessageBox QLabel {
+            color: #CDD6F4;
+            min-width: 280px;
+        }
+        QMessageBox QPushButton {
+            min-width: 76px;
+            padding: 7px 14px;
+            border: 1px solid #45475A;
+            border-radius: 7px;
+            background-color: #313244;
+            color: #CDD6F4;
+        }
+        QMessageBox QPushButton:hover {
+            border-color: #89B4FA;
+            background-color: #45475A;
+        }
+        QMessageBox QPushButton:default {
+            border-color: #89B4FA;
+            color: #89B4FA;
+        }
+    """)
+
+    exit_button = dialog.button(QMessageBox.StandardButton.Yes)
+    cancel_button = dialog.button(QMessageBox.StandardButton.No)
+    if exit_button is not None:
+        exit_button.setText("종료")
+    if cancel_button is not None:
+        cancel_button.setText("취소")
+
+    return dialog.exec() == QMessageBox.StandardButton.Yes
+
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -87,9 +137,11 @@ def main():
     tray = SynapCapTray(parent_widget=widget, always_on_top=always_on_top)
 
     update_worker = UpdateCheckWorker(APP_VERSION)
-    update_worker.update_available.connect(
-        lambda info: tray.set_update_available(info.version, info.url)
-    )
+    def handle_update_available(info):
+        tray.set_update_available(info.version, info.url)
+        widget.set_update_available(info.version, info.url)
+
+    update_worker.update_available.connect(handle_update_available)
     if settings.get("check_updates", True):
         QTimer.singleShot(4000, update_worker.start)
 
@@ -154,7 +206,11 @@ def main():
 
     # 7. Signal/Slot 연결
     def toggle_widget():
-        if widget.isVisible():
+        if widget.isMinimized():
+            widget.showNormal()
+            widget.raise_()
+            widget.activateWindow()
+        elif widget.isVisible():
             widget.hide()
         else:
             widget.show()
@@ -177,6 +233,10 @@ def main():
             update_worker.wait(6000)
         app.quit()
 
+    def request_quit():
+        if confirm_quit(widget):
+            handle_quit()
+
     tray.toggle_widget_requested.connect(toggle_widget)
     tray.refresh_requested.connect(worker.trigger_manual_refresh)
     tray.always_on_top_toggled.connect(handle_always_on_top)
@@ -184,12 +244,15 @@ def main():
     tray.update_requested.connect(
         lambda url: QDesktopServices.openUrl(QUrl(url))
     )
-    tray.quit_requested.connect(handle_quit)
+    tray.quit_requested.connect(request_quit)
 
     widget.settings_requested.connect(open_settings_dialog)
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
     widget.view_mode_changed.connect(handle_view_mode_changed)
-    widget.quit_requested.connect(handle_quit)
+    widget.update_requested.connect(
+        lambda url: QDesktopServices.openUrl(QUrl(url))
+    )
+    widget.quit_requested.connect(request_quit)
 
     print("[SynapCap] HUD Application with GUI Settings started successfully.")
     sys.exit(app.exec())

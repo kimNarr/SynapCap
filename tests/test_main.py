@@ -1,6 +1,10 @@
 import unittest
+from unittest.mock import MagicMock
+
+from PySide6.QtWidgets import QMessageBox
 
 from main import (
+    confirm_quit,
     _provider_query_settings_changed,
     _provider_settings_changed,
     _setting_changed,
@@ -77,6 +81,28 @@ class SettingsChangeTests(unittest.TestCase):
             _provider_query_settings_changed(previous, current)
         )
 
+
+class QuitConfirmationTests(unittest.TestCase):
+    def _dialog(self, result):
+        dialog = MagicMock()
+        dialog.exec.return_value = result
+        dialog.button.return_value = MagicMock()
+        return dialog
+
+    def test_exit_requires_explicit_confirmation(self):
+        dialog = self._dialog(QMessageBox.StandardButton.Yes)
+
+        confirmed = confirm_quit(None, lambda _parent: dialog)
+
+        self.assertTrue(confirmed)
+        dialog.setDefaultButton.assert_called_once_with(
+            QMessageBox.StandardButton.No
+        )
+
+    def test_cancel_keeps_application_running(self):
+        dialog = self._dialog(QMessageBox.StandardButton.No)
+
+        self.assertFalse(confirm_quit(None, lambda _parent: dialog))
 
 if __name__ == "__main__":
     unittest.main()

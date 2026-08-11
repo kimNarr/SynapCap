@@ -78,10 +78,14 @@ h1 span { color: var(--blue); }
 .widget-header, .widget-brand, .provider-name, .quota-label { display: flex; align-items: center; }
 .widget-header { justify-content: space-between; margin-bottom: 13px; }
 .widget-brand { gap: 7px; font-size: 13px; }
+.preview-version { padding: 2px 5px; border: 1px solid #313244; border-radius: 5px; background: #252538; color: #7f849c; font-size: 8px; font-weight: 750; }
 .widget-tools { display: flex; gap: 10px; color: #8d93aa; font-size: 13px; }
 .provider { padding: 2px 0; }
 .provider-name { gap: 7px; margin-bottom: 6px; font-size: 13px; }
-.provider-name i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(166,227,161,.1); }
+.preview-provider-badge { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; font-size: 9px; font-style: normal; font-weight: 850; }
+.codex-badge { background: #252b3f; color: var(--blue); }
+.gemini-badge { background: #26372f; color: var(--green); }
+.claude-badge { background: #3a2b2b; color: #fab387; }
 .quota-label { justify-content: space-between; gap: 10px; color: #a6adc8; font-size: 11px; }
 .quota-label b { color: var(--blue); font-weight: 700; white-space: nowrap; }
 .quota-label.second { margin-top: 8px; }

@@ -9,13 +9,14 @@ from PySide6.QtWidgets import (
 )
 from .icon import (
     create_app_pixmap,
-    create_power_icon,
     create_refresh_icon,
     create_usage_view_icon,
     create_settings_icon,
-    create_close_icon
+    create_close_icon,
+    create_minimize_icon,
 )
 from providers import BaseAIProvider, ModelUsage, UsageWindow
+from version import APP_VERSION
 
 SIZE_PRESETS = {
     "Small": {
@@ -94,6 +95,7 @@ class SynapCapWidget(QWidget):
     settings_requested = Signal()
     refresh_requested = Signal()
     quit_requested = Signal()
+    update_requested = Signal(str)
     view_mode_changed = Signal(str)
 
     def __init__(self, config_data: dict, providers: list[BaseAIProvider]):
@@ -102,6 +104,7 @@ class SynapCapWidget(QWidget):
         self.providers = providers
         self.drag_position = QPoint()
         self.provider_ui_map = {}
+        self._update_url = ""
         configured_view = self.config_data.get("settings", {}).get(
             "usage_view", "bar"
         )
@@ -114,7 +117,7 @@ class SynapCapWidget(QWidget):
         # Frameless Window & Translucent Background
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.SubWindow |
+            Qt.WindowType.Window |
             (
                 Qt.WindowType.WindowStaysOnTopHint
                 if self.config_data.get("settings", {}).get(
@@ -185,6 +188,16 @@ class SynapCapWidget(QWidget):
         )
         header_layout.addWidget(self.title_label)
 
+        self.version_btn = QPushButton(f"v{APP_VERSION}")
+        self.version_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.version_btn.clicked.connect(self._open_update)
+        self._set_version_badge_style(False)
+        self._enable_instant_tooltip(
+            self.version_btn,
+            f"현재 버전 v{APP_VERSION}",
+        )
+        header_layout.addWidget(self.version_btn)
+
         header_layout.addStretch()
 
         btn_style = """
@@ -204,43 +217,50 @@ class SynapCapWidget(QWidget):
         self.view_btn.setStyleSheet(btn_style)
         self.view_btn.clicked.connect(self._toggle_usage_view)
         self._update_view_button()
+        self._enable_instant_tooltip(
+            self.view_btn, self.view_btn.toolTip()
+        )
         header_layout.addWidget(self.view_btn)
 
         # 1) 지금 새로고침 버튼 (Refresh Now Vector Icon Button)
         self.refresh_btn = QPushButton()
         self.refresh_btn.setFixedSize(22, 22)
         self.refresh_btn.setIcon(create_refresh_icon(14, "#89B4FA"))
-        self.refresh_btn.setToolTip("지금 새로고침 (Refresh Now)")
         self.refresh_btn.setStyleSheet(btn_style)
         self.refresh_btn.clicked.connect(self.refresh_requested.emit)
+        self._enable_instant_tooltip(
+            self.refresh_btn, "지금 새로고침"
+        )
         header_layout.addWidget(self.refresh_btn)
 
         # 2) Settings Button (⚙ Vector Icon)
         self.settings_btn = QPushButton()
         self.settings_btn.setFixedSize(22, 22)
         self.settings_btn.setIcon(create_settings_icon(14, "#A6ADC8"))
-        self.settings_btn.setToolTip("설정 (Settings)")
         self.settings_btn.setStyleSheet(btn_style)
         self.settings_btn.clicked.connect(self.settings_requested.emit)
+        self._enable_instant_tooltip(self.settings_btn, "설정")
         header_layout.addWidget(self.settings_btn)
 
-        # 3) 프로그램 완전 종료 버튼 (⏻ Power Quit Vector Icon)
-        self.quit_btn = QPushButton()
-        self.quit_btn.setFixedSize(22, 22)
-        self.quit_btn.setIcon(create_power_icon(14, "#EBA0AC"))
-        self.quit_btn.setToolTip("프로그램 종료 (Quit SynapCap)")
-        self.quit_btn.setStyleSheet(btn_style)
-        self.quit_btn.clicked.connect(self.quit_requested.emit)
-        header_layout.addWidget(self.quit_btn)
+        self.minimize_btn = QPushButton()
+        self.minimize_btn.setFixedSize(22, 22)
+        self.minimize_btn.setIcon(create_minimize_icon(14, "#A6ADC8"))
+        self.minimize_btn.setStyleSheet(btn_style)
+        self.minimize_btn.clicked.connect(self.showMinimized)
+        self._enable_instant_tooltip(
+            self.minimize_btn, "작업 표시줄로 최소화"
+        )
+        header_layout.addWidget(self.minimize_btn)
 
-        # 4) 창 숨기기 버튼 (✕ Close/Hide Vector Icon)
-        self.hide_btn = QPushButton()
-        self.hide_btn.setFixedSize(22, 22)
-        self.hide_btn.setIcon(create_close_icon(14, "#A6ADC8"))
-        self.hide_btn.setToolTip("위젯 숨기기 (Hide to Tray)")
-        self.hide_btn.setStyleSheet(btn_style)
-        self.hide_btn.clicked.connect(self.hide)
-        header_layout.addWidget(self.hide_btn)
+        self.close_btn = QPushButton()
+        self.close_btn.setFixedSize(22, 22)
+        self.close_btn.setIcon(create_close_icon(14, "#EBA0AC"))
+        self.close_btn.setStyleSheet(btn_style)
+        self.close_btn.clicked.connect(self.quit_requested.emit)
+        self._enable_instant_tooltip(
+            self.close_btn, "SynapCap 완전 종료"
+        )
+        header_layout.addWidget(self.close_btn)
 
         self.frame_layout.addLayout(header_layout)
 
@@ -264,6 +284,33 @@ class SynapCapWidget(QWidget):
         self.view_btn.setIcon(create_usage_view_icon(target_view, 14))
         target_name = "링" if target_view == "ring" else "막대"
         self.view_btn.setToolTip(f"{target_name} 그래프로 변경")
+
+    def _set_version_badge_style(self, update_available: bool) -> None:
+        if update_available:
+            foreground = "#11111B"
+            background = "#89B4FA"
+            border = "#89B4FA"
+        else:
+            foreground = "#7F849C"
+            background = "#252538"
+            border = "#313244"
+        self.version_btn.setStyleSheet(
+            f"color: {foreground}; background-color: {background}; "
+            f"border: 1px solid {border}; border-radius: 5px; "
+            "padding: 2px 5px; font-size: 8px; font-weight: 700;"
+        )
+
+    def set_update_available(self, version: str, url: str) -> None:
+        self._update_url = url
+        self.version_btn.setText(f"v{version} ↑")
+        self.version_btn.setToolTip(
+            f"새 버전 v{version} 다운로드 페이지 열기"
+        )
+        self._set_version_badge_style(True)
+
+    def _open_update(self):
+        if self._update_url:
+            self.update_requested.emit(self._update_url)
 
     def _toggle_usage_view(self):
         self.usage_view = "ring" if self.usage_view == "bar" else "bar"
@@ -719,6 +766,11 @@ class SynapCapWidget(QWidget):
 
         self.setWindowFlags(flags)
         self.show()
+
+    def closeEvent(self, event):
+        """Taskbar/OS close requests follow the header × exit behavior."""
+        self.quit_requested.emit()
+        event.ignore()
 
     # Drag-and-Drop Mouse Events
     def mousePressEvent(self, event):

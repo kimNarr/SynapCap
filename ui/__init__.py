@@ -12,7 +12,8 @@ from .icon import (
     create_power_icon,
     create_refresh_icon,
     create_settings_icon,
-    create_close_icon
+    create_close_icon,
+    create_minimize_icon,
 )
 
 __all__ = [
@@ -29,5 +30,6 @@ __all__ = [
     "create_power_icon",
     "create_refresh_icon",
     "create_settings_icon",
-    "create_close_icon"
+    "create_close_icon",
+    "create_minimize_icon",
 ]

@@ -5,11 +5,12 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QEvent
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QApplication, QLabel, QProgressBar
 
 from providers import CodexProvider, ModelUsage, UsageWindow
 from ui.widget import SynapCapWidget, UsageRing
+from version import APP_VERSION
 
 
 class WidgetTests(unittest.TestCase):
@@ -120,6 +121,36 @@ class WidgetTests(unittest.TestCase):
         visible = self.widget._visible_usage_windows(ui, windows)
 
         self.assertEqual([window.label for window in visible], ["주간"])
+
+    def test_version_badge_opens_available_update(self):
+        requested_urls = []
+        self.widget.update_requested.connect(requested_urls.append)
+
+        self.assertEqual(self.widget.version_btn.text(), f"v{APP_VERSION}")
+        self.widget.set_update_available(
+            "0.1.1",
+            "https://github.com/kimNarr/SynapCap/releases/tag/v0.1.1",
+        )
+        self.widget.version_btn.click()
+
+        self.assertEqual(self.widget.version_btn.text(), "v0.1.1 ↑")
+        self.assertEqual(
+            requested_urls,
+            ["https://github.com/kimNarr/SynapCap/releases/tag/v0.1.1"],
+        )
+
+    def test_header_uses_minimize_and_exit_controls(self):
+        quit_requests = []
+        self.widget.quit_requested.connect(lambda: quit_requests.append(True))
+
+        self.assertEqual(self.widget.windowType(), Qt.WindowType.Window)
+        self.widget.minimize_btn.click()
+        self.app.processEvents()
+        self.assertTrue(self.widget.isMinimized())
+
+        self.widget.showNormal()
+        self.widget.close_btn.click()
+        self.assertEqual(quit_requests, [True])
 
     def test_missing_reset_is_shown_explicitly(self):
         self.widget.provider_ui_map["codex"]["show_five_hour"] = True

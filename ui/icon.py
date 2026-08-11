@@ -291,3 +291,22 @@ def create_close_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
     
     painter.end()
     return QIcon(pixmap)
+
+
+def create_minimize_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
+    """작업 표시줄/Dock 최소화용 가로선 아이콘."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+    pen = QPen(QColor(color), 1.8)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    painter.setPen(pen)
+    painter.drawLine(
+        QPointF(size * 0.26, size * 0.68),
+        QPointF(size * 0.74, size * 0.68),
+    )
+
+    painter.end()
+    return QIcon(pixmap)
