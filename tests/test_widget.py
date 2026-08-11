@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtWidgets import QApplication, QLabel, QProgressBar
 
 from providers import CodexProvider, ModelUsage, UsageWindow
@@ -110,6 +110,21 @@ class WidgetTests(unittest.TestCase):
             )
 
         show_text.assert_called_once()
+
+    def test_instant_tooltip_is_anchored_below_hovered_widget(self):
+        expected_position = self.widget.version_btn.mapToGlobal(
+            QPoint(0, self.widget.version_btn.height() + 4)
+        )
+
+        with patch("ui.widget.QToolTip.showText") as show_text:
+            self.widget.eventFilter(
+                self.widget.version_btn, QEvent(QEvent.Type.Enter)
+            )
+
+        self.assertEqual(show_text.call_args.args[0], expected_position)
+        self.assertEqual(
+            show_text.call_args.args[1], f"현재 버전 v{APP_VERSION}"
+        )
 
     def test_usage_windows_can_be_filtered_per_provider(self):
         ui = {"show_five_hour": False, "show_weekly": True}

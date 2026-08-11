@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timedelta
 
 from PySide6.QtCore import QEvent, Qt, QPoint, QRectF, Signal
-from PySide6.QtGui import QColor, QCursor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame,
     QPushButton, QToolTip
@@ -506,8 +506,11 @@ class SynapCapWidget(QWidget):
     def eventFilter(self, watched, event):
         if watched.property("instantTooltip"):
             if event.type() == QEvent.Type.Enter:
+                tooltip_position = watched.mapToGlobal(
+                    QPoint(0, watched.height() + 4)
+                )
                 QToolTip.showText(
-                    QCursor.pos() + QPoint(12, 16),
+                    tooltip_position,
                     watched.toolTip(),
                     watched,
                 )

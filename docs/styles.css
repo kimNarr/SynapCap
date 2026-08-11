@@ -74,11 +74,14 @@ h1 span { color: var(--blue); }
 
 .product-stage { min-height: 470px; position: relative; display: grid; place-items: center; }
 .stage-glow { position: absolute; width: 430px; height: 430px; border-radius: 50%; background: radial-gradient(circle, rgba(137,180,250,.22), rgba(137,180,250,.03) 52%, transparent 70%); }
-.widget-preview { width: min(370px, 100%); position: relative; z-index: 2; padding: 16px; border: 1px solid #3c3f5a; border-radius: 17px; background: rgba(30,30,46,.96); box-shadow: 0 38px 90px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.03); transform: rotate(1.2deg); }
+.widget-preview { width: min(370px, 100%); position: relative; z-index: 2; padding: 16px; border: 1px solid #3c3f5a; border-radius: 17px; background: rgba(30,30,46,.96); box-shadow: 0 38px 90px rgba(0,0,0,.5), inset 0 1px rgba(255,255,255,.03); }
 .widget-header, .widget-brand, .provider-name, .quota-label { display: flex; align-items: center; }
 .widget-header { justify-content: space-between; margin-bottom: 13px; }
 .widget-brand { gap: 7px; font-size: 13px; }
 .preview-version { padding: 2px 5px; border: 1px solid #313244; border-radius: 5px; background: #252538; color: #7f849c; font-size: 8px; font-weight: 750; }
+.preview-tooltip, .reset-hint { position: relative; outline: none; cursor: help; }
+.preview-tooltip::after, .reset-hint::after { content: attr(data-tooltip); position: absolute; z-index: 8; left: 0; top: calc(100% + 5px); width: max-content; max-width: 190px; padding: 5px 7px; border: 1px solid #45475a; border-radius: 5px; background: #313244; color: #cdd6f4; box-shadow: 0 7px 18px rgba(0,0,0,.32); font-size: 9px; font-weight: 500; line-height: 1.3; opacity: 0; visibility: hidden; pointer-events: none; }
+.preview-tooltip:hover::after, .preview-tooltip:focus-visible::after, .reset-hint:hover::after, .reset-hint:focus-visible::after { opacity: 1; visibility: visible; }
 .widget-tools { display: flex; gap: 10px; color: #8d93aa; font-size: 13px; }
 .provider { padding: 2px 0; }
 .provider-name { gap: 7px; margin-bottom: 6px; font-size: 13px; }
@@ -192,7 +195,6 @@ h1 span { color: var(--blue); }
   .hero-actions { width: 100%; flex-direction: column; }
   .hero-actions .button { width: 100%; }
   .product-stage { min-height: 390px; }
-  .widget-preview { transform: none; }
   .stage-caption { right: 0; bottom: 2px; }
   .features, .download-section, .requirements, .updates, .privacy { padding: 78px 0; }
   .feature-grid, .download-grid { grid-template-columns: 1fr; }
