@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QCheckBox, QComboBox, QLineEdit, QPushButton, QTabWidget, QWidget,
     QGroupBox, QFormLayout, QScrollArea, QMessageBox, QStyle,
-    QStyleOptionComboBox, QStyleOptionSpinBox
+    QStyleOptionComboBox, QStyleOptionSpinBox, QFrame
 )
 from .icon import (
     create_app_icon,
@@ -76,6 +76,63 @@ def _draw_chevron(widget: QWidget, rect, direction: str) -> None:
     painter.drawPolyline(points)
     painter.end()
 
+
+class SettingsTitleBar(QWidget):
+    """Cross-platform title bar so Windows and macOS use the same chrome."""
+
+    def __init__(self, dialog: QDialog):
+        super().__init__(dialog)
+        self._dialog = dialog
+        self._drag_offset: QPoint | None = None
+        self.setObjectName("settingsTitleBar")
+        self.setFixedHeight(38)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 0, 6, 0)
+        layout.setSpacing(8)
+
+        icon_label = QLabel()
+        icon_label.setPixmap(create_app_icon(18).pixmap(18, 18))
+        icon_label.setFixedSize(18, 18)
+        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        layout.addWidget(icon_label)
+
+        title_label = QLabel(f"SynapCap v{APP_VERSION} 설정")
+        title_label.setObjectName("settingsTitleLabel")
+        title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        layout.addWidget(title_label)
+        layout.addStretch()
+
+        self.close_button = QPushButton("×")
+        self.close_button.setObjectName("settingsCloseBtn")
+        self.close_button.setFixedSize(28, 28)
+        self.close_button.setToolTip("닫기")
+        self.close_button.clicked.connect(dialog.reject)
+        layout.addWidget(self.close_button)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_offset = (
+                event.globalPosition().toPoint() - self._dialog.frameGeometry().topLeft()
+            )
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (
+            self._drag_offset is not None
+            and event.buttons() & Qt.MouseButton.LeftButton
+        ):
+            self._dialog.move(event.globalPosition().toPoint() - self._drag_offset)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_offset = None
+        super().mouseReleaseEvent(event)
+
 class SettingsDialog(QDialog):
     config_saved = Signal(dict)
 
@@ -88,12 +145,46 @@ class SettingsDialog(QDialog):
     def init_ui(self):
         self.setWindowTitle(f"SynapCap {APP_VERSION} Settings")
         self.setWindowIcon(create_app_icon(32))
+        self.setWindowFlags(
+            Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMinimumSize(560, 600)
         self.setStyleSheet("""
             QDialog {
-                background-color: #1E1E2E;
+                background-color: transparent;
                 color: #CDD6F4;
                 font-family: 'Segoe UI', -apple-system, sans-serif;
+            }
+            QFrame#settingsFrame {
+                background-color: #1E1E2E;
+                border: 1px solid #313244;
+                border-radius: 10px;
+            }
+            QWidget#settingsTitleBar {
+                background-color: #181825;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                border-bottom: 1px solid #313244;
+            }
+            QLabel#settingsTitleLabel {
+                color: #CDD6F4;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QPushButton#settingsCloseBtn {
+                padding: 0;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+                color: #A6ADC8;
+                font-size: 18px;
+                font-weight: 500;
+            }
+            QPushButton#settingsCloseBtn:hover {
+                border: none;
+                background-color: #F38BA8;
+                color: #11111B;
             }
             QLabel {
                 color: #BAC2DE;
@@ -287,7 +378,23 @@ class SettingsDialog(QDialog):
             }
         """)
 
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.settings_frame = QFrame()
+        self.settings_frame.setObjectName("settingsFrame")
+        frame_layout = QVBoxLayout(self.settings_frame)
+        frame_layout.setContentsMargins(0, 0, 0, 10)
+        frame_layout.setSpacing(0)
+
+        self.title_bar = SettingsTitleBar(self)
+        frame_layout.addWidget(self.title_bar)
+
+        content = QWidget()
+        content.setObjectName("settingsContent")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(10, 10, 10, 0)
+        layout.setSpacing(10)
 
         # Tab Widget
         self.tabs = QTabWidget()
@@ -318,6 +425,8 @@ class SettingsDialog(QDialog):
         btn_layout.addWidget(save_btn)
 
         layout.addLayout(btn_layout)
+        frame_layout.addWidget(content)
+        outer_layout.addWidget(self.settings_frame)
 
     def init_general_tab(self):
         form = QFormLayout(self.general_tab)
