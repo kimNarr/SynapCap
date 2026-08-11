@@ -95,7 +95,8 @@ h1 span { color: var(--blue); }
 .track { height: 7px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: #313244; }
 .track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #89b4fa, #74c7ec); }
 .divider { height: 1px; margin: 11px 0; background: #313244; }
-.stage-caption { position: absolute; z-index: 3; right: 12px; bottom: 18px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(17,17,27,.8); color: var(--muted); font-size: 11px; backdrop-filter: blur(10px); }
+.stage-caption { position: absolute; z-index: 3; right: -10px; bottom: -22px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(17,17,27,.94); color: var(--muted); font-size: 11px; backdrop-filter: blur(10px); }
+.stage-caption::before { content: ""; position: absolute; right: 20px; top: -5px; width: 8px; height: 8px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); background: #11111b; transform: rotate(45deg); }
 .stage-caption span { display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--blue); }
 
 .features, .download-section, .requirements, .updates, .privacy { padding: 110px 0; }
@@ -195,7 +196,7 @@ h1 span { color: var(--blue); }
   .hero-actions { width: 100%; flex-direction: column; }
   .hero-actions .button { width: 100%; }
   .product-stage { min-height: 390px; }
-  .stage-caption { right: 0; bottom: 2px; }
+  .stage-caption { right: 8px; bottom: -22px; }
   .features, .download-section, .requirements, .updates, .privacy { padding: 78px 0; }
   .feature-grid, .download-grid { grid-template-columns: 1fr; }
   .feature-grid article { min-height: 190px; }
