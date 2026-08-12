@@ -3,7 +3,7 @@ import sys
 import uuid
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPen, QPolygon
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPolygon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QStyle,
     QStyleFactory,
+    QStyleOptionButton,
     QStyleOptionComboBox,
     QStyleOptionSpinBox,
     QTabWidget,
@@ -78,6 +79,60 @@ class VisibleSpinBox(QSpinBox):
                 self,
             )
             _draw_chevron(self, button_rect, direction)
+
+
+class StyledCheckBox(QCheckBox):
+    """Cross-platform checkbox with a painter-rendered check mark."""
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self.isChecked():
+            return
+
+        option = QStyleOptionButton()
+        self.initStyleOption(option)
+        indicator = self.style().subElementRect(
+            QStyle.SubElement.SE_CheckBoxIndicator,
+            option,
+            self,
+        )
+        if indicator.isEmpty():
+            return
+
+        center = indicator.center()
+        points = QPolygon(
+            [
+                QPoint(center.x() - 5, center.y()),
+                QPoint(center.x() - 1, center.y() + 4),
+                QPoint(center.x() + 6, center.y() - 4),
+            ]
+        )
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor("#11111B"), 2.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.drawPolyline(points)
+        painter.end()
+
+
+class HoverIconButton(QPushButton):
+    """Icon button that keeps a contrasting icon across hover states."""
+
+    def __init__(self, normal_icon: QIcon, hover_icon: QIcon, parent=None):
+        super().__init__(parent)
+        self._normal_icon = normal_icon
+        self._hover_icon = hover_icon
+        self.setIcon(self._normal_icon)
+
+    def enterEvent(self, event) -> None:
+        self.setIcon(self._hover_icon)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.setIcon(self._normal_icon)
+        super().leaveEvent(event)
 
 
 def _draw_chevron(widget: QWidget, rect, direction: str) -> None:
@@ -328,7 +383,6 @@ class SettingsDialog(QDialog):
             QCheckBox::indicator:checked {
                 background-color: #89B4FA;
                 border: 1px solid #89B4FA;
-                image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 6 l3 3 l5 -5' fill='none' stroke='%2311111B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
             }
             QTabWidget::pane {
                 border: 1px solid #313244;
@@ -469,11 +523,11 @@ class SettingsDialog(QDialog):
         form.addRow("자동 갱신 주기:", self.interval_spin)
 
         # Always on Top (항상 위에 고정)
-        self.always_top_check = QCheckBox("항상 위에 위젯 창 고정")
+        self.always_top_check = StyledCheckBox("항상 위에 위젯 창 고정")
         self.always_top_check.setChecked(settings.get("always_on_top", True))
         form.addRow("화면 고정:", self.always_top_check)
 
-        self.update_check = QCheckBox("시작할 때 새 버전 확인")
+        self.update_check = StyledCheckBox("시작할 때 새 버전 확인")
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
 
@@ -486,16 +540,10 @@ class SettingsDialog(QDialog):
             self.size_combo.setCurrentIndex(idx)
         form.addRow("위젯 및 폰트 크기 (Size):", self.size_combo)
 
-        self.usage_bold_check = QCheckBox("사용량 수치를 굵게 표시")
+        self.usage_bold_check = StyledCheckBox("사용량 수치를 굵게 표시")
         self.usage_bold_check.setChecked(settings.get("usage_value_bold", True))
         form.addRow("사용량 글꼴:", self.usage_bold_check)
 
-        # Widget Width (위젯 너비)
-        self.width_spin = VisibleSpinBox()
-        self.width_spin.setRange(200, 800)
-        self.width_spin.setSuffix(" px")
-        self.width_spin.setValue(settings.get("widget_width", 300))
-        form.addRow("위젯 세부 너비:", self.width_spin)
 
     def init_providers_tab(self):
         main_layout = QVBoxLayout(self.providers_tab)
@@ -587,11 +635,13 @@ class SettingsDialog(QDialog):
         dn_btn.setToolTip("아래로 이동")
         dn_btn.setIcon(create_arrow_down_icon(14, "#CDD6F4"))
 
-        del_btn = QPushButton("")
+        del_btn = HoverIconButton(
+            create_trash_icon(14, "#F38BA8"),
+            create_trash_icon(14, "#11111B"),
+        )
         del_btn.setObjectName("deleteIconBtn")
         del_btn.setFixedSize(28, 28)
         del_btn.setToolTip("삭제")
-        del_btn.setIcon(create_trash_icon(14, "#F38BA8"))
 
         header_bar.addWidget(up_btn)
         header_bar.addWidget(dn_btn)
@@ -622,7 +672,7 @@ class SettingsDialog(QDialog):
         g_layout.addRow("프로바이더 종류:", type_combo)
 
         # Enabled Checkbox
-        enabled_check = QCheckBox("이 프로바이더 사용")
+        enabled_check = StyledCheckBox("이 프로바이더 사용")
         enabled_check.setChecked(p_data.get("enabled", True))
         g_layout.addRow("상태:", enabled_check)
 
@@ -639,8 +689,8 @@ class SettingsDialog(QDialog):
         window_options_layout = QHBoxLayout(window_options)
         window_options_layout.setContentsMargins(0, 0, 0, 0)
         window_options_layout.setSpacing(14)
-        five_hour_check = QCheckBox("5시간")
-        weekly_check = QCheckBox("주간")
+        five_hour_check = StyledCheckBox("5시간")
+        weekly_check = StyledCheckBox("주간")
         five_hour_check.setChecked(p_data.get("show_five_hour", True))
         weekly_check.setChecked(p_data.get("show_weekly", True))
         window_options_layout.addWidget(five_hour_check)
@@ -704,6 +754,7 @@ class SettingsDialog(QDialog):
             "connection_label": connection_label,
             "five_hour_check": five_hour_check,
             "weekly_check": weekly_check,
+            "delete_button": del_btn,
             "original_data": dict(p_data),
         }
 
@@ -764,7 +815,7 @@ class SettingsDialog(QDialog):
         self.config_data["settings"]["check_updates"] = self.update_check.isChecked()
         self.config_data["settings"]["widget_size"] = self.size_combo.currentText()
         self.config_data["settings"]["usage_value_bold"] = self.usage_bold_check.isChecked()
-        self.config_data["settings"]["widget_width"] = self.width_spin.value()
+        self.config_data["settings"].pop("widget_width", None)
 
         updated_providers = []
         for pw in self.provider_widgets:

@@ -3,11 +3,11 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QApplication, QDialog, QFormLayout
 
 from config import get_default_config
-from ui.settings_dialog import SettingsDialog
+from ui.settings_dialog import SettingsDialog, StyledCheckBox
 
 
 class SettingsDialogTests(unittest.TestCase):
@@ -68,6 +68,29 @@ class SettingsDialogTests(unittest.TestCase):
 
         item = self._provider_item("codex")
         self.assertFalse(item["type_combo"].itemIcon(0).isNull())
+
+    def test_manual_widget_width_setting_is_not_exposed(self):
+        self.assertFalse(hasattr(self.dialog, "width_spin"))
+
+    def test_checkboxes_use_cross_platform_painted_indicator(self):
+        item = self._provider_item("antigravity")
+
+        self.assertIsInstance(self.dialog.always_top_check, StyledCheckBox)
+        self.assertIsInstance(item["enabled_check"], StyledCheckBox)
+        self.assertIsInstance(item["five_hour_check"], StyledCheckBox)
+        self.assertNotIn("data:image", self.dialog.styleSheet())
+
+    def test_delete_icon_keeps_contrast_on_hover(self):
+        button = self._provider_item("codex")["delete_button"]
+        normal_icon_key = button.icon().cacheKey()
+
+        QApplication.sendEvent(button, QEvent(QEvent.Type.Enter))
+        hover_icon_key = button.icon().cacheKey()
+
+        self.assertNotEqual(hover_icon_key, normal_icon_key)
+
+        QApplication.sendEvent(button, QEvent(QEvent.Type.Leave))
+        self.assertEqual(button.icon().cacheKey(), normal_icon_key)
 
 
 if __name__ == "__main__":
