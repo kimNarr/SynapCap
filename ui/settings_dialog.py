@@ -547,9 +547,29 @@ class SettingsDialog(QDialog):
             self.size_combo.setCurrentIndex(idx)
         form.addRow("위젯 및 폰트 크기 (Size):", self.size_combo)
 
-        self.usage_bold_check = StyledCheckBox("사용량 수치를 굵게 표시")
-        self.usage_bold_check.setChecked(settings.get("usage_value_bold", True))
-        form.addRow("사용량 글꼴:", self.usage_bold_check)
+        self.expanded_font_spin = VisibleSpinBox()
+        self.expanded_font_spin.setRange(10, 18)
+        self.expanded_font_spin.setSuffix(" px")
+        self.expanded_font_spin.setValue(settings.get("expanded_font_size", 13))
+        form.addRow("펼침 글꼴 크기:", self.expanded_font_spin)
+
+        self.expanded_font_bold_check = StyledCheckBox("펼침 상태 글꼴을 굵게 표시")
+        self.expanded_font_bold_check.setChecked(
+            settings.get("expanded_font_bold", True)
+        )
+        form.addRow("펼침 글꼴 굵기:", self.expanded_font_bold_check)
+
+        self.compact_font_spin = VisibleSpinBox()
+        self.compact_font_spin.setRange(9, 16)
+        self.compact_font_spin.setSuffix(" px")
+        self.compact_font_spin.setValue(settings.get("compact_font_size", 12))
+        form.addRow("막대 글꼴 크기:", self.compact_font_spin)
+
+        self.compact_font_bold_check = StyledCheckBox("막대 상태 글꼴을 굵게 표시")
+        self.compact_font_bold_check.setChecked(
+            settings.get("compact_font_bold", True)
+        )
+        form.addRow("막대 글꼴 굵기:", self.compact_font_bold_check)
 
     def init_feedback_tab(self):
         layout = QVBoxLayout(self.feedback_tab)
@@ -905,7 +925,15 @@ class SettingsDialog(QDialog):
         self.config_data["settings"]["always_on_top"] = self.always_top_check.isChecked()
         self.config_data["settings"]["check_updates"] = self.update_check.isChecked()
         self.config_data["settings"]["widget_size"] = self.size_combo.currentText()
-        self.config_data["settings"]["usage_value_bold"] = self.usage_bold_check.isChecked()
+        self.config_data["settings"]["expanded_font_size"] = self.expanded_font_spin.value()
+        self.config_data["settings"]["expanded_font_bold"] = (
+            self.expanded_font_bold_check.isChecked()
+        )
+        self.config_data["settings"]["compact_font_size"] = self.compact_font_spin.value()
+        self.config_data["settings"]["compact_font_bold"] = (
+            self.compact_font_bold_check.isChecked()
+        )
+        self.config_data["settings"].pop("usage_value_bold", None)
         self.config_data["settings"].pop("widget_width", None)
 
         updated_providers = []
