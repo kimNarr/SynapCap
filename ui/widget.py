@@ -1,4 +1,5 @@
 import re
+import sys
 from datetime import datetime, timedelta
 
 from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QTimer, Signal
@@ -178,6 +179,7 @@ class SynapCapWidget(QWidget):
                 else Qt.WindowType(0)
             )
         )
+        self._apply_platform_window_attributes()
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         settings = self.config_data.get("settings", {})
@@ -1072,7 +1074,18 @@ class SynapCapWidget(QWidget):
             flags &= ~Qt.WindowType.WindowStaysOnTopHint
 
         self.setWindowFlags(flags)
+        self._apply_platform_window_attributes()
         self.show()
+
+    def _apply_platform_window_attributes(self) -> None:
+        if sys.platform == "darwin":
+            # Qt.Tool maps to NSPanel on macOS and is normally hidden when the
+            # application deactivates. Keep the menu-bar utility visible when
+            # the user clicks another app while preserving the topmost option.
+            self.setAttribute(
+                Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow,
+                True,
+            )
 
     def closeEvent(self, event):
         """Taskbar/OS close requests follow the header × exit behavior."""
