@@ -48,7 +48,43 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(settings["always_on_top"])
             self.assertTrue(settings["check_updates"])
             self.assertEqual(settings["usage_view"], "bar")
-            self.assertTrue(settings["usage_value_bold"])
+            self.assertEqual(settings["expanded_font_size"], 13)
+            self.assertTrue(settings["expanded_font_bold"])
+            self.assertEqual(settings["compact_font_size"], 12)
+            self.assertTrue(settings["compact_font_bold"])
+
+    def test_legacy_usage_bold_is_migrated_to_expanded_font(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps({"settings": {"usage_value_bold": False}}),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertFalse(settings["expanded_font_bold"])
+            self.assertNotIn("usage_value_bold", settings)
+
+    def test_font_sizes_are_normalized_to_safe_ranges(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "settings": {
+                            "expanded_font_size": 99,
+                            "compact_font_size": 1,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertEqual(settings["expanded_font_size"], 18)
+            self.assertEqual(settings["compact_font_size"], 9)
 
     def test_legacy_manual_width_is_removed(self):
         with tempfile.TemporaryDirectory() as temp_dir:

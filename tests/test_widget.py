@@ -92,7 +92,7 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
 
     def test_usage_value_bold_can_be_disabled(self):
-        self.widget.config_data["settings"]["usage_value_bold"] = False
+        self.widget.config_data["settings"]["expanded_font_bold"] = False
         self.widget.update_data([self.usage])
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
@@ -236,9 +236,9 @@ class WidgetTests(unittest.TestCase):
         compact_value = self.widget.compact_ui_map["codex"]["value"]
         self.assertEqual(compact_value.text(), "49%")
         self.assertIn("Codex", compact_value.toolTip())
-        self.assertIn("font-size: 10px", compact_value.styleSheet())
+        self.assertIn("font-size: 12px", compact_value.styleSheet())
         self.assertEqual(self.widget.compact_logo.size().width(), 20)
-        self.assertEqual(self.widget.expand_btn.height(), 24)
+        self.assertEqual(self.widget.expand_btn.height(), 26)
         self.assertGreaterEqual(self.widget.frame.height(), 40)
         self.assertIn("border: 1px solid #585B70", self.widget.frame.styleSheet())
 
@@ -467,7 +467,10 @@ class WidgetTests(unittest.TestCase):
                 "widget_width": 350,
                 "always_on_top": False,
                 "usage_view": "bar",
-                "usage_value_bold": False,
+                "expanded_font_size": 16,
+                "expanded_font_bold": False,
+                "compact_font_size": 14,
+                "compact_font_bold": False,
             }
         }
 
@@ -478,7 +481,200 @@ class WidgetTests(unittest.TestCase):
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
+        self.assertIn("font-size: 16px", usage_label.styleSheet())
         self.assertIn("font-weight: 400", usage_label.styleSheet())
+
+    def test_large_independent_fonts_resize_rows_bars_and_compact_width(self):
+        config = {
+            "settings": {
+                "widget_size": "Medium",
+                "always_on_top": False,
+                "usage_view": "bar",
+                "expanded_font_size": 18,
+                "expanded_font_bold": True,
+                "compact_font_size": 16,
+                "compact_font_bold": False,
+            }
+        }
+        self.widget.rebuild_ui(
+            config,
+            [CodexProvider({"id": "codex", "name": "Codex"})],
+            preserve_usage=False,
+        )
+        self.widget.update_data([self.usage])
+        self.app.processEvents()
+
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
+        progress = row.findChild(QProgressBar)
+        self.assertIn("font-size: 18px", usage_label.styleSheet())
+        self.assertGreaterEqual(progress.height(), 13)
+        self.assertGreaterEqual(self.widget.width(), 360)
+
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        compact_value = self.widget.compact_ui_map["codex"]["value"]
+        self.assertIn("font-size: 16px", compact_value.styleSheet())
+        self.assertIn("font-weight: 400", compact_value.styleSheet())
+        self.assertGreaterEqual(compact_value.width(), compact_value.sizeHint().width())
+        self.assertGreaterEqual(self.widget.frame.height(), compact_value.sizeHint().height() + 16)
+
+    def test_max_compact_font_fits_three_providers_without_clipping(self):
+        providers: list[BaseAIProvider] = [
+            CodexProvider({"id": "codex", "name": "Codex"}),
+            AntigravityProvider(
+                {
+                    "id": "gemini",
+                    "name": "Gemini",
+                    "show_five_hour": True,
+                    "show_weekly": True,
+                }
+            ),
+            ClaudeProvider(
+                {
+                    "id": "claude",
+                    "name": "Claude",
+                    "show_five_hour": True,
+                    "show_weekly": True,
+                }
+            ),
+        ]
+        config = {
+            "settings": {
+                "widget_size": "Medium",
+                "always_on_top": False,
+                "usage_view": "bar",
+                "expanded_font_size": 13,
+                "expanded_font_bold": True,
+                "compact_font_size": 16,
+                "compact_font_bold": True,
+            }
+        }
+        self.widget.rebuild_ui(config, providers, preserve_usage=False)
+        self.widget.update_data(
+            [
+                self.usage,
+                ModelUsage(
+                    "gemini",
+                    "Gemini",
+                    "Gemini",
+                    49,
+                    100,
+                    "%",
+                    windows=[
+                        UsageWindow("5시간", 25, "", 75),
+                        UsageWindow("주간", 49, "", 51),
+                    ],
+                ),
+                ModelUsage(
+                    "claude",
+                    "Claude",
+                    "Claude",
+                    46,
+                    100,
+                    "%",
+                    windows=[
+                        UsageWindow("5시간", 46, "", 54),
+                        UsageWindow("주간", 12, "", 88),
+                    ],
+                ),
+            ]
+        )
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        for compact_ui in self.widget.compact_ui_map.values():
+            value = compact_ui["value"]
+            self.assertGreaterEqual(value.width(), value.sizeHint().width())
+        self.assertGreaterEqual(
+            self.widget.width(),
+            self.widget.compact_bar.sizeHint().width()
+            + self.widget.frame_layout.contentsMargins().left()
+            + self.widget.frame_layout.contentsMargins().right(),
+        )
+
+    def test_first_compact_load_reflows_from_spinners_to_values(self):
+        providers: list[BaseAIProvider] = [
+            CodexProvider({"id": "codex", "name": "Codex"}),
+            AntigravityProvider(
+                {
+                    "id": "gemini",
+                    "name": "Gemini",
+                    "show_five_hour": True,
+                    "show_weekly": True,
+                }
+            ),
+            ClaudeProvider(
+                {
+                    "id": "claude",
+                    "name": "Claude",
+                    "show_five_hour": True,
+                    "show_weekly": True,
+                }
+            ),
+        ]
+        self.widget.rebuild_ui(
+            {
+                "settings": {
+                    "widget_size": "Medium",
+                    "always_on_top": False,
+                    "usage_view": "bar",
+                    "expanded_font_size": 13,
+                    "expanded_font_bold": True,
+                    "compact_font_size": 12,
+                    "compact_font_bold": True,
+                }
+            },
+            providers,
+            preserve_usage=False,
+        )
+        self.widget.enter_compact_mode()
+        self.widget.set_loading()
+        self.app.processEvents()
+        loading_width = self.widget.width()
+
+        self.widget.update_data(
+            [
+                self.usage,
+                ModelUsage(
+                    "gemini",
+                    "Gemini",
+                    "Gemini",
+                    59,
+                    100,
+                    "%",
+                    windows=[
+                        UsageWindow("5시간", 59, "", 41),
+                        UsageWindow("주간", 10, "", 90),
+                    ],
+                ),
+                ModelUsage(
+                    "claude",
+                    "Claude",
+                    "Claude",
+                    51,
+                    100,
+                    "%",
+                    windows=[
+                        UsageWindow("5시간", 51, "", 49),
+                        UsageWindow("주간", 13, "", 87),
+                    ],
+                ),
+            ]
+        )
+        self.app.processEvents()
+
+        self.assertGreater(self.widget.width(), loading_width)
+        for compact_ui in self.widget.compact_ui_map.values():
+            value = compact_ui["value"]
+            self.assertTrue(value.isVisible())
+            self.assertGreaterEqual(value.width(), value.sizeHint().width())
+        self.assertGreaterEqual(
+            self.widget.width(),
+            self.widget.compact_bar.sizeHint().width()
+            + self.widget.frame_layout.contentsMargins().left()
+            + self.widget.frame_layout.contentsMargins().right(),
+        )
 
     def test_rebuild_shrinks_after_provider_is_removed(self):
         providers: list[BaseAIProvider] = [

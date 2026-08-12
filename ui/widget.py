@@ -68,18 +68,32 @@ SIZE_PRESETS = {
 
 
 class UsageRing(QWidget):
-    def __init__(self, used: float, color: str, bold: bool = True, parent=None):
+    def __init__(
+        self,
+        used: float,
+        color: str,
+        bold: bool = True,
+        font_size: int = 13,
+        parent=None,
+    ):
         super().__init__(parent)
         self.used = max(0.0, min(100.0, float(used)))
         self.color = QColor(color)
         self.bold = bold
         self.value_text = f"{self.used:.0f}%"
-        self.setFixedSize(42, 42)
+        self.font_size = font_size
+        self.ring_size = max(42, font_size + 32)
+        self.setFixedSize(self.ring_size, self.ring_size)
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        ring_rect = QRectF(3.5, 3.5, 35, 35)
+        ring_rect = QRectF(
+            3.5,
+            3.5,
+            self.ring_size - 7,
+            self.ring_size - 7,
+        )
 
         background_pen = QPen(QColor("#313244"), 4.0)
         background_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -93,10 +107,10 @@ class UsageRing(QWidget):
 
         painter.setPen(QColor("#CDD6F4"))
         value_weight = QFont.Weight.Bold if self.bold else QFont.Weight.Normal
-        value_size = 8 if self.used >= 99.5 else 10
+        value_size = max(8, self.font_size - (3 if self.used >= 99.5 else 1))
         painter.setFont(QFont("Segoe UI", value_size, value_weight))
         painter.drawText(
-            QRectF(4, 4, 34, 34),
+            QRectF(4, 4, self.ring_size - 8, self.ring_size - 8),
             Qt.AlignmentFlag.AlignCenter,
             self.value_text,
         )
@@ -190,8 +204,7 @@ class SynapCapWidget(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         settings = self.config_data.get("settings", {})
-        size_key = settings.get("widget_size", "Medium")
-        preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
+        preset = self._expanded_preset(settings)
 
         width = max(300, preset["width"])
         self._expanded_width = width
@@ -367,6 +380,7 @@ class SynapCapWidget(QWidget):
         self.compact_close_btn.clicked.connect(self.quit_requested.emit)
         self._enable_instant_tooltip(self.compact_close_btn, "SynapCap 완전 종료")
         self.compact_layout.addWidget(self.compact_close_btn)
+        self._apply_compact_metrics()
         self.compact_bar.hide()
         self.frame_layout.addWidget(self.compact_bar)
 
@@ -385,6 +399,57 @@ class SynapCapWidget(QWidget):
         outer_layout.addWidget(self.frame)
 
         self._schedule_fit_to_content()
+
+    @staticmethod
+    def _expanded_preset(settings: dict) -> dict:
+        size_key = settings.get("widget_size", "Medium")
+        preset = dict(SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"]))
+        font_size = max(10, min(18, int(settings.get("expanded_font_size", 13))))
+        preset.update(
+            {
+                "title_size": font_size + 2,
+                "name_size": font_size + 1,
+                "val_size": font_size,
+                "pbar_height": max(8, round(font_size * 0.72)),
+                "badge_size": max(preset["badge_size"], font_size + 18),
+                "card_padding": max(preset["card_padding"], round(font_size * 0.8)),
+                "card_spacing": max(7, round(font_size * 0.58)),
+                "window_spacing": max(5, round(font_size * 0.42)),
+            }
+        )
+        preset["width"] = max(preset["width"], 300 + max(0, font_size - 13) * 12)
+        return preset
+
+    def _compact_metrics(self) -> dict:
+        settings = self.config_data.get("settings", {})
+        font_size = max(9, min(16, int(settings.get("compact_font_size", 12))))
+        return {
+            "font_size": font_size,
+            "font_weight": 800 if settings.get("compact_font_bold", True) else 400,
+            "icon_size": max(22, font_size + 10),
+            "logo_size": max(20, font_size + 8),
+            "button_size": max(24, font_size + 14),
+            "glyph_size": max(14, font_size + 2),
+            "item_spacing": max(5, round(font_size * 0.5)),
+            "bar_spacing": max(8, round(font_size * 0.7)),
+            "vertical_margin": max(2, round((font_size - 8) * 0.5)),
+        }
+
+    def _apply_compact_metrics(self) -> None:
+        metrics = self._compact_metrics()
+        vertical = metrics["vertical_margin"]
+        self.compact_layout.setContentsMargins(4, vertical, 2, vertical)
+        self.compact_layout.setSpacing(metrics["bar_spacing"])
+        self.compact_items_layout.setSpacing(metrics["bar_spacing"])
+        logo_size = metrics["logo_size"]
+        self.compact_logo.setFixedSize(logo_size, logo_size)
+        self.compact_logo.setPixmap(create_app_pixmap(logo_size))
+        button_size = metrics["button_size"]
+        glyph_size = metrics["glyph_size"]
+        self.expand_btn.setFixedSize(button_size, button_size)
+        self.compact_close_btn.setFixedSize(button_size, button_size)
+        self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, "#89B4FA"))
+        self.compact_close_btn.setIcon(create_close_icon(glyph_size, "#EBA0AC"))
 
     def _schedule_fit_to_content(
         self,
@@ -409,6 +474,16 @@ class SynapCapWidget(QWidget):
             if layout is not None:
                 layout.invalidate()
                 layout.activate()
+        if self.is_compact:
+            # Text and spinner visibility changes are polished asynchronously by
+            # Qt. Recalculate once more here so the first loaded values, not the
+            # narrower loading state, determine the final compact width.
+            for compact_ui in self.compact_ui_map.values():
+                compact_ui["item"].adjustSize()
+            self.compact_bar.adjustSize()
+            self._apply_compact_width()
+            self.compact_layout.invalidate()
+            self.compact_layout.activate()
         self.cards_frame.adjustSize()
         self.frame.adjustSize()
         self.adjustSize()
@@ -454,11 +529,12 @@ class SynapCapWidget(QWidget):
 
     def _update_expand_direction(self, resize_anchor: ResizeAnchor) -> None:
         _point, _anchor_left, anchor_top = resize_anchor
+        glyph_size = self._compact_metrics()["glyph_size"]
         if anchor_top:
-            self.expand_btn.setIcon(create_arrow_down_icon(14, "#89B4FA"))
+            self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, "#89B4FA"))
             tooltip = "아래로 전체 위젯 펼치기"
         else:
-            self.expand_btn.setIcon(create_arrow_up_icon(14, "#89B4FA"))
+            self.expand_btn.setIcon(create_arrow_up_icon(glyph_size, "#89B4FA"))
             tooltip = "위로 전체 위젯 펼치기"
         self._enable_instant_tooltip(self.expand_btn, tooltip)
 
@@ -487,6 +563,7 @@ class SynapCapWidget(QWidget):
         )
 
     def _build_compact_items(self) -> None:
+        metrics = self._compact_metrics()
         self.compact_ui_map.clear()
         while self.compact_items_layout.count():
             item = self.compact_items_layout.takeAt(0)
@@ -502,26 +579,28 @@ class SynapCapWidget(QWidget):
             item_widget = QWidget()
             item_layout = QHBoxLayout(item_widget)
             item_layout.setContentsMargins(0, 0, 0, 0)
-            item_layout.setSpacing(5)
+            item_layout.setSpacing(metrics["item_spacing"])
             item_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
             icon_label = QLabel()
-            icon_label.setFixedSize(22, 22)
-            icon_label.setPixmap(create_provider_pixmap(provider_type, 22))
+            icon_size = metrics["icon_size"]
+            icon_label.setFixedSize(icon_size, icon_size)
+            icon_label.setPixmap(create_provider_pixmap(provider_type, icon_size))
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             icon_label.setToolTip(provider.name)
             item_layout.addWidget(icon_label)
 
             value_label = QLabel("—")
-            value_label.setMinimumWidth(27)
+            value_label.setMinimumWidth(max(27, metrics["font_size"] * 3))
             value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             value_label.setStyleSheet(
-                "color: #CDD6F4; font-size: 10px; font-weight: 800; "
+                f"color: #CDD6F4; font-size: {metrics['font_size']}px; "
+                f"font-weight: {metrics['font_weight']}; "
                 "font-family: 'Segoe UI', -apple-system, sans-serif;"
             )
             item_layout.addWidget(value_label)
 
-            loading_spinner = LoadingSpinner(18)
+            loading_spinner = LoadingSpinner(max(18, metrics["font_size"] + 6))
             item_layout.addWidget(loading_spinner)
             value_label.hide()
             loading_spinner.start()
@@ -541,7 +620,13 @@ class SynapCapWidget(QWidget):
         self.header_widget.hide()
         self.cards_frame.hide()
         self.compact_bar.show()
-        self.frame_layout.setContentsMargins(8, 8, 7, 8)
+        compact_margin = max(8, self._compact_metrics()["vertical_margin"] + 6)
+        self.frame_layout.setContentsMargins(
+            compact_margin,
+            compact_margin,
+            max(7, compact_margin - 1),
+            compact_margin,
+        )
         self.frame_layout.setSpacing(0)
         self._refresh_compact_values(resize_anchor)
 
@@ -570,6 +655,17 @@ class SynapCapWidget(QWidget):
         )
         self.setFixedWidth(responsive_width)
 
+    @staticmethod
+    def _fit_compact_value_label(value_label: QLabel, font_size: int) -> None:
+        """Drop loading-era constraints and reserve the rendered text width."""
+        value_label.setMinimumWidth(0)
+        value_label.ensurePolished()
+        value_label.adjustSize()
+        value_label.setMinimumWidth(max(font_size * 3, value_label.sizeHint().width()))
+        parent = value_label.parentWidget()
+        if parent is not None:
+            parent.adjustSize()
+
     def _refresh_compact_values(
         self,
         resize_anchor: ResizeAnchor | None = None,
@@ -577,6 +673,7 @@ class SynapCapWidget(QWidget):
         if self.is_compact and resize_anchor is None:
             resize_anchor = self._capture_resize_anchor()
         usage_by_provider = {usage.provider_id: usage for usage in self.latest_usage}
+        metrics = self._compact_metrics()
         for provider_id, compact_ui in self.compact_ui_map.items():
             usage = usage_by_provider.get(provider_id)
             value_label = compact_ui["value"]
@@ -589,7 +686,11 @@ class SynapCapWidget(QWidget):
             value_label.show()
             if usage.error:
                 value_label.setText("!")
-                value_label.setStyleSheet("color: #F38BA8; font-size: 12px; font-weight: 800;")
+                value_label.setStyleSheet(
+                    f"color: #F38BA8; font-size: {metrics['font_size']}px; "
+                    f"font-weight: {metrics['font_weight']};"
+                )
+                self._fit_compact_value_label(value_label, metrics["font_size"])
                 value_label.setToolTip(usage.error)
                 continue
 
@@ -602,15 +703,18 @@ class SynapCapWidget(QWidget):
                     "/".join(f"{window.used:.0f}%" for window in windows)
                 )
                 value_label.setStyleSheet(
-                    f"color: {color}; font-size: 10px; font-weight: 800; "
+                    f"color: {color}; font-size: {metrics['font_size']}px; "
+                    f"font-weight: {metrics['font_weight']}; "
                     "font-family: 'Segoe UI', -apple-system, sans-serif;"
                 )
             else:
                 value_label.setText(f"{used:.0f}%")
                 value_label.setStyleSheet(
-                    f"color: {color}; font-size: 10px; font-weight: 800; "
+                    f"color: {color}; font-size: {metrics['font_size']}px; "
+                    f"font-weight: {metrics['font_weight']}; "
                     "font-family: 'Segoe UI', -apple-system, sans-serif;"
                 )
+            self._fit_compact_value_label(value_label, metrics["font_size"])
             tooltip_lines = [
                 f"{window.label} {window.used:.0f}% 사용" for window in windows
             ] or [f"{used:.0f}% 사용"]
@@ -676,8 +780,8 @@ class SynapCapWidget(QWidget):
         self.provider_ui_map.clear()
 
         settings = self.config_data.get("settings", {})
-        size_key = settings.get("widget_size", "Medium")
-        preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
+        preset = self._expanded_preset(settings)
+        expanded_weight = 700 if settings.get("expanded_font_bold", True) else 400
 
         # Update title font size dynamically
         if hasattr(self, "title_label"):
@@ -702,7 +806,7 @@ class SynapCapWidget(QWidget):
             c_layout = QVBoxLayout(card_widget)
             card_padding = preset["card_padding"]
             c_layout.setContentsMargins(card_padding, card_padding, card_padding, card_padding)
-            c_layout.setSpacing(7)
+            c_layout.setSpacing(preset["card_spacing"])
 
             # Title Row (LED Status Dot + Provider Name + Usage & Status Text)
             title_row = QHBoxLayout()
@@ -720,7 +824,7 @@ class SynapCapWidget(QWidget):
             # Provider Name
             name_label = QLabel(provider.name)
             name_label.setStyleSheet(
-                "color: #CDD6F4; font-weight: bold; "
+                f"color: #CDD6F4; font-weight: {expanded_weight}; "
                 f"font-size: {preset['name_size']}px; "
                 "font-family: 'Segoe UI', sans-serif;"
             )
@@ -743,7 +847,7 @@ class SynapCapWidget(QWidget):
 
             windows_layout = QVBoxLayout()
             windows_layout.setContentsMargins(0, 0, 0, 0)
-            windows_layout.setSpacing(5)
+            windows_layout.setSpacing(preset["window_spacing"])
             c_layout.addLayout(windows_layout)
 
             self.cards_layout.addWidget(card_widget)
@@ -801,14 +905,14 @@ class SynapCapWidget(QWidget):
         if configured_view in {"bar", "ring"}:
             self.usage_view = configured_view
             self._update_view_button()
-        size_key = settings.get("widget_size", "Medium")
-        preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
+        preset = self._expanded_preset(settings)
 
         width = max(300, preset["width"])
         self._expanded_width = width
         self.setFixedWidth(width)
         self.set_always_on_top(settings.get("always_on_top", True))
 
+        self._apply_compact_metrics()
         self._build_provider_cards()
         self._build_compact_items()
         if preserved_usage:
@@ -993,7 +1097,9 @@ class SynapCapWidget(QWidget):
         preset: dict,
     ):
         self._clear_usage_rows(ui)
-        usage_value_bold = self.config_data.get("settings", {}).get("usage_value_bold", True)
+        usage_value_bold = self.config_data.get("settings", {}).get(
+            "expanded_font_bold", True
+        )
         usage_value_weight = 700 if usage_value_bold else 400
 
         for window in windows:
@@ -1015,7 +1121,10 @@ class SynapCapWidget(QWidget):
                 details_layout.setSpacing(1)
 
                 window_label = QLabel(window.label)
-                window_label.setStyleSheet(f"color: #CDD6F4; font-size: {preset['val_size']}px;")
+                window_label.setStyleSheet(
+                    f"color: #CDD6F4; font-size: {preset['val_size']}px; "
+                    f"font-weight: {usage_value_weight};"
+                )
                 details_layout.addWidget(window_label)
 
                 if not reset_display:
@@ -1033,7 +1142,12 @@ class SynapCapWidget(QWidget):
                 row_layout.addLayout(details_layout)
                 row_layout.addStretch()
 
-                ring = UsageRing(window.used, color, usage_value_bold)
+                ring = UsageRing(
+                    window.used,
+                    color,
+                    usage_value_bold,
+                    preset["val_size"],
+                )
                 self._enable_instant_tooltip(ring, usage_tooltip)
                 row_layout.addWidget(ring)
             else:
@@ -1048,7 +1162,10 @@ class SynapCapWidget(QWidget):
                 reset_suffix = f" · {reset_display}" if reset_display else " · 리셋 시각 미상"
                 window_label = QLabel(f"{window.label}{reset_suffix}")
                 self._enable_instant_tooltip(window_label, reset_tooltip)
-                window_label.setStyleSheet(f"color: #A6ADC8; font-size: {preset['val_size']}px;")
+                window_label.setStyleSheet(
+                    f"color: #A6ADC8; font-size: {preset['val_size']}px; "
+                    f"font-weight: {usage_value_weight};"
+                )
                 info_layout.addWidget(window_label)
                 info_layout.addStretch()
 
@@ -1081,8 +1198,7 @@ class SynapCapWidget(QWidget):
         previous_usage = {usage.provider_id: usage for usage in self.latest_usage}
         self.latest_usage = list(usage_list)
         settings = self.config_data.get("settings", {})
-        size_key = settings.get("widget_size", "Medium")
-        preset = SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"])
+        preset = self._expanded_preset(settings)
         rendered_provider = False
 
         for usage in usage_list:

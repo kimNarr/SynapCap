@@ -39,7 +39,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "always_on_top": True,
         "widget_size": "Medium",
         "usage_view": "bar",
-        "usage_value_bold": True,
+        "expanded_font_size": 13,
+        "expanded_font_bold": True,
+        "compact_font_size": 12,
+        "compact_font_bold": True,
         "check_updates": True,
         "theme": "dark"
     },
@@ -119,8 +122,21 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
             settings.pop("widget_width", None)
             if settings.get("usage_view") not in {"bar", "ring"}:
                 settings["usage_view"] = "bar"
-            if not isinstance(settings.get("usage_value_bold"), bool):
-                settings["usage_value_bold"] = True
+            legacy_bold = loaded_settings.get("usage_value_bold")
+            if "expanded_font_bold" not in loaded_settings and isinstance(legacy_bold, bool):
+                settings["expanded_font_bold"] = legacy_bold
+            settings.pop("usage_value_bold", None)
+            for key, minimum, maximum, fallback in (
+                ("expanded_font_size", 10, 18, 13),
+                ("compact_font_size", 9, 16, 12),
+            ):
+                value = settings.get(key)
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    value = fallback
+                settings[key] = max(minimum, min(maximum, int(value)))
+            for key in ("expanded_font_bold", "compact_font_bold"):
+                if not isinstance(settings.get(key), bool):
+                    settings[key] = True
             data["settings"] = settings
             if "providers" not in data or not data["providers"]:
                 data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])

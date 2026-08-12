@@ -2,10 +2,12 @@
   "settings": {
     "refresh_interval_sec": 30,
     "always_on_top": true,
-    "widget_width": 300,
     "widget_size": "Medium",
     "usage_view": "bar",
-    "usage_value_bold": true,
+    "expanded_font_size": 13,
+    "expanded_font_bold": true,
+    "compact_font_size": 12,
+    "compact_font_bold": true,
     "check_updates": true,
     "theme": "dark"
   },

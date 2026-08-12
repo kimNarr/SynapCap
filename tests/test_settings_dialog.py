@@ -75,6 +75,27 @@ class SettingsDialogTests(unittest.TestCase):
     def test_manual_widget_width_setting_is_not_exposed(self):
         self.assertFalse(hasattr(self.dialog, "width_spin"))
 
+    def test_expanded_and_compact_font_controls_are_independent(self):
+        self.assertEqual(self.dialog.expanded_font_spin.value(), 13)
+        self.assertTrue(self.dialog.expanded_font_bold_check.isChecked())
+        self.assertEqual(self.dialog.compact_font_spin.value(), 12)
+        self.assertTrue(self.dialog.compact_font_bold_check.isChecked())
+
+        self.dialog.expanded_font_spin.setValue(17)
+        self.dialog.expanded_font_bold_check.setChecked(False)
+        self.dialog.compact_font_spin.setValue(15)
+        self.dialog.compact_font_bold_check.setChecked(False)
+
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+
+        settings = saved[0]["settings"]
+        self.assertEqual(settings["expanded_font_size"], 17)
+        self.assertFalse(settings["expanded_font_bold"])
+        self.assertEqual(settings["compact_font_size"], 15)
+        self.assertFalse(settings["compact_font_bold"])
+
     def test_checkboxes_use_cross_platform_painted_indicator(self):
         item = self._provider_item("antigravity")
 
