@@ -50,6 +50,18 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(settings["usage_view"], "bar")
             self.assertTrue(settings["usage_value_bold"])
 
+    def test_legacy_manual_width_is_removed(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps({"settings": {"widget_width": 640}}),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertNotIn("widget_width", settings)
+
     def test_provider_window_visibility_is_normalized(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"

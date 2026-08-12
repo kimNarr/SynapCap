@@ -37,7 +37,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "settings": {
         "refresh_interval_sec": 30,
         "always_on_top": True,
-        "widget_width": 300,
         "widget_size": "Medium",
         "usage_view": "bar",
         "usage_value_bold": True,
@@ -115,6 +114,9 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
                 loaded_settings = {}
             settings = deepcopy(DEFAULT_CONFIG["settings"])
             settings.update(loaded_settings)
+            # v0.1.6 and earlier exposed a manual width that conflicted with
+            # compact-mode restoration. Width is now derived from the size preset.
+            settings.pop("widget_width", None)
             if settings.get("usage_view") not in {"bar", "ring"}:
                 settings["usage_view"] = "bar"
             if not isinstance(settings.get("usage_value_bold"), bool):

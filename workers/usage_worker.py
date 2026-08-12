@@ -5,6 +5,7 @@ from providers import BaseAIProvider
 
 class UsageWorker(QThread):
     updated = Signal(object)
+    refresh_started = Signal()
 
     def __init__(self, providers: List[BaseAIProvider], interval_sec: int = 30):
         super().__init__()
@@ -23,6 +24,7 @@ class UsageWorker(QThread):
         for provider in self.providers:
             provider.invalidate_cache()
         self._force_refresh = True
+        self.refresh_started.emit()
 
     def run(self):
         print("[SynapCap Worker] Worker thread started fetching usage data...")
@@ -48,6 +50,9 @@ class UsageWorker(QThread):
                 if self._force_refresh:
                     self._force_refresh = False
                     print("[SynapCap Worker] Manual refresh triggered!")
+                    # A click can arrive while the previous fetch is still running.
+                    # Re-assert loading immediately before the requested fetch begins.
+                    self.refresh_started.emit()
                     break
                 time.sleep(1)
                 sleep_count += 1

@@ -170,6 +170,7 @@ def main():
 
     # 5. Background Worker 생성 및 실행
     worker = UsageWorker(providers, interval_sec=refresh_interval)
+    worker.refresh_started.connect(widget.set_loading)
     worker.updated.connect(widget.update_data)
     worker.start()
 

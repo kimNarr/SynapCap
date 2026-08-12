@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QProgressBar
 
 from providers import (
     AntigravityProvider,
+    BaseAIProvider,
     ClaudeProvider,
     CodexProvider,
     ModelUsage,
@@ -141,6 +142,7 @@ class WidgetTests(unittest.TestCase):
         ui = {"show_five_hour": False, "show_weekly": True}
         windows = [
             UsageWindow("5시간", 10, "", 90),
+            UsageWindow("현재 세션", 20, "", 80),
             UsageWindow("주간", 50, "", 50),
         ]
 
@@ -208,13 +210,74 @@ class WidgetTests(unittest.TestCase):
         compact_value = self.widget.compact_ui_map["codex"]["value"]
         self.assertEqual(compact_value.text(), "49%")
         self.assertIn("Codex", compact_value.toolTip())
-        self.assertIn("font-size: 11px", compact_value.styleSheet())
+        self.assertIn("font-size: 10px", compact_value.styleSheet())
         self.assertEqual(self.widget.compact_logo.size().width(), 20)
         self.assertEqual(self.widget.expand_btn.height(), 24)
         self.assertGreaterEqual(self.widget.frame.height(), 40)
         self.assertIn("border: 1px solid #585B70", self.widget.frame.styleSheet())
 
-    def test_compact_bar_expands_small_width_for_three_providers(self):
+    def test_loading_uses_animation_and_keeps_existing_rows(self):
+        ui = self.widget.provider_ui_map["codex"]
+
+        self.assertEqual(ui["status"].text(), "")
+        self.assertTrue(ui["spinner"].is_spinning())
+
+        self.widget.update_data([self.usage])
+        existing_rows = len(ui["window_rows"])
+        self.assertFalse(ui["spinner"].is_spinning())
+
+        self.widget.set_loading()
+
+        self.assertTrue(ui["spinner"].is_spinning())
+        self.assertFalse(self.widget.refresh_btn.isEnabled())
+        self.assertEqual(len(ui["window_rows"]), existing_rows)
+
+        self.widget.update_data([self.usage])
+        self.assertFalse(ui["spinner"].is_spinning())
+        self.assertTrue(self.widget.refresh_btn.isEnabled())
+
+    def test_compact_bar_shows_both_enabled_usage_windows(self):
+        provider = AntigravityProvider(
+            {
+                "id": "gemini",
+                "name": "Gemini",
+                "show_five_hour": True,
+                "show_weekly": True,
+            }
+        )
+        self.widget.rebuild_ui(
+            self.widget.config_data,
+            [provider],
+            preserve_usage=False,
+        )
+        usage = ModelUsage(
+            "gemini",
+            "Gemini",
+            "Gemini",
+            49,
+            100,
+            "%",
+            windows=[
+                UsageWindow("주간", 49, "", 51),
+                UsageWindow("5시간", 15, "", 85),
+            ],
+        )
+
+        self.widget.update_data([usage])
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        compact_value = self.widget.compact_ui_map["gemini"]["value"]
+        self.assertEqual(compact_value.text(), "15%/49%")
+        self.assertGreaterEqual(compact_value.width(), compact_value.sizeHint().width())
+        self.assertIn("5시간 15% 사용", compact_value.toolTip())
+        self.assertIn("주간 49% 사용", compact_value.toolTip())
+
+        self.widget.provider_ui_map["gemini"]["show_five_hour"] = False
+        self.widget._refresh_compact_values()
+        self.assertEqual(compact_value.text(), "49%")
+
+    def test_small_preset_uses_300px_minimum_and_compact_fits_content(self):
         widget = SynapCapWidget(
             {
                 "settings": {
@@ -232,16 +295,70 @@ class WidgetTests(unittest.TestCase):
         )
         widget.show()
         self.app.processEvents()
+        self.assertEqual(widget.width(), 300)
 
         widget.enter_compact_mode()
         self.app.processEvents()
 
-        self.assertGreaterEqual(widget.width(), 292)
+        self.assertLess(widget.width(), 300)
+        self.assertGreaterEqual(
+            widget.width(),
+            widget.compact_bar.sizeHint().width()
+            + widget.frame_layout.contentsMargins().left()
+            + widget.frame_layout.contentsMargins().right(),
+        )
         widget.exit_compact_mode()
         self.app.processEvents()
-        self.assertEqual(widget.width(), 260)
+        self.assertEqual(widget.width(), 300)
         widget.close()
         widget.deleteLater()
+
+    def test_compact_width_follows_visible_provider_count(self):
+        provider_sets: list[list[BaseAIProvider]] = [
+            [CodexProvider({"id": "codex", "name": "Codex"})],
+            [
+                CodexProvider({"id": "codex", "name": "Codex"}),
+                AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+            ],
+            [
+                CodexProvider({"id": "codex", "name": "Codex"}),
+                AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+                ClaudeProvider({"id": "claude", "name": "Claude"}),
+            ],
+        ]
+
+        widths = []
+        for providers in provider_sets:
+            self.widget.rebuild_ui(
+                self.widget.config_data,
+                providers,
+                preserve_usage=False,
+            )
+            self.widget.enter_compact_mode()
+            self.app.processEvents()
+            widths.append(self.widget.width())
+            self.widget.exit_compact_mode()
+            self.app.processEvents()
+
+        self.assertLess(widths[0], widths[1])
+        self.assertLess(widths[1], widths[2])
+        self.assertEqual(self.widget.width(), 300)
+
+    def test_compact_toggle_preserves_bottom_right_anchor(self):
+        self.widget.move(120, 180)
+        self.app.processEvents()
+        expanded_bottom_right = self.widget.frameGeometry().bottomRight()
+
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        compact_bottom_right = self.widget.frameGeometry().bottomRight()
+
+        self.assertEqual(compact_bottom_right, expanded_bottom_right)
+
+        self.widget.exit_compact_mode()
+        self.app.processEvents()
+
+        self.assertEqual(self.widget.frameGeometry().bottomRight(), compact_bottom_right)
 
     def test_confirmed_shutdown_does_not_request_quit_again(self):
         quit_requests = []
@@ -294,7 +411,7 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("font-weight: 400", usage_label.styleSheet())
 
     def test_rebuild_shrinks_after_provider_is_removed(self):
-        providers = [
+        providers: list[BaseAIProvider] = [
             CodexProvider({"id": provider_id, "name": provider_id.title()})
             for provider_id in ("first", "second", "third")
         ]
