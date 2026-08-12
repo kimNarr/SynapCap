@@ -177,6 +177,9 @@ def main():
     # 6. GUI Settings Dialog 오픈 및 Hot-Reload 연결
     def open_settings_dialog():
         dialog = SettingsDialog(config_data, parent=widget)
+        dialog.feedback_requested.connect(
+            lambda url: QDesktopServices.openUrl(QUrl(url))
+        )
 
         def handle_config_saved(new_config: dict):
             nonlocal config_data, providers
@@ -340,6 +343,9 @@ def main():
     tray.refresh_requested.connect(worker.trigger_manual_refresh)
     tray.always_on_top_toggled.connect(handle_always_on_top)
     tray.settings_requested.connect(open_settings_dialog)
+    tray.feedback_requested.connect(
+        lambda url: QDesktopServices.openUrl(QUrl(url))
+    )
     tray.update_requested.connect(start_one_click_update)
     tray.quit_requested.connect(request_quit)
 

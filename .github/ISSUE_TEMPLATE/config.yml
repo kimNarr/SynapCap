@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 사용 방법과 오류 해결 문서
+    url: https://kimnarr.github.io/SynapCap/#troubleshooting
+    about: CLI 설치와 로그인, 운영체제별 오류 해결 방법을 먼저 확인해 주세요.

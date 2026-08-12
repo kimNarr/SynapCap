@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -21,6 +22,7 @@ from version import APP_VERSION
 from .icon import (
     create_app_pixmap,
     create_arrow_down_icon,
+    create_arrow_up_icon,
     create_close_icon,
     create_minimize_icon,
     create_provider_pixmap,
@@ -28,6 +30,11 @@ from .icon import (
     create_settings_icon,
     create_usage_view_icon,
 )
+
+# A frameless widget has no visible resize border, so a slightly wider magnetic
+# zone feels natural and avoids leaving a narrow unusable gap near an edge.
+EDGE_SNAP_DISTANCE = 48
+ResizeAnchor = tuple[QPoint, bool, bool]
 
 SIZE_PRESETS = {
     "Small": {
@@ -155,7 +162,7 @@ class SynapCapWidget(QWidget):
         self._shutdown_in_progress = False
         self.is_compact = False
         self.compact_ui_map = {}
-        self._pending_bottom_right: QPoint | None = None
+        self._pending_resize_anchor: ResizeAnchor | None = None
         configured_view = self.config_data.get("settings", {}).get("usage_view", "bar")
         self.usage_view = configured_view if configured_view in {"bar", "ring"} else "bar"
         self.latest_usage: list[ModelUsage] = []
@@ -379,10 +386,18 @@ class SynapCapWidget(QWidget):
 
         self._schedule_fit_to_content()
 
-    def _schedule_fit_to_content(self, bottom_right: QPoint | None = None) -> None:
+    def _schedule_fit_to_content(
+        self,
+        resize_anchor: ResizeAnchor | None = None,
+    ) -> None:
         """Resize after Qt has applied deferred child/layout removals."""
-        if bottom_right is not None:
-            self._pending_bottom_right = QPoint(bottom_right)
+        if resize_anchor is not None:
+            point, anchor_left, anchor_top = resize_anchor
+            self._pending_resize_anchor = (
+                QPoint(point),
+                anchor_left,
+                anchor_top,
+            )
         self._fit_timer.start(0)
 
     def _fit_to_content(self) -> None:
@@ -397,13 +412,79 @@ class SynapCapWidget(QWidget):
         self.cards_frame.adjustSize()
         self.frame.adjustSize()
         self.adjustSize()
-        if self._pending_bottom_right is not None:
-            anchor = self._pending_bottom_right
-            self.move(
-                anchor.x() - self.frameGeometry().width() + 1,
-                anchor.y() - self.frameGeometry().height() + 1,
-            )
-            self._pending_bottom_right = None
+        if self._pending_resize_anchor is not None:
+            self._move_to_resize_anchor(self._pending_resize_anchor)
+            self._pending_resize_anchor = None
+
+    def _available_geometry(self, point: QPoint | None = None):
+        screen = QApplication.screenAt(point) if point is not None else self.screen()
+        if screen is None:
+            screen = self.screen() or QApplication.primaryScreen()
+        return screen.availableGeometry() if screen is not None else self.frameGeometry()
+
+    def _capture_resize_anchor(self) -> ResizeAnchor:
+        """Choose the nearest screen corner so resizing grows into free space."""
+        geometry = self.frameGeometry()
+        available = self._available_geometry(geometry.center())
+        anchor_left = abs(geometry.left() - available.left()) <= abs(
+            available.right() - geometry.right()
+        )
+        anchor_top = abs(geometry.top() - available.top()) <= abs(
+            available.bottom() - geometry.bottom()
+        )
+        anchor = QPoint(
+            geometry.left() if anchor_left else geometry.right(),
+            geometry.top() if anchor_top else geometry.bottom(),
+        )
+        return anchor, anchor_left, anchor_top
+
+    def _move_to_resize_anchor(self, resize_anchor: ResizeAnchor) -> None:
+        anchor, anchor_left, anchor_top = resize_anchor
+        geometry = self.frameGeometry()
+        available = self._available_geometry(anchor)
+        x = anchor.x() if anchor_left else anchor.x() - geometry.width() + 1
+        y = anchor.y() if anchor_top else anchor.y() - geometry.height() + 1
+        max_x = max(available.left(), available.right() - geometry.width() + 1)
+        max_y = max(available.top(), available.bottom() - geometry.height() + 1)
+        self.move(
+            max(available.left(), min(x, max_x)),
+            max(available.top(), min(y, max_y)),
+        )
+        self._snap_to_screen_edges()
+
+    def _update_expand_direction(self, resize_anchor: ResizeAnchor) -> None:
+        _point, _anchor_left, anchor_top = resize_anchor
+        if anchor_top:
+            self.expand_btn.setIcon(create_arrow_down_icon(14, "#89B4FA"))
+            tooltip = "아래로 전체 위젯 펼치기"
+        else:
+            self.expand_btn.setIcon(create_arrow_up_icon(14, "#89B4FA"))
+            tooltip = "위로 전체 위젯 펼치기"
+        self._enable_instant_tooltip(self.expand_btn, tooltip)
+
+    def _snap_to_screen_edges(self) -> None:
+        """Keep a dragged widget on-screen and magnetize it near an edge."""
+        geometry = self.frameGeometry()
+        available = self._available_geometry(geometry.center())
+        x = geometry.left()
+        y = geometry.top()
+
+        if abs(geometry.left() - available.left()) <= EDGE_SNAP_DISTANCE:
+            x = available.left()
+        elif abs(available.right() - geometry.right()) <= EDGE_SNAP_DISTANCE:
+            x = available.right() - geometry.width() + 1
+
+        if abs(geometry.top() - available.top()) <= EDGE_SNAP_DISTANCE:
+            y = available.top()
+        elif abs(available.bottom() - geometry.bottom()) <= EDGE_SNAP_DISTANCE:
+            y = available.bottom() - geometry.height() + 1
+
+        max_x = max(available.left(), available.right() - geometry.width() + 1)
+        max_y = max(available.top(), available.bottom() - geometry.height() + 1)
+        self.move(
+            max(available.left(), min(x, max_x)),
+            max(available.top(), min(y, max_y)),
+        )
 
     def _build_compact_items(self) -> None:
         self.compact_ui_map.clear()
@@ -455,21 +536,19 @@ class SynapCapWidget(QWidget):
     def enter_compact_mode(self) -> None:
         if self.is_compact:
             return
-        bottom_right = self.frameGeometry().bottomRight()
+        resize_anchor = self._capture_resize_anchor()
         self.is_compact = True
         self.header_widget.hide()
         self.cards_frame.hide()
         self.compact_bar.show()
         self.frame_layout.setContentsMargins(8, 8, 7, 8)
         self.frame_layout.setSpacing(0)
-        self._refresh_compact_values()
-        self._apply_compact_width()
-        self._schedule_fit_to_content(bottom_right)
+        self._refresh_compact_values(resize_anchor)
 
     def exit_compact_mode(self) -> None:
         if not self.is_compact:
             return
-        bottom_right = self.frameGeometry().bottomRight()
+        resize_anchor = self._capture_resize_anchor()
         self.is_compact = False
         self.compact_bar.hide()
         self.header_widget.show()
@@ -477,10 +556,9 @@ class SynapCapWidget(QWidget):
         self.setFixedWidth(self._expanded_width)
         self.frame_layout.setContentsMargins(12, 14, 12, 12)
         self.frame_layout.setSpacing(10)
-        self._schedule_fit_to_content(bottom_right)
+        self._schedule_fit_to_content(resize_anchor)
 
     def _apply_compact_width(self) -> None:
-        bottom_right = self.frameGeometry().bottomRight()
         self.compact_items_layout.invalidate()
         self.compact_items_layout.activate()
         self.compact_layout.invalidate()
@@ -491,13 +569,13 @@ class SynapCapWidget(QWidget):
             150, content_width + margins.left() + margins.right() + 2
         )
         self.setFixedWidth(responsive_width)
-        if self.isVisible():
-            self.move(
-                bottom_right.x() - self.frameGeometry().width() + 1,
-                bottom_right.y() - self.frameGeometry().height() + 1,
-            )
 
-    def _refresh_compact_values(self) -> None:
+    def _refresh_compact_values(
+        self,
+        resize_anchor: ResizeAnchor | None = None,
+    ) -> None:
+        if self.is_compact and resize_anchor is None:
+            resize_anchor = self._capture_resize_anchor()
         usage_by_provider = {usage.provider_id: usage for usage in self.latest_usage}
         for provider_id, compact_ui in self.compact_ui_map.items():
             usage = usage_by_provider.get(provider_id)
@@ -541,6 +619,9 @@ class SynapCapWidget(QWidget):
             )
         if self.is_compact:
             self._apply_compact_width()
+            if resize_anchor is not None:
+                self._update_expand_direction(resize_anchor)
+                self._schedule_fit_to_content(resize_anchor)
 
     def _update_view_button(self):
         target_view = "ring" if self.usage_view == "bar" else "bar"
@@ -708,9 +789,7 @@ class SynapCapWidget(QWidget):
         providers: list[BaseAIProvider],
         preserve_usage: bool = True,
     ):
-        compact_bottom_right = (
-            self.frameGeometry().bottomRight() if self.is_compact else None
-        )
+        resize_anchor = self._capture_resize_anchor() if self.is_compact else None
         preserved_usage = list(self.latest_usage) if preserve_usage else []
         self.config_data = config_data
         self.providers = providers
@@ -738,12 +817,13 @@ class SynapCapWidget(QWidget):
             self.header_widget.hide()
             self.cards_frame.hide()
             self.compact_bar.show()
-            self._apply_compact_width()
-            self._refresh_compact_values()
-        self._schedule_fit_to_content(compact_bottom_right)
+            self._refresh_compact_values(resize_anchor)
+        else:
+            self._schedule_fit_to_content()
 
     def set_loading(self) -> None:
         """Show non-blocking provider loading indicators without hiding old data."""
+        resize_anchor = self._capture_resize_anchor() if self.is_compact else None
         for ui in self.provider_ui_map.values():
             ui["status"].hide()
             ui["spinner"].start()
@@ -752,6 +832,7 @@ class SynapCapWidget(QWidget):
             compact_ui["spinner"].start()
         if self.is_compact:
             self._apply_compact_width()
+            self._schedule_fit_to_content(resize_anchor)
         self.refresh_btn.setEnabled(False)
 
     def _finish_loading(self) -> None:
@@ -1109,3 +1190,12 @@ class SynapCapWidget(QWidget):
         if event.buttons() == Qt.MouseButton.LeftButton:
             self.move(event.globalPosition().toPoint() - self.drag_position)
             event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._snap_to_screen_edges()
+            if self.is_compact:
+                self._update_expand_direction(self._capture_resize_anchor())
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)

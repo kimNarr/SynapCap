@@ -1,0 +1,69 @@
+name: 버그 신고
+description: 오류나 예상과 다른 동작을 알려주세요.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제보해 주셔서 감사합니다. 공개 Issue에 API 키, 로그인 코드, 계정 정보 또는 설정 파일 원문을 올리지 마세요.
+  - type: input
+    id: version
+    attributes:
+      label: SynapCap 버전
+      description: 위젯 상단 또는 환경설정 제목에 표시된 버전입니다.
+      placeholder: v0.1.9
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 운영체제
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS Apple Silicon
+        - macOS Intel
+        - 기타
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: 관련 AI 서비스
+      multiple: true
+      options:
+        - Codex
+        - Gemini / Antigravity
+        - Claude
+        - 앱 UI / 설정 / 업데이트
+  - type: textarea
+    id: problem
+    attributes:
+      label: 발생한 문제
+      description: 실제 결과와 원했던 결과를 함께 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 재현 방법
+      placeholder: |
+        1. SynapCap을 실행합니다.
+        2. ...
+        3. 문제가 발생합니다.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 추가 정보
+      description: 개인정보를 제거한 오류 문구나 스크린샷을 첨부해 주세요.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: 공개 정보 확인
+      options:
+        - label: API 키, 로그인 코드, 계정 정보 등 민감한 정보를 제거했습니다.
+          required: true
