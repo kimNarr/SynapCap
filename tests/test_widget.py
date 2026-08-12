@@ -202,6 +202,32 @@ class WidgetTests(unittest.TestCase):
         self.widget.close_btn.click()
         self.assertEqual(quit_requests, [True])
 
+    def test_macos_tool_window_stays_visible_when_application_deactivates(self):
+        provider = CodexProvider({"id": "codex", "name": "Codex"})
+        with patch("ui.widget.sys.platform", "darwin"):
+            widget = SynapCapWidget(
+                {
+                    "settings": {
+                        "widget_size": "Medium",
+                        "always_on_top": True,
+                    }
+                },
+                [provider],
+            )
+
+        self.assertTrue(
+            widget.testAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
+        )
+        self.assertTrue(widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+
+        widget.set_always_on_top(False)
+        self.assertTrue(
+            widget.testAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
+        )
+        self.assertFalse(widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        widget.close()
+        widget.deleteLater()
+
     def test_compact_bar_shows_latest_provider_usage(self):
         self.widget.update_data([self.usage])
         self.widget.enter_compact_mode()
