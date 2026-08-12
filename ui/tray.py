@@ -1,6 +1,7 @@
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from feedback import FEEDBACK_CHOOSER_URL
 from version import APP_VERSION
 
 from .icon import create_app_icon
@@ -11,6 +12,7 @@ class SynapCapTray(QObject):
     toggle_widget_requested = Signal()
     always_on_top_toggled = Signal(bool)
     settings_requested = Signal()
+    feedback_requested = Signal(str)
     update_requested = Signal(str)
     quit_requested = Signal()
 
@@ -64,6 +66,11 @@ class SynapCapTray(QObject):
 
         self.settings_action = menu.addAction("설정...")
         self.settings_action.triggered.connect(self.settings_requested.emit)
+
+        self.feedback_action = menu.addAction("피드백 보내기...")
+        self.feedback_action.triggered.connect(
+            lambda: self.feedback_requested.emit(FEEDBACK_CHOOSER_URL)
+        )
 
         self.update_action = menu.addAction("")
         self.update_action.setVisible(False)

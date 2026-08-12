@@ -370,8 +370,30 @@ class WidgetTests(unittest.TestCase):
         self.assertLess(widths[1], widths[2])
         self.assertEqual(self.widget.width(), 300)
 
-    def test_compact_toggle_preserves_bottom_right_anchor(self):
-        self.widget.move(120, 180)
+    def test_compact_toggle_expands_downward_near_top_edge(self):
+        available = self.widget.screen().availableGeometry()
+        self.widget.move(available.left() + 64, available.top() + 64)
+        self.app.processEvents()
+        expanded_top_left = self.widget.frameGeometry().topLeft()
+
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        compact_top_left = self.widget.frameGeometry().topLeft()
+
+        self.assertEqual(compact_top_left, expanded_top_left)
+
+        self.widget.exit_compact_mode()
+        self.app.processEvents()
+
+        self.assertEqual(self.widget.frameGeometry().topLeft(), compact_top_left)
+        self.assertGreaterEqual(self.widget.frameGeometry().top(), available.top())
+
+    def test_compact_toggle_expands_upward_near_bottom_edge(self):
+        available = self.widget.screen().availableGeometry()
+        self.widget.move(
+            available.right() - self.widget.width() - 64,
+            available.bottom() - self.widget.height() - 64,
+        )
         self.app.processEvents()
         expanded_bottom_right = self.widget.frameGeometry().bottomRight()
 
@@ -385,6 +407,28 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         self.assertEqual(self.widget.frameGeometry().bottomRight(), compact_bottom_right)
+        self.assertLessEqual(self.widget.frameGeometry().bottom(), available.bottom())
+
+    def test_drag_release_snaps_widget_to_nearby_screen_edges(self):
+        available = self.widget.screen().availableGeometry()
+        self.widget.move(available.left() + 40, available.top() + 36)
+
+        self.widget._snap_to_screen_edges()
+
+        self.assertEqual(self.widget.frameGeometry().left(), available.left())
+        self.assertEqual(self.widget.frameGeometry().top(), available.top())
+
+    def test_resize_reapplies_edge_snap_without_leaving_a_gap(self):
+        available = self.widget.screen().availableGeometry()
+        self.widget.move(available.left() + 36, available.top() + 32)
+
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        self.widget.exit_compact_mode()
+        self.app.processEvents()
+
+        self.assertEqual(self.widget.frameGeometry().left(), available.left())
+        self.assertEqual(self.widget.frameGeometry().top(), available.top())
 
     def test_confirmed_shutdown_does_not_request_quit_again(self):
         quit_requests = []

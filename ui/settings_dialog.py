@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from feedback import feedback_url
 from providers import PROVIDER_TYPE_OPTIONS
 from version import APP_VERSION
 
@@ -211,6 +212,7 @@ class SettingsTitleBar(QWidget):
 
 class SettingsDialog(QDialog):
     config_saved = Signal(dict)
+    feedback_requested = Signal(str)
 
     def __init__(self, current_config: dict, parent=None):
         super().__init__(parent)
@@ -489,6 +491,11 @@ class SettingsDialog(QDialog):
         self.init_providers_tab()
         self.tabs.addTab(self.providers_tab, "AI Providers")
 
+        # 3. 피드백 Tab
+        self.feedback_tab = QWidget()
+        self.init_feedback_tab()
+        self.tabs.addTab(self.feedback_tab, "Feedback")
+
         layout.addWidget(self.tabs)
 
         # Buttons (저장 / 취소)
@@ -543,6 +550,90 @@ class SettingsDialog(QDialog):
         self.usage_bold_check = StyledCheckBox("사용량 수치를 굵게 표시")
         self.usage_bold_check.setChecked(settings.get("usage_value_bold", True))
         form.addRow("사용량 글꼴:", self.usage_bold_check)
+
+    def init_feedback_tab(self):
+        layout = QVBoxLayout(self.feedback_tab)
+        layout.setContentsMargins(22, 24, 22, 22)
+        layout.setSpacing(12)
+
+        title = QLabel("SynapCap에 의견 보내기")
+        title.setStyleSheet("color: #CDD6F4; font-size: 17px; font-weight: 750;")
+        layout.addWidget(title)
+
+        description = QLabel(
+            "유형을 선택하면 브라우저에서 GitHub Issue 작성 화면이 열립니다. "
+            "내용을 확인한 뒤 직접 등록해 주세요."
+        )
+        description.setWordWrap(True)
+        description.setStyleSheet("color: #A6ADC8; line-height: 1.5;")
+        layout.addWidget(description)
+
+        self.feedback_buttons = {}
+        feedback_options = (
+            (
+                "버그 신고",
+                "오류 현상, 재현 방법과 운영체제 정보를 알려주세요.",
+                "bug",
+            ),
+            (
+                "기능 제안",
+                "필요한 기능과 어떤 상황에서 도움이 되는지 알려주세요.",
+                "feature",
+            ),
+            (
+                "기타 의견",
+                "UI, 사용성, 문서 등 자유로운 의견을 남겨주세요.",
+                "other",
+            ),
+        )
+
+        for button_text, detail_text, feedback_type in feedback_options:
+            card = QFrame()
+            card.setObjectName("feedbackCard")
+            card.setStyleSheet(
+                "QFrame#feedbackCard { background-color: #181825; "
+                "border: 1px solid #313244; border-radius: 10px; }"
+            )
+            card_layout = QHBoxLayout(card)
+            card_layout.setContentsMargins(16, 14, 14, 14)
+            card_layout.setSpacing(16)
+
+            copy_layout = QVBoxLayout()
+            copy_layout.setSpacing(4)
+            option_title = QLabel(button_text)
+            option_title.setStyleSheet(
+                "color: #CDD6F4; font-size: 13px; font-weight: 700;"
+            )
+            option_detail = QLabel(detail_text)
+            option_detail.setWordWrap(True)
+            option_detail.setStyleSheet("color: #7F849C; font-size: 11px;")
+            copy_layout.addWidget(option_title)
+            copy_layout.addWidget(option_detail)
+            card_layout.addLayout(copy_layout, 1)
+
+            open_button = QPushButton("작성하기 ↗")
+            open_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            open_button.clicked.connect(
+                lambda _checked=False, kind=feedback_type: self.feedback_requested.emit(
+                    feedback_url(kind)
+                )
+            )
+            self.feedback_buttons[feedback_type] = open_button
+            card_layout.addWidget(open_button)
+            layout.addWidget(card)
+
+        privacy_note = QLabel(
+            "공개 Issue에는 API 키, 로그인 코드, 계정 정보, 설정 파일 원문을 "
+            "올리지 마세요. 스크린샷에도 개인정보가 없는지 확인해 주세요."
+        )
+        privacy_note.setWordWrap(True)
+        privacy_note.setStyleSheet(
+            "color: #F9E2AF; background-color: rgba(249, 226, 175, 0.06); "
+            "border: 1px solid rgba(249, 226, 175, 0.2); border-radius: 8px; "
+            "padding: 10px; font-size: 11px;"
+        )
+        layout.addWidget(privacy_note)
+        layout.addStretch()
 
 
     def init_providers_tab(self):

@@ -61,8 +61,11 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(self.dialog.result(), QDialog.DialogCode.Rejected)
 
     def test_settings_window_uses_cross_platform_fusion_controls(self):
+        app = QApplication.instance()
+        self.assertIsInstance(app, QApplication)
+        assert isinstance(app, QApplication)
         self.assertEqual(
-            QApplication.instance().style().metaObject().className(),
+            app.style().metaObject().className(),
             "QFusionStyle",
         )
 
@@ -91,6 +94,19 @@ class SettingsDialogTests(unittest.TestCase):
 
         QApplication.sendEvent(button, QEvent(QEvent.Type.Leave))
         self.assertEqual(button.icon().cacheKey(), normal_icon_key)
+
+    def test_feedback_tab_opens_each_github_issue_form(self):
+        self.assertEqual(self.dialog.tabs.tabText(2), "Feedback")
+        requested_urls = []
+        self.dialog.feedback_requested.connect(requested_urls.append)
+
+        for feedback_type in ("bug", "feature", "other"):
+            self.dialog.feedback_buttons[feedback_type].click()
+
+        self.assertEqual(len(requested_urls), 3)
+        self.assertIn("template=bug_report.yml", requested_urls[0])
+        self.assertIn("template=feature_request.yml", requested_urls[1])
+        self.assertIn("template=general_feedback.yml", requested_urls[2])
 
 
 if __name__ == "__main__":

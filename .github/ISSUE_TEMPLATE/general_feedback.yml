@@ -1,0 +1,23 @@
+name: 기타 의견
+description: UI, 사용성, 문서 등에 대한 자유로운 의견을 남겨주세요.
+title: "[Feedback] "
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: 의견 분야
+      options:
+        - UI와 가독성
+        - 사용 흐름
+        - 설치와 업데이트
+        - 문서와 홈페이지
+        - 기타
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: 의견
+      description: 좋았던 점이나 개선했으면 하는 점을 자유롭게 알려주세요.
+    validations:
+      required: true
