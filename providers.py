@@ -1,7 +1,7 @@
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Type
+from datetime import datetime
 
 from subscription_usage import (
     SubscriptionUsageError,
@@ -10,12 +10,13 @@ from subscription_usage import (
     query_codex_subscription,
 )
 
+
 @dataclass
 class UsageWindow:
     label: str
     used: float
     reset_text: str
-    remaining: Optional[float] = None
+    remaining: float | None = None
 
 
 @dataclass
@@ -26,12 +27,13 @@ class ModelUsage:
     used: float
     limit: float
     unit: str  # "%", "$", "k tokens", "reqs"
-    status_text: Optional[str] = None
-    error: Optional[str] = None
-    windows: Optional[List[UsageWindow]] = None
+    status_text: str | None = None
+    error: str | None = None
+    windows: list[UsageWindow] | None = None
+    fetched_at: datetime | None = None
 
 
-def _usage_windows(snapshot) -> List[UsageWindow]:
+def _usage_windows(snapshot) -> list[UsageWindow]:
     return [
         UsageWindow(
             label=window.label,
@@ -50,10 +52,10 @@ class BaseAIProvider(ABC):
         self.limit = float(config.get("limit", 100.0))
         self.unit = config.get("unit", "%")
         self.cache_ttl_sec = max(0.0, float(config.get("cache_ttl_sec", 60)))
-        self._cache_result: Optional[ModelUsage] = None
+        self._cache_result: ModelUsage | None = None
         self._cache_time = 0.0
 
-    def get_cached_usage(self) -> Optional[ModelUsage]:
+    def get_cached_usage(self) -> ModelUsage | None:
         if self._cache_result is None:
             return None
         if time.monotonic() - self._cache_time >= self.cache_ttl_sec:
@@ -61,6 +63,8 @@ class BaseAIProvider(ABC):
         return self._cache_result
 
     def remember_usage(self, usage: ModelUsage) -> ModelUsage:
+        if usage.fetched_at is None:
+            usage.fetched_at = datetime.now().astimezone()
         self._cache_result = usage
         self._cache_time = time.monotonic()
         return usage
@@ -180,13 +184,13 @@ PROVIDER_TYPE_OPTIONS = (
 )
 
 
-PROVIDER_REGISTRY: Dict[str, Type[BaseAIProvider]] = {
+PROVIDER_REGISTRY: dict[str, type[BaseAIProvider]] = {
     "codex": CodexProvider,
     "antigravity": AntigravityProvider,
     "claude": ClaudeProvider,
 }
 
-def load_providers_from_config(config_data: dict) -> List[BaseAIProvider]:
+def load_providers_from_config(config_data: dict) -> list[BaseAIProvider]:
     providers = []
     for p_cfg in config_data.get("providers", []):
         if not p_cfg.get("enabled", True):

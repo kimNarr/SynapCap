@@ -587,7 +587,7 @@ class SynapCapWidget(QWidget):
             icon_label.setFixedSize(icon_size, icon_size)
             icon_label.setPixmap(create_provider_pixmap(provider_type, icon_size))
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            icon_label.setToolTip(provider.name)
+            self._enable_instant_tooltip(icon_label, provider.name)
             item_layout.addWidget(icon_label)
 
             value_label = QLabel("—")
@@ -598,6 +598,7 @@ class SynapCapWidget(QWidget):
                 f"font-weight: {metrics['font_weight']}; "
                 "font-family: 'Segoe UI', -apple-system, sans-serif;"
             )
+            self._enable_instant_tooltip(value_label, provider.name)
             item_layout.addWidget(value_label)
 
             loading_spinner = LoadingSpinner(max(18, metrics["font_size"] + 6))
@@ -606,6 +607,7 @@ class SynapCapWidget(QWidget):
             loading_spinner.start()
             self.compact_items_layout.addWidget(item_widget)
             self.compact_ui_map[provider.provider_id] = {
+                "icon": icon_label,
                 "value": value_label,
                 "spinner": loading_spinner,
                 "item": item_widget,
@@ -718,9 +720,15 @@ class SynapCapWidget(QWidget):
             tooltip_lines = [
                 f"{window.label} {window.used:.0f}% 사용" for window in windows
             ] or [f"{used:.0f}% 사용"]
-            value_label.setToolTip(
-                f"{usage.provider_name}\n" + "\n".join(tooltip_lines)
+            source_tooltip = self._usage_source_tooltip(
+                usage,
+                compact_ui["provider_type"],
             )
+            tooltip = f"{usage.provider_name}\n" + "\n".join(tooltip_lines)
+            if source_tooltip:
+                tooltip += f"\n{source_tooltip}"
+            value_label.setToolTip(tooltip)
+            compact_ui["icon"].setToolTip(tooltip)
         if self.is_compact:
             self._apply_compact_width()
             if resize_anchor is not None:
@@ -839,6 +847,7 @@ class SynapCapWidget(QWidget):
 
             status_label = QLabel()
             status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._enable_instant_tooltip(status_label, "조회 상태")
             self._set_status_badge(status_label, "waiting", preset)
             status_label.hide()
             title_row.addWidget(status_label)
@@ -860,7 +869,8 @@ class SynapCapWidget(QWidget):
                 "spinner": loading_spinner,
                 "windows_layout": windows_layout,
                 "window_rows": [],
-                "show_five_hour": provider.config.get("show_five_hour", provider_type != "codex"),
+                "provider_type": provider_type,
+                "show_five_hour": provider.config.get("show_five_hour", True),
                 "show_weekly": provider.config.get("show_weekly", True),
                 "limit": provider.limit,
                 "unit": provider.unit,
@@ -879,6 +889,7 @@ class SynapCapWidget(QWidget):
         colors = {
             "waiting": ("#F9E2AF", "#323040"),
             "error": ("#F38BA8", "#3B2735"),
+            "source": ("#89B4FA", "#252B3F"),
         }
         foreground, background = colors.get(state, ("#A6E3A1", "#26372F"))
         label.setStyleSheet(
@@ -1052,7 +1063,7 @@ class SynapCapWidget(QWidget):
         if not match:
             return reset_text, tooltip
 
-        current = now or datetime.now()
+        current = now or datetime.now().astimezone()
         try:
             reset_at = current.replace(
                 month=int(match.group(1)),
@@ -1090,11 +1101,29 @@ class SynapCapWidget(QWidget):
             relative += " 후"
         return relative, tooltip
 
+    @staticmethod
+    def _usage_source_tooltip(usage: ModelUsage, provider_type: str) -> str:
+        lines: list[str] = []
+        if provider_type == "claude":
+            lines.append("Claude CLI 기준 사용량")
+
+        if usage.fetched_at is not None:
+            fetched_at = usage.fetched_at
+            lines.append(
+                f"마지막 조회: {fetched_at.month}/{fetched_at.day} "
+                f"{fetched_at:%H:%M:%S}"
+            )
+
+        if provider_type == "claude":
+            lines.append("Claude 화면과 일시적으로 차이가 날 수 있습니다.")
+        return "\n".join(lines)
+
     def _render_usage_rows(
         self,
         ui: dict,
         windows: list[UsageWindow],
         preset: dict,
+        source_tooltip: str = "",
     ):
         self._clear_usage_rows(ui)
         usage_value_bold = self.config_data.get("settings", {}).get(
@@ -1108,6 +1137,8 @@ class SynapCapWidget(QWidget):
                 window.remaining if window.remaining is not None else max(0.0, 100.0 - window.used)
             )
             usage_tooltip = f"{window.used:.0f}% 사용 · {remaining:.0f}% 남음"
+            if source_tooltip:
+                usage_tooltip += f"\n{source_tooltip}"
             reset_display, reset_tooltip = self._reset_presentation(window.reset_text)
             color = self._usage_color(window.used)
 
@@ -1209,6 +1240,8 @@ class SynapCapWidget(QWidget):
 
             rendered_provider = True
             ui = self.provider_ui_map[usage.provider_id]
+            provider_type = ui.get("provider_type", usage.provider_id)
+            source_tooltip = self._usage_source_tooltip(usage, provider_type)
 
             if usage.error:
                 ui["badge"].setToolTip(f"조회 실패: {usage.error}")
@@ -1226,8 +1259,18 @@ class SynapCapWidget(QWidget):
                 self._set_status_badge(ui["status"], "error", preset)
                 self._clear_usage_rows(ui)
             else:
-                ui["badge"].setToolTip("정상 조회 · 최신 데이터")
-                ui["status"].hide()
+                success_tooltip = usage.provider_name
+                if source_tooltip:
+                    success_tooltip += f"\n{source_tooltip}"
+                ui["badge"].setToolTip(success_tooltip)
+                ui["name"].setToolTip(success_tooltip)
+                if provider_type == "claude":
+                    ui["status"].setText("CLI 기준")
+                    ui["status"].setToolTip(source_tooltip)
+                    self._set_status_badge(ui["status"], "source", preset)
+                    ui["status"].show()
+                else:
+                    ui["status"].hide()
                 windows = usage.windows or [
                     UsageWindow(
                         label="사용량",
@@ -1240,7 +1283,12 @@ class SynapCapWidget(QWidget):
                 ]
                 visible_windows = self._visible_usage_windows(ui, windows)
                 if visible_windows:
-                    self._render_usage_rows(ui, visible_windows, preset)
+                    self._render_usage_rows(
+                        ui,
+                        visible_windows,
+                        preset,
+                        source_tooltip,
+                    )
                 else:
                     ui["status"].show()
                     ui["status"].setText("한도 정보 없음")

@@ -1,6 +1,6 @@
 import os
 import unittest
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -58,7 +58,7 @@ class WidgetTests(unittest.TestCase):
     def test_reset_time_is_presented_relatively(self):
         relative, tooltip = self.widget._reset_presentation(
             "8/12 09:49",
-            now=datetime(2026, 8, 10, 17, 0),
+            now=datetime(2026, 8, 10, 17, 0, tzinfo=UTC),
         )
 
         self.assertEqual(relative, "1일 16시간 후")
@@ -90,6 +90,24 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
         self.assertEqual(self.widget.usage_view, "bar")
         self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
+
+    def test_codex_defaults_to_five_hour_and_weekly_windows(self):
+        self.usage.windows = [
+            UsageWindow("5시간", 38, "8/26 14:07", 62),
+            UsageWindow("주간", 6, "9/2 09:07", 94),
+        ]
+
+        self.widget.update_data([self.usage])
+
+        rows = self.widget.provider_ui_map["codex"]["window_rows"]
+        self.assertEqual(len(rows), 2)
+        labels = [
+            label.text()
+            for row in rows
+            for label in row.findChildren(QLabel)
+        ]
+        self.assertIn("38%", labels)
+        self.assertIn("6%", labels)
 
     def test_usage_value_bold_can_be_disabled(self):
         self.widget.config_data["settings"]["expanded_font_bold"] = False
@@ -126,6 +144,50 @@ class WidgetTests(unittest.TestCase):
             self.widget.eventFilter(progress, QEvent(QEvent.Type.Enter))
 
         show_text.assert_called_once()
+
+    def test_claude_discloses_cli_source_and_query_time(self):
+        provider = ClaudeProvider({"id": "claude", "name": "Claude"})
+        self.widget.rebuild_ui(
+            {
+                "settings": {
+                    "widget_size": "Medium",
+                    "always_on_top": False,
+                    "usage_view": "bar",
+                }
+            },
+            [provider],
+        )
+        usage = ModelUsage(
+            "claude",
+            "Claude",
+            "Claude Code",
+            100,
+            100,
+            "%",
+            windows=[
+                UsageWindow("5시간", 100, "8/14 14:40", 0),
+                UsageWindow("주간", 34, "8/19 04:00", 66),
+            ],
+            fetched_at=datetime(2026, 8, 14, 13, 20, 30, tzinfo=UTC),
+        )
+
+        self.widget.update_data([usage])
+
+        ui = self.widget.provider_ui_map["claude"]
+        self.assertEqual(ui["status"].text(), "CLI 기준")
+        self.assertFalse(ui["status"].isHidden())
+        self.assertTrue(ui["status"].property("instantTooltip"))
+        self.assertIn("마지막 조회: 8/14 13:20:30", ui["status"].toolTip())
+        self.assertIn("일시적으로 차이가 날 수 있습니다", ui["status"].toolTip())
+        progress = ui["window_rows"][0].findChild(QProgressBar)
+        self.assertIn("Claude CLI 기준 사용량", progress.toolTip())
+
+        self.widget.enter_compact_mode()
+        compact_tooltip = self.widget.compact_ui_map["claude"]["value"].toolTip()
+        self.assertIn("마지막 조회: 8/14 13:20:30", compact_tooltip)
+        self.assertTrue(
+            self.widget.compact_ui_map["claude"]["value"].property("instantTooltip")
+        )
 
     def test_instant_tooltip_is_anchored_below_hovered_widget(self):
         expected_position = self.widget.version_btn.mapToGlobal(

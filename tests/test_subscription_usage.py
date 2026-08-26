@@ -222,7 +222,10 @@ class ProviderCacheTests(unittest.TestCase):
 
         first = provider.fetch_usage()
         self.assertEqual(first.used, 10)
+        self.assertIsNotNone(first.windows)
+        assert first.windows is not None
         self.assertEqual(first.windows[0].remaining, 90)
+        self.assertIsNotNone(first.fetched_at)
         self.assertEqual(provider.fetch_usage().used, 10)
         provider.invalidate_cache()
         self.assertEqual(provider.fetch_usage().used, 20)

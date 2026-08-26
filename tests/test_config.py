@@ -125,10 +125,36 @@ class ConfigTests(unittest.TestCase):
 
             providers = load_config(str(path))["providers"]
 
-            self.assertFalse(providers[0]["show_five_hour"])
-            self.assertTrue(providers[0]["show_weekly"])
+            self.assertTrue(providers[0]["show_five_hour"])
+            self.assertFalse(providers[0]["show_weekly"])
             self.assertFalse(providers[1]["show_five_hour"])
             self.assertTrue(providers[1]["show_weekly"])
+
+    def test_current_schema_preserves_codex_window_choice(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "providers": [
+                            {
+                                "id": "codex",
+                                "type": "codex",
+                                "show_five_hour": False,
+                                "show_weekly": True,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            loaded = load_config(str(path))
+
+            self.assertEqual(loaded["schema_version"], 2)
+            self.assertFalse(loaded["providers"][0]["show_five_hour"])
+            self.assertTrue(loaded["providers"][0]["show_weekly"])
 
 
 if __name__ == "__main__":

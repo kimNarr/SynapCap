@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "settings": {
     "refresh_interval_sec": 30,
     "always_on_top": true,
@@ -19,7 +20,7 @@
       "enabled": true,
       "source": "local_subscription",
       "cache_ttl_sec": 60,
-      "show_five_hour": false,
+      "show_five_hour": true,
       "show_weekly": true,
       "limit": 100.0,
       "unit": "%"
