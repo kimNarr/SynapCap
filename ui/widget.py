@@ -1074,7 +1074,11 @@ class SynapCapWidget(QWidget):
                 microsecond=0,
             )
             if reset_at < current - timedelta(minutes=1):
-                reset_at = reset_at.replace(year=reset_at.year + 1)
+                next_year_reset = reset_at.replace(year=reset_at.year + 1)
+                if next_year_reset - current <= timedelta(days=8):
+                    reset_at = next_year_reset
+                else:
+                    return "초기화 확인 중", tooltip
         except ValueError:
             return reset_text, tooltip
 

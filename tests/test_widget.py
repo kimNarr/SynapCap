@@ -64,6 +64,24 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(relative, "1일 16시간 후")
         self.assertEqual(tooltip, "8/12 09:49 초기화")
 
+    def test_past_reset_does_not_roll_over_to_next_year(self):
+        relative, tooltip = self.widget._reset_presentation(
+            "8/26 13:00",
+            now=datetime(2026, 8, 26, 14, 2, tzinfo=UTC),
+        )
+
+        self.assertEqual(relative, "초기화 확인 중")
+        self.assertEqual(tooltip, "8/26 13:00 초기화")
+
+    def test_reset_rolls_over_only_near_year_boundary(self):
+        relative, tooltip = self.widget._reset_presentation(
+            "1/1 00:30",
+            now=datetime(2026, 12, 31, 23, 30, tzinfo=UTC),
+        )
+
+        self.assertEqual(relative, "1시간 후")
+        self.assertEqual(tooltip, "1/1 00:30 초기화")
+
     def test_bar_and_ring_views_can_be_toggled(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
