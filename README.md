@@ -20,6 +20,7 @@ SynapCap은 로컬에 로그인된 AI 도구의 구독 한도와 리셋 시각�
 
 - Codex, Gemini, Claude 사용량을 동일한 `사용량 %` 기준으로 표시
 - 서비스가 제공하는 5시간 한도와 주간 한도를 각각 표시
+- Codex 최신 App Server가 제공하는 5시간·주간 한도를 모두 지원하며 기존 설정은 업데이트 후 5시간 표시를 한 번 자동 활성화
 - 막대형·링형 그래프 전환
 - 리셋까지 남은 시간을 표시하고, 마우스를 올리면 `8/12 15:09 초기화` 형식으로 정확한 시각 제공
 - 항상 위에 고정, 크기·갱신 주기 설정
@@ -98,6 +99,8 @@ SynapCap은 웹 채팅 페이지를 읽지 않습니다. 각 서비스의 로컬
 | Codex | Codex CLI, 또는 Windows Codex 앱 | Codex App Server의 구독 rate limit |
 | Gemini | Antigravity CLI (`agy`) | `agy --print /usage` |
 | Claude | Claude Code CLI (`claude`) | `claude -p /usage` |
+
+Claude 사용량은 Claude Code CLI가 반환한 값을 기준으로 표시합니다. 실행 중인 Claude 화면의 값이 먼저 갱신되고 새 CLI 조회에는 수분 뒤 반영되는 경우가 있으므로, 카드의 `CLI 기준` 배지나 사용량에 마우스를 올려 마지막 조회 시각을 확인하세요. SynapCap은 값을 임의로 보정하지 않습니다.
 
 웹 ChatGPT, Gemini, Claude만 사용하는 계정은 대상이 아닙니다. SynapCap이 사용량 조회를 위해 별도의 유료 API를 호출하지는 않지만, 각 서비스의 구독 정책과 로컬 CLI 동작은 해당 서비스에 따릅니다.
 

@@ -26,13 +26,19 @@ class SettingsDialogTests(unittest.TestCase):
     def _provider_item(self, provider_id: str) -> dict:
         return next(item for item in self.dialog.provider_widgets if item["id"] == provider_id)
 
-    def test_codex_only_allows_weekly_window(self):
+    def test_codex_allows_five_hour_and_weekly_windows(self):
         item = self._provider_item("codex")
 
-        self.assertFalse(item["five_hour_check"].isChecked())
-        self.assertFalse(item["five_hour_check"].isEnabled())
+        self.assertTrue(item["five_hour_check"].isChecked())
+        self.assertTrue(item["five_hour_check"].isEnabled())
         self.assertTrue(item["weekly_check"].isChecked())
-        self.assertFalse(item["weekly_check"].isEnabled())
+        self.assertTrue(item["weekly_check"].isEnabled())
+
+        item["five_hour_check"].setChecked(False)
+        item["weekly_check"].setChecked(False)
+
+        self.assertFalse(item["five_hour_check"].isChecked())
+        self.assertTrue(item["weekly_check"].isChecked())
 
     def test_gemini_cannot_hide_both_windows(self):
         item = self._provider_item("antigravity")

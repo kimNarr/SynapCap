@@ -817,16 +817,6 @@ class SettingsDialog(QDialog):
                 return
             updating_window_options = True
             try:
-                selected_type = type_combo.currentData() or "codex"
-                if selected_type == "codex":
-                    five_hour_check.setChecked(False)
-                    weekly_check.setChecked(True)
-                    five_hour_check.setEnabled(False)
-                    weekly_check.setEnabled(False)
-                    five_hour_check.setToolTip("Codex는 현재 주간 한도만 제공합니다.")
-                    weekly_check.setToolTip("Codex에서 제공하는 유일한 한도입니다.")
-                    return
-
                 if not five_hour_check.isChecked() and not weekly_check.isChecked():
                     weekly_check.setChecked(True)
                 five_hour_check.setEnabled(weekly_check.isChecked())

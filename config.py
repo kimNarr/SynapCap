@@ -3,9 +3,11 @@ import os
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from version import APP_NAME
+
+CONFIG_SCHEMA_VERSION = 2
 
 
 def _default_config_path() -> Path:
@@ -33,7 +35,8 @@ def _default_config_path() -> Path:
 
 CONFIG_FILE_PATH = str(_default_config_path())
 
-DEFAULT_CONFIG: Dict[str, Any] = {
+DEFAULT_CONFIG: dict[str, Any] = {
+    "schema_version": CONFIG_SCHEMA_VERSION,
     "settings": {
         "refresh_interval_sec": 30,
         "always_on_top": True,
@@ -54,7 +57,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "enabled": True,
             "source": "local_subscription",
             "cache_ttl_sec": 60,
-            "show_five_hour": False,
+            "show_five_hour": True,
             "show_weekly": True,
             "limit": 100.0,
             "unit": "%"
@@ -87,7 +90,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     ]
 }
 
-def get_default_config() -> Dict[str, Any]:
+def get_default_config() -> dict[str, Any]:
     return deepcopy(DEFAULT_CONFIG)
 
 
@@ -97,7 +100,8 @@ def _legacy_config_path() -> Path | None:
     candidate = Path(sys.executable).resolve().parent / "synapcap.json"
     return candidate if candidate.is_file() else None
 
-def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
+
+def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
     requested_path = Path(file_path)
     source_path = requested_path
     if not source_path.exists():
@@ -112,6 +116,9 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
     try:
         with source_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
+            source_schema_version = data.get("schema_version", 1)
+            if not isinstance(source_schema_version, int):
+                source_schema_version = 1
             loaded_settings = data.get("settings", {})
             if not isinstance(loaded_settings, dict):
                 loaded_settings = {}
@@ -142,16 +149,18 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
                 data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])
             for provider in data["providers"]:
                 provider_type = provider.get("type", "codex")
-                if provider_type == "codex":
-                    provider["show_five_hour"] = False
-                    provider["show_weekly"] = True
-                    continue
+                if provider_type == "codex" and source_schema_version < 2:
+                    # Older releases forced this option off because Codex only
+                    # exposed the weekly window. Enable the newly available
+                    # five-hour window once, then preserve the user's choice.
+                    provider["show_five_hour"] = True
                 show_five_hour = provider.get("show_five_hour", True)
                 show_weekly = provider.get("show_weekly", True)
                 provider["show_five_hour"] = bool(show_five_hour)
                 provider["show_weekly"] = bool(show_weekly)
                 if not provider["show_five_hour"] and not provider["show_weekly"]:
                     provider["show_weekly"] = True
+            data["schema_version"] = CONFIG_SCHEMA_VERSION
             if source_path != requested_path:
                 save_config(data, str(requested_path))
             return data
@@ -159,7 +168,8 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> Dict[str, Any]:
         print(f"[SynapCap Config] Error loading config ({e}). Using default settings.")
         return get_default_config()
 
-def save_config(config_data: Dict[str, Any], file_path: str = CONFIG_FILE_PATH) -> bool:
+
+def save_config(config_data: dict[str, Any], file_path: str = CONFIG_FILE_PATH) -> bool:
     try:
         destination = Path(file_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
