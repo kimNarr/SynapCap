@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" width="88" alt="SynapCap logo">
+  <img src="docs/assets/logo.png" width="110" alt="SynapCap logo">
 </p>
 
 <h1 align="center">SynapCap</h1>

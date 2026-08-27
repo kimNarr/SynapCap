@@ -1,5 +1,7 @@
 import math
+import sys
 from functools import lru_cache
+from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
@@ -89,10 +91,47 @@ def create_app_icon(size: int = 32) -> QIcon:
     return QIcon(pixmap)
 
 
+@lru_cache(maxsize=1)
+def _app_logo_source() -> QPixmap:
+    roots: list[Path] = []
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        roots.append(Path(bundle_root))
+    roots.append(Path(__file__).resolve().parents[1])
+
+    for root in roots:
+        source = QPixmap(str(root / "assets" / "synapcap-logo-source.png"))
+        if not source.isNull():
+            return source
+    return QPixmap()
+
+
 def create_app_pixmap(size: int = 32) -> QPixmap:
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
 
+    source = _app_logo_source()
+    if not source.isNull():
+        # The supplied artwork has intentionally transparent export margins.
+        # Crop only those margins so small tray icons stay optically centered.
+        cropped = source.copy(50, 15, 1199, 1199)
+        target_size = max(1, round(size * 0.96))
+        scaled = cropped.scaled(
+            target_size,
+            target_size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        painter = QPainter(pixmap)
+        painter.drawPixmap(
+            (size - scaled.width()) // 2,
+            (size - scaled.height()) // 2,
+            scaled,
+        )
+        painter.end()
+        return pixmap
+
+    # Keep a code-rendered fallback for incomplete source checkouts.
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 

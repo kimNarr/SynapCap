@@ -26,6 +26,7 @@ python -m PyInstaller \
   --onedir \
   --name SynapCap \
   --icon assets/synapcap.icns \
+  --add-data "assets/synapcap-logo-source.png:assets" \
   --osx-bundle-identifier io.github.kimNarr.SynapCap \
   main.py
 
