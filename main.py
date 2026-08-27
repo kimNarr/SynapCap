@@ -88,7 +88,7 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
             min-width: 60px;
             padding: 5px 10px;
             border: 1px solid #45475A;
-            border-radius: 6px;
+            border-radius: 5px;
             background-color: #313244;
             color: #CDD6F4;
         }

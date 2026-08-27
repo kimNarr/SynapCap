@@ -19,6 +19,17 @@ class ReleaseScriptTests(unittest.TestCase):
             '--add-data "assets/synapcap-logo-source.png:assets"', macos_script
         )
 
+    def test_windows_shortcuts_use_a_versioned_icon_path(self):
+        script = (ROOT / "packaging" / "windows" / "SynapCap.iss").read_text(
+            encoding="utf-8"
+        )
+
+        versioned_icon = r"SynapCap-v{#MyAppVersion}.ico"
+        self.assertIn('ChangesAssociations=yes', script)
+        self.assertIn(f'DestName: "{versioned_icon}"', script)
+        self.assertIn(r'Name: "{app}\SynapCap-v*.ico"', script)
+        self.assertEqual(script.count(f'IconFilename: "{{app}}\\{versioned_icon}"'), 3)
+
     def test_macos_bundle_is_resigned_before_disk_image_creation(self):
         script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
 

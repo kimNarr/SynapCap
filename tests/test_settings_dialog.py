@@ -1,4 +1,5 @@
 import os
+import re
 import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -77,6 +78,22 @@ class SettingsDialogTests(unittest.TestCase):
 
         item = self._provider_item("codex")
         self.assertFalse(item["type_combo"].itemIcon(0).isNull())
+
+    def test_settings_controls_use_compact_radius_and_stronger_outer_border(self):
+        style = self.dialog.styleSheet()
+        radii = {
+            int(match.group(1))
+            for match in re.finditer(
+                r"border(?:-[a-z]+)*-radius:\s*(\d+)px",
+                style,
+            )
+        }
+
+        self.assertEqual(radii, {4, 5, 6})
+        self.assertIn("border: 2px solid #45475A", style)
+        self.assertIn("QLineEdit, QSpinBox", style)
+        self.assertIn("QComboBox", style)
+        self.assertIn("border-radius: 5px", style)
 
     def test_manual_widget_width_setting_is_not_exposed(self):
         self.assertFalse(hasattr(self.dialog, "width_spin"))

@@ -241,13 +241,13 @@ class SettingsDialog(QDialog):
             }
             QFrame#settingsFrame {
                 background-color: #1E1E2E;
-                border: 1px solid #313244;
-                border-radius: 10px;
+                border: 2px solid #45475A;
+                border-radius: 6px;
             }
             QWidget#settingsTitleBar {
                 background-color: #181825;
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
                 border-bottom: 1px solid #313244;
             }
             QLabel#settingsTitleLabel {
@@ -258,7 +258,7 @@ class SettingsDialog(QDialog):
             QPushButton#settingsCloseBtn {
                 padding: 0;
                 border: none;
-                border-radius: 6px;
+                border-radius: 4px;
                 background: transparent;
                 color: #A6ADC8;
                 font-size: 18px;
@@ -277,7 +277,7 @@ class SettingsDialog(QDialog):
             QGroupBox {
                 background-color: #181825;
                 border: 1px solid #313244;
-                border-radius: 10px;
+                border-radius: 6px;
                 margin-top: 14px;
                 padding-top: 16px;
                 font-weight: bold;
@@ -294,7 +294,7 @@ class SettingsDialog(QDialog):
                 background-color: #11111B;
                 color: #CDD6F4;
                 border: 1px solid #313244;
-                border-radius: 8px;
+                border-radius: 5px;
                 padding: 7px 12px;
                 font-size: 13px;
                 selection-background-color: #45475A;
@@ -304,7 +304,7 @@ class SettingsDialog(QDialog):
                 background-color: #181825;
             }
             QLineEdit:focus, QSpinBox:focus {
-                border: 1px solid #89B4FA;
+                border: 2px solid #89B4FA;
                 background-color: #1E1E2E;
                 color: #FFFFFF;
             }
@@ -312,7 +312,7 @@ class SettingsDialog(QDialog):
                 background-color: #11111B;
                 color: #CDD6F4;
                 border: 1px solid #313244;
-                border-radius: 8px;
+                border-radius: 5px;
                 padding: 7px 32px 7px 12px;
                 font-size: 13px;
                 selection-background-color: #45475A;
@@ -322,7 +322,7 @@ class SettingsDialog(QDialog):
                 background-color: #181825;
             }
             QComboBox:focus {
-                border: 1px solid #89B4FA;
+                border: 2px solid #89B4FA;
             }
             QComboBox::drop-down {
                 subcontrol-origin: padding;
@@ -330,8 +330,8 @@ class SettingsDialog(QDialog):
                 width: 30px;
                 background-color: #313244;
                 border-left: 1px solid #45475A;
-                border-top-right-radius: 8px;
-                border-bottom-right-radius: 8px;
+                border-top-right-radius: 5px;
+                border-bottom-right-radius: 5px;
             }
             QComboBox::drop-down:hover {
                 background-color: #45475A;
@@ -340,6 +340,7 @@ class SettingsDialog(QDialog):
                 background-color: #181825;
                 color: #CDD6F4;
                 border: 1px solid #45475A;
+                border-radius: 5px;
                 selection-background-color: #45475A;
                 selection-color: #FFFFFF;
                 outline: 0;
@@ -355,7 +356,7 @@ class SettingsDialog(QDialog):
                 background-color: #313244;
                 border-left: 1px solid #45475A;
                 border-bottom: 1px solid #45475A;
-                border-top-right-radius: 7px;
+                border-top-right-radius: 5px;
             }
             QSpinBox::up-button:hover {
                 background-color: #45475A;
@@ -366,7 +367,7 @@ class SettingsDialog(QDialog):
                 width: 28px;
                 background-color: #313244;
                 border-left: 1px solid #45475A;
-                border-bottom-right-radius: 7px;
+                border-bottom-right-radius: 5px;
             }
             QSpinBox::down-button:hover {
                 background-color: #45475A;
@@ -388,15 +389,15 @@ class SettingsDialog(QDialog):
             }
             QTabWidget::pane {
                 border: 1px solid #313244;
-                border-radius: 10px;
+                border-radius: 6px;
                 background-color: #1E1E2E;
             }
             QTabBar::tab {
                 background: #11111B;
                 color: #A6ADC8;
                 padding: 9px 20px;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
                 margin-right: 3px;
                 font-weight: 600;
             }
@@ -409,7 +410,7 @@ class SettingsDialog(QDialog):
                 background-color: #313244;
                 color: #CDD6F4;
                 border: 1px solid #45475A;
-                border-radius: 8px;
+                border-radius: 5px;
                 padding: 7px 14px;
                 font-weight: bold;
             }
@@ -612,7 +613,7 @@ class SettingsDialog(QDialog):
             card.setObjectName("feedbackCard")
             card.setStyleSheet(
                 "QFrame#feedbackCard { background-color: #181825; "
-                "border: 1px solid #313244; border-radius: 10px; }"
+                "border: 1px solid #313244; border-radius: 6px; }"
             )
             card_layout = QHBoxLayout(card)
             card_layout.setContentsMargins(16, 14, 14, 14)
@@ -649,7 +650,7 @@ class SettingsDialog(QDialog):
         privacy_note.setWordWrap(True)
         privacy_note.setStyleSheet(
             "color: #F9E2AF; background-color: rgba(249, 226, 175, 0.06); "
-            "border: 1px solid rgba(249, 226, 175, 0.2); border-radius: 8px; "
+            "border: 1px solid rgba(249, 226, 175, 0.2); border-radius: 6px; "
             "padding: 10px; font-size: 11px;"
         )
         layout.addWidget(privacy_note)
