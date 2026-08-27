@@ -6,7 +6,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QPoint, Qt
-from PySide6.QtWidgets import QApplication, QLabel, QProgressBar
+from PySide6.QtWidgets import QApplication, QLabel, QProgressBar, QWidget
 
 from providers import (
     AntigravityProvider,
@@ -201,15 +201,17 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("Claude CLI 기준 사용량", progress.toolTip())
 
         self.widget.enter_compact_mode()
-        compact_tooltip = self.widget.compact_ui_map["claude"]["value"].toolTip()
+        compact_item = self.widget.compact_ui_map["claude"]["item"]
+        compact_tooltip = compact_item.toolTip()
         self.assertIn("마지막 조회: 8/14 13:20:30", compact_tooltip)
-        self.assertTrue(
+        self.assertTrue(compact_item.property("instantTooltip"))
+        self.assertFalse(
             self.widget.compact_ui_map["claude"]["value"].property("instantTooltip")
         )
 
     def test_instant_tooltip_is_anchored_below_hovered_widget(self):
         expected_position = self.widget.version_btn.mapToGlobal(
-            QPoint(0, self.widget.version_btn.height() + 4)
+            QPoint(0, self.widget.version_btn.height() + 8)
         )
 
         with patch("ui.widget.QToolTip.showText") as show_text:
@@ -217,6 +219,22 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(show_text.call_args.args[0], expected_position)
         self.assertEqual(show_text.call_args.args[1], f"현재 버전 v{APP_VERSION}")
+
+    def test_instant_tooltip_moves_above_widgets_near_screen_bottom(self):
+        screen = QApplication.primaryScreen()
+        self.assertIsNotNone(screen)
+        assert screen is not None
+        available = screen.availableGeometry()
+        watched = QWidget()
+        watched.resize(100, 20)
+        watched.move(available.left() + 20, available.bottom() - 10)
+
+        position = self.widget._instant_tooltip_position(
+            watched,
+            "Provider\n5시간 10% 사용\n주간 20% 사용",
+        )
+
+        self.assertLess(position.y(), watched.mapToGlobal(QPoint(0, 0)).y())
 
     def test_usage_windows_can_be_filtered_per_provider(self):
         ui = {"show_five_hour": False, "show_weekly": True}
@@ -314,13 +332,16 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         compact_value = self.widget.compact_ui_map["codex"]["value"]
+        compact_item = self.widget.compact_ui_map["codex"]["item"]
         self.assertEqual(compact_value.text(), "49%")
-        self.assertIn("Codex", compact_value.toolTip())
+        self.assertIn("Codex", compact_item.toolTip())
         self.assertIn("font-size: 12px", compact_value.styleSheet())
         self.assertEqual(self.widget.compact_logo.size().width(), 20)
         self.assertEqual(self.widget.expand_btn.height(), 26)
         self.assertGreaterEqual(self.widget.frame.height(), 40)
-        self.assertIn("border: 1px solid #585B70", self.widget.frame.styleSheet())
+        self.assertIn("border: 2px solid #585B70", self.widget.frame.styleSheet())
+        self.assertIn("QFrame#rootFrame", self.widget.frame.styleSheet())
+        self.assertIn("border-radius: 6px", self.widget.frame.styleSheet())
 
     def test_loading_uses_animation_and_keeps_existing_rows(self):
         ui = self.widget.provider_ui_map["codex"]
@@ -374,10 +395,11 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         compact_value = self.widget.compact_ui_map["gemini"]["value"]
+        compact_item = self.widget.compact_ui_map["gemini"]["item"]
         self.assertEqual(compact_value.text(), "15%/49%")
         self.assertGreaterEqual(compact_value.width(), compact_value.sizeHint().width())
-        self.assertIn("5시간 15% 사용", compact_value.toolTip())
-        self.assertIn("주간 49% 사용", compact_value.toolTip())
+        self.assertIn("5시간 15% 사용", compact_item.toolTip())
+        self.assertIn("주간 49% 사용", compact_item.toolTip())
 
         self.widget.provider_ui_map["gemini"]["show_five_hour"] = False
         self.widget._refresh_compact_values()

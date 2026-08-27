@@ -3,7 +3,7 @@ import sys
 from datetime import datetime, timedelta
 
 from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -225,17 +225,17 @@ class SynapCapWidget(QWidget):
             }
             QFrame#rootFrame {
                 background-color: #202033;
-                border: 1px solid #585B70;
-                border-radius: 16px;
+                border: 2px solid #585B70;
+                border-radius: 6px;
             }
             QWidget#compactBar {
                 background-color: #242438;
-                border-radius: 9px;
+                border-radius: 4px;
             }
             QFrame#providersFrame {
                 background-color: #181825;
                 border: 1px solid #313244;
-                border-radius: 11px;
+                border-radius: 6px;
             }
             QLabel {
                 border: none;
@@ -592,7 +592,6 @@ class SynapCapWidget(QWidget):
             icon_label.setFixedSize(icon_size, icon_size)
             icon_label.setPixmap(create_provider_pixmap(provider_type, icon_size))
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._enable_instant_tooltip(icon_label, provider.name)
             item_layout.addWidget(icon_label)
 
             value_label = QLabel("—")
@@ -603,13 +602,13 @@ class SynapCapWidget(QWidget):
                 f"font-weight: {metrics['font_weight']}; "
                 "font-family: 'Segoe UI', -apple-system, sans-serif;"
             )
-            self._enable_instant_tooltip(value_label, provider.name)
             item_layout.addWidget(value_label)
 
             loading_spinner = LoadingSpinner(max(18, metrics["font_size"] + 6))
             item_layout.addWidget(loading_spinner)
             value_label.hide()
             loading_spinner.start()
+            self._enable_instant_tooltip(item_widget, provider.name)
             self.compact_items_layout.addWidget(item_widget)
             self.compact_ui_map[provider.provider_id] = {
                 "icon": icon_label,
@@ -698,7 +697,7 @@ class SynapCapWidget(QWidget):
                     f"font-weight: {metrics['font_weight']};"
                 )
                 self._fit_compact_value_label(value_label, metrics["font_size"])
-                value_label.setToolTip(usage.error)
+                compact_ui["item"].setToolTip(usage.error)
                 continue
 
             provider_ui = self.provider_ui_map.get(provider_id, {})
@@ -732,8 +731,7 @@ class SynapCapWidget(QWidget):
             tooltip = f"{usage.provider_name}\n" + "\n".join(tooltip_lines)
             if source_tooltip:
                 tooltip += f"\n{source_tooltip}"
-            value_label.setToolTip(tooltip)
-            compact_ui["icon"].setToolTip(tooltip)
+            compact_ui["item"].setToolTip(tooltip)
         if self.is_compact:
             self._apply_compact_width()
             if resize_anchor is not None:
@@ -899,7 +897,7 @@ class SynapCapWidget(QWidget):
         foreground, background = colors.get(state, ("#A6E3A1", "#26372F"))
         label.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
-            "border-radius: 6px; padding: 3px 7px; "
+            "border-radius: 5px; padding: 3px 7px; "
             f"font-size: {max(9, preset['val_size'] - 1)}px; font-weight: 700;"
         )
 
@@ -995,10 +993,38 @@ class SynapCapWidget(QWidget):
         widget.setProperty("instantTooltip", True)
         widget.installEventFilter(self)
 
+    @staticmethod
+    def _instant_tooltip_position(watched: QWidget, text: str) -> QPoint:
+        gap = 8
+        lines = text.splitlines() or [""]
+        metrics = QFontMetrics(QToolTip.font())
+        tooltip_width = max(metrics.horizontalAdvance(line) for line in lines) + 24
+        tooltip_height = (metrics.lineSpacing() * len(lines)) + 16
+        global_top_left = watched.mapToGlobal(QPoint(0, 0))
+        position = watched.mapToGlobal(QPoint(0, watched.height() + gap))
+        screen = QApplication.screenAt(
+            watched.mapToGlobal(watched.rect().center())
+        ) or QApplication.primaryScreen()
+        if screen is None:
+            return position
+
+        available = screen.availableGeometry()
+        max_x = max(available.left() + 4, available.right() - tooltip_width - 4)
+        x = max(available.left() + 4, min(position.x(), max_x))
+        if position.y() + tooltip_height > available.bottom() - 4:
+            y = global_top_left.y() - tooltip_height - gap
+        else:
+            y = position.y()
+        y = max(available.top() + 4, y)
+        return QPoint(x, y)
+
     def eventFilter(self, watched, event):
         if watched.property("instantTooltip"):
             if event.type() == QEvent.Type.Enter:
-                tooltip_position = watched.mapToGlobal(QPoint(0, watched.height() + 4))
+                tooltip_position = self._instant_tooltip_position(
+                    watched,
+                    watched.toolTip(),
+                )
                 QToolTip.showText(
                     tooltip_position,
                     watched.toolTip(),
