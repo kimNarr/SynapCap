@@ -7,6 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from main import (
+    _launch_restart_process,
     _launch_windows_installer,
     _provider_query_settings_changed,
     _provider_settings_changed,
@@ -34,6 +35,17 @@ class UpdateInstallerTests(unittest.TestCase):
 
         with self.assertRaises(OSError):
             _launch_windows_installer(r"C:\Temp\SynapCap-Setup.exe")
+
+    @patch("main.subprocess.Popen")
+    @patch("main.sys.argv", ["main.py", "--sample"])
+    @patch("main.sys.executable", "python-test")
+    def test_restart_launches_replacement_process(self, popen):
+        with patch("main.sys.frozen", False, create=True):
+            _launch_restart_process()
+
+        command = popen.call_args.args[0]
+        self.assertEqual(command, ["python-test", "main.py", "--sample"])
+        self.assertTrue(popen.call_args.kwargs["close_fds"])
 
 
 class SettingsChangeTests(unittest.TestCase):
@@ -135,6 +147,7 @@ class QuitConfirmationTests(unittest.TestCase):
 
         icon_label = dialog.findChild(QLabel, "qt_msgboxex_icon_label")
         self.assertIsNotNone(icon_label)
+        assert icon_label is not None
         self.assertLess(icon_label.minimumWidth(), 100)
         self.assertLess(dialog.sizeHint().width(), 420)
         self.assertLess(

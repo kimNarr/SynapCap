@@ -13,6 +13,8 @@ from updates import UpdateCheckWorker, UpdateDownloadWorker, UpdateInfo
 from version import APP_VERSION
 from workers import UsageWorker
 
+UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+
 
 def _provider_settings_changed(previous: dict, current: dict) -> bool:
     return previous.get("providers", []) != current.get("providers", [])
@@ -131,6 +133,24 @@ def _launch_windows_installer(path: str) -> None:
         raise OSError(f"installer launch failed ({result})")
 
 
+def _restart_command() -> list[str]:
+    if getattr(sys, "frozen", False):
+        return [sys.executable, *sys.argv[1:]]
+    return [sys.executable, *sys.argv]
+
+
+def _launch_restart_process() -> None:
+    command = _restart_command()
+    if sys.platform == "win32":
+        subprocess.Popen(
+            command,
+            close_fds=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        return
+    subprocess.Popen(command, close_fds=True)
+
+
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -157,16 +177,46 @@ def main():
     update_worker = UpdateCheckWorker(APP_VERSION)
     pending_update: UpdateInfo | None = None
     download_worker: UpdateDownloadWorker | None = None
+    manual_update_check = False
+    update_found_in_current_check = False
 
     def handle_update_available(info):
-        nonlocal pending_update
+        nonlocal pending_update, update_found_in_current_check
+        should_notify = pending_update is None or pending_update.version != info.version
         pending_update = info
-        tray.set_update_available(info.version, info.url)
+        update_found_in_current_check = True
+        tray.set_update_available(info.version, info.url, notify=should_notify)
         widget.set_update_available(info.version, info.url)
 
+    def request_update_check(manual: bool = False):
+        nonlocal manual_update_check, update_found_in_current_check
+        if update_worker.isRunning():
+            if manual:
+                manual_update_check = True
+                tray.set_update_checking(True)
+            return
+        manual_update_check = manual
+        update_found_in_current_check = False
+        if manual:
+            tray.set_update_checking(True)
+        update_worker.start()
+
+    def handle_update_check_finished():
+        nonlocal manual_update_check
+        if manual_update_check:
+            tray.set_update_checking(False)
+            if not update_found_in_current_check:
+                tray.show_no_update_found()
+        manual_update_check = False
+
     update_worker.update_available.connect(handle_update_available)
+    update_worker.finished.connect(handle_update_check_finished)
+    update_timer = QTimer(app)
+    update_timer.setInterval(UPDATE_CHECK_INTERVAL_MS)
+    update_timer.timeout.connect(request_update_check)
     if settings.get("check_updates", True):
-        QTimer.singleShot(4000, update_worker.start)
+        update_timer.start()
+        QTimer.singleShot(4000, request_update_check)
 
     # 5. Background Worker 생성 및 실행
     worker = UsageWorker(providers, interval_sec=refresh_interval)
@@ -187,6 +237,11 @@ def main():
             provider_layout_changed = _provider_settings_changed(previous_config, new_config)
             provider_query_changed = _provider_query_settings_changed(previous_config, new_config)
             interval_changed = _setting_changed(previous_config, new_config, "refresh_interval_sec")
+            update_setting_changed = _setting_changed(
+                previous_config,
+                new_config,
+                "check_updates",
+            )
             config_data = new_config
 
             # synapcap.json 저장
@@ -207,6 +262,12 @@ def main():
 
             if interval_changed:
                 worker.set_interval(config_data.get("settings", {}).get("refresh_interval_sec", 30))
+            if update_setting_changed:
+                if config_data.get("settings", {}).get("check_updates", True):
+                    update_timer.start()
+                    request_update_check()
+                else:
+                    update_timer.stop()
             if provider_query_changed:
                 worker.trigger_manual_refresh()
 
@@ -261,6 +322,14 @@ def main():
             return
         if confirm_quit(widget):
             handle_quit()
+
+    def handle_restart():
+        try:
+            _launch_restart_process()
+        except OSError:
+            tray.show_restart_error()
+            return
+        handle_quit()
 
     def restore_update_controls():
         if pending_update is None:
@@ -341,12 +410,14 @@ def main():
 
     tray.toggle_widget_requested.connect(toggle_widget)
     tray.refresh_requested.connect(worker.trigger_manual_refresh)
+    tray.update_check_requested.connect(lambda: request_update_check(True))
     tray.always_on_top_toggled.connect(handle_always_on_top)
     tray.settings_requested.connect(open_settings_dialog)
     tray.feedback_requested.connect(
         lambda url: QDesktopServices.openUrl(QUrl(url))
     )
     tray.update_requested.connect(start_one_click_update)
+    tray.restart_requested.connect(handle_restart)
     tray.quit_requested.connect(request_quit)
 
     widget.settings_requested.connect(open_settings_dialog)
