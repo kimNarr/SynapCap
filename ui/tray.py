@@ -13,7 +13,9 @@ class SynapCapTray(QObject):
     always_on_top_toggled = Signal(bool)
     settings_requested = Signal()
     feedback_requested = Signal(str)
+    update_check_requested = Signal()
     update_requested = Signal(str)
+    restart_requested = Signal()
     quit_requested = Signal()
 
     def __init__(self, parent_widget=None, always_on_top: bool = True):
@@ -62,6 +64,9 @@ class SynapCapTray(QObject):
         self.refresh_action = menu.addAction("지금 새로고침")
         self.refresh_action.triggered.connect(self.refresh_requested.emit)
 
+        self.check_update_action = menu.addAction("업데이트 확인")
+        self.check_update_action.triggered.connect(self.update_check_requested.emit)
+
         menu.addSeparator()
 
         self.settings_action = menu.addAction("설정...")
@@ -84,6 +89,9 @@ class SynapCapTray(QObject):
 
         menu.addSeparator()
 
+        self.restart_action = menu.addAction("SynapCap 재시작")
+        self.restart_action.triggered.connect(self.restart_requested.emit)
+
         self.quit_action = menu.addAction("SynapCap 종료")
         self.quit_action.triggered.connect(self.quit_requested.emit)
 
@@ -100,16 +108,39 @@ class SynapCapTray(QObject):
         self.always_on_top = checked
         self.always_on_top_toggled.emit(checked)
 
-    def set_update_available(self, version: str, url: str):
+    def set_update_available(self, version: str, url: str, notify: bool = True):
         self._update_url = url
         self.update_action.setEnabled(True)
         self.update_action.setText(f"업데이트 v{version} 설치")
         self.update_action.setVisible(True)
+        if notify:
+            self.tray_icon.showMessage(
+                "SynapCap 업데이트",
+                f"새 버전 v{version}을 사용할 수 있습니다.",
+                QSystemTrayIcon.MessageIcon.Information,
+                5000,
+            )
+
+    def set_update_checking(self, checking: bool):
+        self.check_update_action.setEnabled(not checking)
+        self.check_update_action.setText(
+            "업데이트 확인 중..." if checking else "업데이트 확인"
+        )
+
+    def show_no_update_found(self):
         self.tray_icon.showMessage(
             "SynapCap 업데이트",
-            f"새 버전 v{version}을 사용할 수 있습니다.",
+            "새 업데이트를 찾지 못했습니다.",
             QSystemTrayIcon.MessageIcon.Information,
-            5000,
+            4000,
+        )
+
+    def show_restart_error(self):
+        self.tray_icon.showMessage(
+            "SynapCap 재시작 실패",
+            "새 프로세스를 시작하지 못했습니다. 현재 앱은 계속 실행됩니다.",
+            QSystemTrayIcon.MessageIcon.Warning,
+            6000,
         )
 
     def set_update_progress(self, version: str, percent: int):

@@ -16,7 +16,7 @@ from providers import (
     ModelUsage,
     UsageWindow,
 )
-from ui.widget import SynapCapWidget, UsageRing
+from ui.widget import SIZE_PRESETS, SynapCapWidget, UsageRing
 from version import APP_VERSION
 
 
@@ -418,6 +418,38 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(widget.width(), 300)
         widget.close()
         widget.deleteLater()
+
+    def test_large_preset_width_survives_compact_round_trip(self):
+        self.widget.rebuild_ui(
+            {
+                "settings": {
+                    "widget_size": "Large",
+                    "always_on_top": False,
+                    "usage_view": "bar",
+                }
+            },
+            [CodexProvider({"id": "codex", "name": "Codex"})],
+            preserve_usage=False,
+        )
+        self.widget.update_data([self.usage])
+        self.app.processEvents()
+        expected_width = SIZE_PRESETS["Large"]["width"]
+        self.assertEqual(self.widget.width(), expected_width)
+
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        self.assertLess(self.widget.width(), expected_width)
+
+        self.widget.exit_compact_mode()
+        self.app.processEvents()
+
+        self.assertEqual(self.widget.width(), expected_width)
+
+        # A deferred Qt content-fit pass must not replace the selected Large
+        # width with a transient compact/content size hint.
+        self.widget.setFixedWidth(SIZE_PRESETS["Medium"]["width"])
+        self.widget._fit_to_content()
+        self.assertEqual(self.widget.width(), expected_width)
 
     def test_compact_width_follows_visible_provider_count(self):
         provider_sets: list[list[BaseAIProvider]] = [

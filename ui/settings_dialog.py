@@ -534,7 +534,7 @@ class SettingsDialog(QDialog):
         self.always_top_check.setChecked(settings.get("always_on_top", True))
         form.addRow("화면 고정:", self.always_top_check)
 
-        self.update_check = StyledCheckBox("시작할 때 새 버전 확인")
+        self.update_check = StyledCheckBox("자동으로 새 버전 확인")
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
 

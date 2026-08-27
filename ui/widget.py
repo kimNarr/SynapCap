@@ -487,6 +487,11 @@ class SynapCapWidget(QWidget):
         self.cards_frame.adjustSize()
         self.frame.adjustSize()
         self.adjustSize()
+        if not self.is_compact:
+            # Qt may recalculate a narrower size hint after the compact bar is
+            # hidden (notably with Windows DPI/layout updates). The selected
+            # expanded preset remains the source of truth across the round trip.
+            self.setFixedWidth(self._expanded_width)
         if self._pending_resize_anchor is not None:
             self._move_to_resize_anchor(self._pending_resize_anchor)
             self._pending_resize_anchor = None

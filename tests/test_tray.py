@@ -25,6 +25,34 @@ class TrayTests(unittest.TestCase):
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()
 
+    def test_update_check_and_restart_actions_emit_requests(self):
+        tray = SynapCapTray()
+        update_checks = []
+        restarts = []
+        tray.update_check_requested.connect(lambda: update_checks.append(True))
+        tray.restart_requested.connect(lambda: restarts.append(True))
+
+        tray.check_update_action.trigger()
+        tray.restart_action.trigger()
+
+        self.assertEqual(update_checks, [True])
+        self.assertEqual(restarts, [True])
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
+    def test_update_check_action_shows_progress_state(self):
+        tray = SynapCapTray()
+
+        tray.set_update_checking(True)
+        self.assertFalse(tray.check_update_action.isEnabled())
+        self.assertEqual(tray.check_update_action.text(), "업데이트 확인 중...")
+
+        tray.set_update_checking(False)
+        self.assertTrue(tray.check_update_action.isEnabled())
+        self.assertEqual(tray.check_update_action.text(), "업데이트 확인")
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
 
 if __name__ == "__main__":
     unittest.main()
