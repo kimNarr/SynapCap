@@ -16,7 +16,7 @@ from providers import (
     ModelUsage,
     UsageWindow,
 )
-from ui.widget import SIZE_PRESETS, SynapCapWidget, UsageRing
+from ui.widget import SynapCapWidget, UsageRing
 from version import APP_VERSION
 
 
@@ -150,7 +150,8 @@ class WidgetTests(unittest.TestCase):
 
         status = self.widget.provider_ui_map["codex"]["status"]
         self.assertEqual(status.text(), "설치 필요")
-        self.assertEqual(status.toolTip(), usage.error)
+        self.assertIn(usage.error, status.toolTip())
+        self.assertIn("진단 정보 보기", status.toolTip())
 
     def test_progress_tooltip_is_shown_on_enter(self):
         self.widget.update_data([self.usage])
@@ -208,6 +209,34 @@ class WidgetTests(unittest.TestCase):
         self.assertFalse(
             self.widget.compact_ui_map["claude"]["value"].property("instantTooltip")
         )
+
+    def test_old_usage_tooltip_recommends_refresh(self):
+        text = self.widget._data_freshness_text(
+            datetime(2026, 8, 27, 8, 0, tzinfo=UTC),
+            30,
+            now=datetime(2026, 8, 27, 8, 12, tzinfo=UTC),
+        )
+
+        self.assertIn("12분 전", text)
+        self.assertIn("새로고침 권장", text)
+
+    def test_status_badge_requests_provider_diagnostics(self):
+        usage = ModelUsage(
+            "codex",
+            "Codex",
+            "Codex",
+            0,
+            100,
+            "%",
+            error="codex CLI를 찾을 수 없음",
+        )
+        requested = []
+        self.widget.diagnostics_requested.connect(requested.append)
+        self.widget.update_data([usage])
+
+        self.widget.provider_ui_map["codex"]["status"].click()
+
+        self.assertEqual(requested, ["codex"])
 
     def test_instant_tooltip_is_anchored_below_hovered_widget(self):
         expected_position = self.widget.version_btn.mapToGlobal(
@@ -405,7 +434,7 @@ class WidgetTests(unittest.TestCase):
         self.widget._refresh_compact_values()
         self.assertEqual(compact_value.text(), "49%")
 
-    def test_small_preset_uses_300px_minimum_and_compact_fits_content(self):
+    def test_legacy_size_setting_uses_responsive_minimum_and_compact_fits_content(self):
         widget = SynapCapWidget(
             {
                 "settings": {
@@ -441,13 +470,13 @@ class WidgetTests(unittest.TestCase):
         widget.close()
         widget.deleteLater()
 
-    def test_large_preset_width_survives_compact_round_trip(self):
+    def test_responsive_font_width_survives_compact_round_trip(self):
         self.widget.rebuild_ui(
             {
                 "settings": {
-                    "widget_size": "Large",
                     "always_on_top": False,
                     "usage_view": "bar",
+                    "expanded_font_size": 18,
                 }
             },
             [CodexProvider({"id": "codex", "name": "Codex"})],
@@ -455,7 +484,8 @@ class WidgetTests(unittest.TestCase):
         )
         self.widget.update_data([self.usage])
         self.app.processEvents()
-        expected_width = SIZE_PRESETS["Large"]["width"]
+        expected_width = self.widget._expanded_width
+        self.assertGreater(expected_width, 300)
         self.assertEqual(self.widget.width(), expected_width)
 
         self.widget.enter_compact_mode()
@@ -467,11 +497,61 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(self.widget.width(), expected_width)
 
-        # A deferred Qt content-fit pass must not replace the selected Large
-        # width with a transient compact/content size hint.
-        self.widget.setFixedWidth(SIZE_PRESETS["Medium"]["width"])
+        # A deferred Qt content-fit pass must not replace the responsive width
+        # with a transient compact/content size hint.
+        self.widget.setFixedWidth(300)
         self.widget._fit_to_content()
         self.assertEqual(self.widget.width(), expected_width)
+
+    def test_root_frame_fills_large_window_after_view_and_compact_round_trips(self):
+        providers: list[BaseAIProvider] = [
+            CodexProvider({"id": "codex", "name": "Codex"}),
+            AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+            ClaudeProvider({"id": "claude", "name": "Claude"}),
+        ]
+        usages = [
+            ModelUsage(
+                provider.provider_id,
+                provider.name,
+                provider.name,
+                49,
+                100,
+                "%",
+                windows=[
+                    UsageWindow("5시간", 49, "8/27 18:00", 51),
+                    UsageWindow("주간", 32, "9/1 09:00", 68),
+                ],
+            )
+            for provider in providers
+        ]
+        self.widget.rebuild_ui(
+            {
+                "settings": {
+                    "always_on_top": False,
+                    "usage_view": "bar",
+                    "expanded_font_size": 18,
+                }
+            },
+            providers,
+            preserve_usage=False,
+        )
+        self.widget.update_data(usages)
+        self.app.processEvents()
+
+        for action in (
+            self.widget._toggle_usage_view,
+            self.widget._toggle_usage_view,
+            self.widget.enter_compact_mode,
+            self.widget.exit_compact_mode,
+        ):
+            action()
+            self.app.processEvents()
+
+        self.widget._fit_to_content()
+        self.app.processEvents()
+
+        self.assertEqual(self.widget.width(), self.widget._expanded_width)
+        self.assertEqual(self.widget.frame.width(), self.widget.width())
 
     def test_compact_width_follows_visible_provider_count(self):
         provider_sets: list[list[BaseAIProvider]] = [

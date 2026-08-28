@@ -7,9 +7,13 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from config import load_config, save_config
+from diagnostics import build_diagnostic_report
 from providers import load_providers_from_config
+from release_notes import consume_whats_new, release_url
+from single_instance import SingleInstanceGuard
 from ui import SettingsDialog, SynapCapTray, SynapCapWidget, create_app_icon
 from updates import UpdateCheckWorker, UpdateDownloadWorker, UpdateInfo
+from usage_alerts import update_usage_alert_state
 from version import APP_VERSION
 from workers import UsageWorker
 
@@ -157,9 +161,14 @@ def main():
     app.setApplicationName("SynapCap")
     app.setApplicationVersion(APP_VERSION)
     app.setWindowIcon(create_app_icon(64))
+    single_instance = SingleInstanceGuard(parent=app)
+    if not single_instance.acquire():
+        return
 
     # 1. Config 로드
     config_data = load_config()
+    show_whats_new = consume_whats_new(config_data)
+    save_config(config_data)
     settings = config_data.get("settings", {})
     refresh_interval = settings.get("refresh_interval_sec", 30)
     always_on_top = settings.get("always_on_top", True)
@@ -173,6 +182,16 @@ def main():
 
     # 4. System Tray 생성
     tray = SynapCapTray(parent_widget=widget, always_on_top=always_on_top)
+
+    def show_widget():
+        if widget.isMinimized():
+            widget.showNormal()
+        else:
+            widget.show()
+        widget.raise_()
+        widget.activateWindow()
+
+    single_instance.activation_requested.connect(show_widget)
 
     update_worker = UpdateCheckWorker(APP_VERSION)
     pending_update: UpdateInfo | None = None
@@ -221,7 +240,26 @@ def main():
     # 5. Background Worker 생성 및 실행
     worker = UsageWorker(providers, interval_sec=refresh_interval)
     worker.refresh_started.connect(widget.set_loading)
-    worker.updated.connect(widget.update_data)
+    active_usage_alerts: set[tuple[str, str]] = set()
+
+    def handle_usage_updated(usage_list):
+        widget.update_data(usage_list)
+        threshold = int(
+            config_data.get("settings", {}).get("usage_alert_threshold", 90)
+        )
+        for alert in update_usage_alert_state(
+            usage_list,
+            config_data,
+            active_usage_alerts,
+        ):
+            tray.show_usage_alert(
+                alert.provider_name,
+                alert.window_label,
+                alert.used,
+                threshold,
+            )
+
+    worker.updated.connect(handle_usage_updated)
     worker.start()
 
     # 6. GUI Settings Dialog 오픈 및 Hot-Reload 연결
@@ -278,6 +316,42 @@ def main():
         dialog.config_saved.connect(handle_config_saved)
         dialog.exec()
 
+    def open_provider_diagnostics(provider_id: str):
+        provider_config = next(
+            (
+                provider
+                for provider in config_data.get("providers", [])
+                if provider.get("id") == provider_id
+            ),
+            {"id": provider_id, "name": provider_id, "type": provider_id},
+        )
+        usage = next(
+            (
+                item
+                for item in widget.latest_usage
+                if item.provider_id == provider_id
+            ),
+            None,
+        )
+        report = build_diagnostic_report(provider_config, usage)
+        dialog = QMessageBox(widget)
+        dialog.setWindowTitle(f"{provider_config.get('name', provider_id)} 진단")
+        dialog.setIcon(QMessageBox.Icon.Information)
+        dialog.setText("로컬 사용량 조회 진단 정보")
+        dialog.setInformativeText(
+            "CLI 설치·로그인 상태를 확인할 수 있습니다. "
+            "아래 보고서에는 계정 토큰이나 API 키가 포함되지 않습니다."
+        )
+        dialog.setDetailedText(report)
+        copy_button = dialog.addButton(
+            "진단 정보 복사",
+            QMessageBox.ButtonRole.ActionRole,
+        )
+        dialog.addButton("닫기", QMessageBox.ButtonRole.RejectRole)
+        dialog.exec()
+        if dialog.clickedButton() is copy_button:
+            QApplication.clipboard().setText(report)
+
     # 7. Signal/Slot 연결
     def toggle_widget():
         if widget.isMinimized():
@@ -287,9 +361,7 @@ def main():
         elif widget.isVisible():
             widget.hide()
         else:
-            widget.show()
-            widget.raise_()
-            widget.activateWindow()
+            show_widget()
 
     def handle_always_on_top(checked: bool):
         config_data["settings"]["always_on_top"] = checked
@@ -315,6 +387,7 @@ def main():
         if update_worker.isRunning():
             update_worker.requestInterruption()
             update_worker.wait(6000)
+        single_instance.close()
         app.quit()
 
     def request_quit():
@@ -424,7 +497,29 @@ def main():
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
     widget.view_mode_changed.connect(handle_view_mode_changed)
     widget.update_requested.connect(start_one_click_update)
+    widget.diagnostics_requested.connect(open_provider_diagnostics)
     widget.quit_requested.connect(request_quit)
+
+    def show_whats_new_dialog():
+        dialog = QMessageBox(widget)
+        dialog.setWindowTitle(f"SynapCap v{APP_VERSION}")
+        dialog.setIcon(QMessageBox.Icon.Information)
+        dialog.setText(f"SynapCap이 v{APP_VERSION}로 업데이트되었습니다.")
+        dialog.setInformativeText(
+            "새 기능과 오류 수정 사항이 적용되었습니다. "
+            "자세한 내용은 GitHub 릴리스에서 확인할 수 있습니다."
+        )
+        details_button = dialog.addButton(
+            "변경 사항 보기",
+            QMessageBox.ButtonRole.ActionRole,
+        )
+        dialog.addButton("닫기", QMessageBox.ButtonRole.RejectRole)
+        dialog.exec()
+        if dialog.clickedButton() is details_button:
+            QDesktopServices.openUrl(QUrl(release_url()))
+
+    if show_whats_new:
+        QTimer.singleShot(1200, show_whats_new_dialog)
 
     print("[SynapCap] HUD Application with GUI Settings started successfully.")
     sys.exit(app.exec())

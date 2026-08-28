@@ -7,7 +7,7 @@ from typing import Any
 
 from version import APP_NAME
 
-CONFIG_SCHEMA_VERSION = 2
+CONFIG_SCHEMA_VERSION = 3
 
 
 def _default_config_path() -> Path:
@@ -40,13 +40,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "settings": {
         "refresh_interval_sec": 30,
         "always_on_top": True,
-        "widget_size": "Medium",
         "usage_view": "bar",
         "expanded_font_size": 13,
         "expanded_font_bold": True,
         "compact_font_size": 12,
         "compact_font_bold": True,
+        "usage_alerts_enabled": False,
+        "usage_alert_threshold": 90,
         "check_updates": True,
+        "last_seen_version": "",
         "theme": "dark"
     },
     "providers": [
@@ -124,9 +126,14 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 loaded_settings = {}
             settings = deepcopy(DEFAULT_CONFIG["settings"])
             settings.update(loaded_settings)
-            # v0.1.6 and earlier exposed a manual width that conflicted with
-            # compact-mode restoration. Width is now derived from the size preset.
+            # Existing installations should see the first post-update note.
+            # Brand-new configurations return above with an empty value.
+            if "last_seen_version" not in loaded_settings:
+                settings["last_seen_version"] = "legacy"
+            # Legacy manual size controls conflicted with responsive restoration.
+            # Width is now derived from font metrics and visible content.
             settings.pop("widget_width", None)
+            settings.pop("widget_size", None)
             if settings.get("usage_view") not in {"bar", "ring"}:
                 settings["usage_view"] = "bar"
             legacy_bold = loaded_settings.get("usage_value_bold")
@@ -144,6 +151,20 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
             for key in ("expanded_font_bold", "compact_font_bold"):
                 if not isinstance(settings.get(key), bool):
                     settings[key] = True
+            if not isinstance(settings.get("usage_alerts_enabled"), bool):
+                settings["usage_alerts_enabled"] = False
+            alert_threshold = settings.get("usage_alert_threshold", 90)
+            if isinstance(alert_threshold, bool) or not isinstance(
+                alert_threshold,
+                (int, float),
+            ):
+                alert_threshold = 90
+            settings["usage_alert_threshold"] = max(
+                50,
+                min(100, int(alert_threshold)),
+            )
+            if not isinstance(settings.get("last_seen_version"), str):
+                settings["last_seen_version"] = ""
             data["settings"] = settings
             if "providers" not in data or not data["providers"]:
                 data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])

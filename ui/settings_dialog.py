@@ -539,15 +539,6 @@ class SettingsDialog(QDialog):
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
 
-        # Widget Size Preset (Small / Medium / Large) - NoWheelComboBox 적용
-        self.size_combo = NoWheelComboBox()
-        self.size_combo.addItems(["Small", "Medium", "Large"])
-        curr_size = settings.get("widget_size", "Medium")
-        idx = self.size_combo.findText(curr_size)
-        if idx >= 0:
-            self.size_combo.setCurrentIndex(idx)
-        form.addRow("위젯 및 폰트 크기 (Size):", self.size_combo)
-
         self.expanded_font_spin = VisibleSpinBox()
         self.expanded_font_spin.setRange(10, 18)
         self.expanded_font_spin.setSuffix(" px")
@@ -571,6 +562,26 @@ class SettingsDialog(QDialog):
             settings.get("compact_font_bold", True)
         )
         form.addRow("막대 글꼴 굵기:", self.compact_font_bold_check)
+
+        self.usage_alert_check = StyledCheckBox("설정한 사용량 이상에서 알림")
+        self.usage_alert_check.setChecked(
+            settings.get("usage_alerts_enabled", False)
+        )
+        form.addRow("사용량 알림:", self.usage_alert_check)
+
+        self.usage_alert_threshold_spin = VisibleSpinBox()
+        self.usage_alert_threshold_spin.setRange(50, 100)
+        self.usage_alert_threshold_spin.setSuffix(" %")
+        self.usage_alert_threshold_spin.setValue(
+            settings.get("usage_alert_threshold", 90)
+        )
+        self.usage_alert_threshold_spin.setEnabled(
+            self.usage_alert_check.isChecked()
+        )
+        self.usage_alert_check.toggled.connect(
+            self.usage_alert_threshold_spin.setEnabled
+        )
+        form.addRow("알림 기준:", self.usage_alert_threshold_spin)
 
     def init_feedback_tab(self):
         layout = QVBoxLayout(self.feedback_tab)
@@ -915,7 +926,6 @@ class SettingsDialog(QDialog):
         self.config_data["settings"]["refresh_interval_sec"] = self.interval_spin.value()
         self.config_data["settings"]["always_on_top"] = self.always_top_check.isChecked()
         self.config_data["settings"]["check_updates"] = self.update_check.isChecked()
-        self.config_data["settings"]["widget_size"] = self.size_combo.currentText()
         self.config_data["settings"]["expanded_font_size"] = self.expanded_font_spin.value()
         self.config_data["settings"]["expanded_font_bold"] = (
             self.expanded_font_bold_check.isChecked()
@@ -924,8 +934,15 @@ class SettingsDialog(QDialog):
         self.config_data["settings"]["compact_font_bold"] = (
             self.compact_font_bold_check.isChecked()
         )
+        self.config_data["settings"]["usage_alerts_enabled"] = (
+            self.usage_alert_check.isChecked()
+        )
+        self.config_data["settings"]["usage_alert_threshold"] = (
+            self.usage_alert_threshold_spin.value()
+        )
         self.config_data["settings"].pop("usage_value_bold", None)
         self.config_data["settings"].pop("widget_width", None)
+        self.config_data["settings"].pop("widget_size", None)
 
         updated_providers = []
         for pw in self.provider_widgets:

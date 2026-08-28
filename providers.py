@@ -108,6 +108,7 @@ class CodexProvider(BaseAIProvider):
                 limit=100.0,
                 unit="%",
                 error=str(exc),
+                fetched_at=datetime.now().astimezone(),
             )
 
 
@@ -141,6 +142,7 @@ class AntigravityProvider(BaseAIProvider):
                 limit=100.0,
                 unit="%",
                 error=str(exc),
+                fetched_at=datetime.now().astimezone(),
             )
 
 # ==========================================
@@ -173,6 +175,7 @@ class ClaudeProvider(BaseAIProvider):
                 limit=100.0,
                 unit="%",
                 error=str(exc),
+                fetched_at=datetime.now().astimezone(),
             )
 
 

@@ -162,6 +162,21 @@ class SynapCapTray(QObject):
             6000,
         )
 
+    def show_usage_alert(
+        self,
+        provider_name: str,
+        window_label: str,
+        used: float,
+        threshold: int,
+    ):
+        self.tray_icon.showMessage(
+            f"{provider_name} 사용량 알림",
+            f"{window_label} 사용량이 {used:.0f}%로 알림 기준 "
+            f"{threshold}%에 도달했습니다.",
+            QSystemTrayIcon.MessageIcon.Warning,
+            7000,
+        )
+
     def _open_update(self):
         if self._update_url:
             self.update_requested.emit(self._update_url)
