@@ -552,6 +552,10 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(self.widget.width(), self.widget._expanded_width)
         self.assertEqual(self.widget.frame.width(), self.widget.width())
+        self.assertEqual(
+            self.widget.cards_frame.width(),
+            self.widget.frame_layout.contentsRect().width(),
+        )
 
     def test_compact_width_follows_visible_provider_count(self):
         provider_sets: list[list[BaseAIProvider]] = [

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QToolTip,
     QVBoxLayout,
     QWidget,
@@ -368,6 +369,10 @@ class SynapCapWidget(QWidget):
         # 2. Dynamic Provider Cards Container
         self.cards_frame = QFrame()
         self.cards_frame.setObjectName("providersFrame")
+        self.cards_frame.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
         self.cards_layout = QVBoxLayout()
         self.cards_layout.setContentsMargins(0, 0, 0, 0)
         self.cards_layout.setSpacing(0)
@@ -481,7 +486,9 @@ class SynapCapWidget(QWidget):
             self._apply_compact_width()
             self.compact_layout.invalidate()
             self.compact_layout.activate()
-        self.cards_frame.adjustSize()
+        # Let frame_layout own the card width. Calling adjustSize() here after
+        # leaving compact mode shrinks the card to its content size and leaves
+        # an empty strip at the right of an otherwise restored expanded widget.
         self.frame.adjustSize()
         self.adjustSize()
         if not self.is_compact:
