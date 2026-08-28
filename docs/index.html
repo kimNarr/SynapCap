@@ -91,10 +91,10 @@
       </div>
       <div class="feature-grid">
         <article><div class="feature-icon">01</div><h3>기준을 하나로</h3><p>서비스마다 다른 표시 방식을 모두 사용량 기준으로 통일합니다.</p></article>
-        <article><div class="feature-icon">02</div><h3>한도를 내 방식대로</h3><p>5시간·주간 한도를 함께 보거나 프로바이더별로 필요한 항목만 남깁니다.</p></article>
+        <article><div class="feature-icon">02</div><h3>한도를 내 방식대로</h3><p>5시간·주간 한도를 고르고 선택한 임계치에 도달할 때만 알림을 받을 수 있습니다.</p></article>
         <article><div class="feature-icon">03</div><h3>리셋까지 바로</h3><p>남은 시간을 먼저 보여주고 마우스를 올리면 <code>8/12 15:09 초기화</code>처럼 정확한 시각을 즉시 표시합니다.</p></article>
         <article><div class="feature-icon">04</div><h3>로컬 우선</h3><p>API 키를 서버로 보내지 않고 로그인된 로컬 클라이언트에서 조회합니다.</p></article>
-        <article><div class="feature-icon">05</div><h3>트레이에만 가볍게</h3><p>작업 표시줄·Dock은 차지하지 않고 알림 영역에서 표시·업데이트 확인·재시작을 제어하며, 가로형 사용률 바로 전환합니다.</p></article>
+        <article><div class="feature-icon">05</div><h3>트레이에만 가볍게</h3><p>중복 실행 없이 기존 위젯을 앞으로 표시하고, 알림 영역에서 표시·업데이트 확인·재시작을 제어합니다.</p></article>
         <article><div class="feature-icon">06</div><h3>검증형 원클릭 업데이트</h3><p>새 버전을 알리고 운영체제에 맞는 설치 파일을 내려받아 SHA-256 확인 후 설치를 이어갑니다.</p></article>
       </div>
     </section>
@@ -161,13 +161,13 @@
       <div class="section-heading centered">
         <p class="section-kicker">Troubleshooting</p>
         <h2>오류 문구에서 바로 해결까지</h2>
-        <p>카드에 표시되는 상태를 확인하고 필요한 조치만 진행하세요. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다.</p>
+        <p>카드의 상태 배지를 누르면 CLI 감지 경로와 해결 안내가 열립니다. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다.</p>
       </div>
       <div class="error-grid">
         <article><span class="error-badge">설치 필요</span><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다.</p></article>
         <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행합니다. Antigravity 인증 코드는 복사해서 <code>agy</code>가 기다리는 터미널에 붙여 넣고 Enter를 누릅니다.</p></article>
         <article><span class="error-badge warning">시간 초과</span><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
-        <article><span class="error-badge muted">조회 오류</span><h3>상세 메시지를 확인하세요</h3><p>상태 배지에 마우스를 올려 원인을 확인하고 앱과 CLI를 업데이트합니다.</p></article>
+        <article><span class="error-badge muted">조회 오류</span><h3>진단 정보를 확인하세요</h3><p>상태 배지를 눌러 원인을 확인하고 토큰이 없는 진단 보고서를 복사해 Issue에 첨부할 수 있습니다.</p></article>
       </div>
       <aside class="permission-note" aria-label="Windows 다운로드 평판 경고 안내">
         <strong>Windows 다운로드 평판 경고</strong>
@@ -199,7 +199,7 @@
         <p>업데이트를 선택한 뒤 공식 Release 파일을 검증하고 운영체제에 맞는 설치 단계까지 이어갑니다.</p>
       </div>
       <div class="update-flow">
-        <article><span>1</span><h3>새 버전 확인</h3><p>앱 시작 시 GitHub의 최신 공개 버전 번호만 확인합니다. 설정에서 끌 수 있습니다.</p></article>
+        <article><span>1</span><h3>새 버전 확인</h3><p>앱 시작 시 최신 공개 버전을 확인하고, 업데이트 뒤에는 해당 Release 안내를 최초 한 번 표시합니다.</p></article>
         <article><span>2</span><h3>다운로드·검증</h3><p>상단 배지나 트레이 메뉴를 누르면 운영체제별 파일과 체크섬을 공식 Release에서 받아 SHA-256을 자동 확인합니다.</p></article>
         <article><span>3</span><h3>설치 이어가기</h3><p>Windows는 UAC 승인 후 자동 설치·재실행합니다. 미서명 macOS 버전은 검증된 DMG를 열어 앱 교체만 남겨 둡니다.</p></article>
       </div>

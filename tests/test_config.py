@@ -52,6 +52,9 @@ class ConfigTests(unittest.TestCase):
             self.assertTrue(settings["expanded_font_bold"])
             self.assertEqual(settings["compact_font_size"], 12)
             self.assertTrue(settings["compact_font_bold"])
+            self.assertFalse(settings["usage_alerts_enabled"])
+            self.assertEqual(settings["usage_alert_threshold"], 90)
+            self.assertEqual(settings["last_seen_version"], "legacy")
 
     def test_legacy_usage_bold_is_migrated_to_expanded_font(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -86,17 +89,47 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(settings["expanded_font_size"], 18)
             self.assertEqual(settings["compact_font_size"], 9)
 
+    def test_usage_alert_settings_are_normalized(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "settings": {
+                            "usage_alerts_enabled": "yes",
+                            "usage_alert_threshold": 999,
+                            "last_seen_version": 123,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertFalse(settings["usage_alerts_enabled"])
+            self.assertEqual(settings["usage_alert_threshold"], 100)
+            self.assertEqual(settings["last_seen_version"], "")
+
     def test_legacy_manual_width_is_removed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
-                json.dumps({"settings": {"widget_width": 640}}),
+                json.dumps(
+                    {
+                        "settings": {
+                            "widget_width": 640,
+                            "widget_size": "Large",
+                        }
+                    }
+                ),
                 encoding="utf-8",
             )
 
             settings = load_config(str(path))["settings"]
 
             self.assertNotIn("widget_width", settings)
+            self.assertNotIn("widget_size", settings)
 
     def test_provider_window_visibility_is_normalized(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -152,7 +185,7 @@ class ConfigTests(unittest.TestCase):
 
             loaded = load_config(str(path))
 
-            self.assertEqual(loaded["schema_version"], 2)
+            self.assertEqual(loaded["schema_version"], 3)
             self.assertFalse(loaded["providers"][0]["show_five_hour"])
             self.assertTrue(loaded["providers"][0]["show_weekly"])
 

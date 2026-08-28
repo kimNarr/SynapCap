@@ -97,6 +97,7 @@ class SettingsDialogTests(unittest.TestCase):
 
     def test_manual_widget_width_setting_is_not_exposed(self):
         self.assertFalse(hasattr(self.dialog, "width_spin"))
+        self.assertFalse(hasattr(self.dialog, "size_combo"))
 
     def test_expanded_and_compact_font_controls_are_independent(self):
         self.assertEqual(self.dialog.expanded_font_spin.value(), 13)
@@ -118,6 +119,20 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertFalse(settings["expanded_font_bold"])
         self.assertEqual(settings["compact_font_size"], 15)
         self.assertFalse(settings["compact_font_bold"])
+
+    def test_usage_alert_threshold_is_enabled_and_saved_explicitly(self):
+        self.assertFalse(self.dialog.usage_alert_check.isChecked())
+        self.assertFalse(self.dialog.usage_alert_threshold_spin.isEnabled())
+
+        self.dialog.usage_alert_check.setChecked(True)
+        self.dialog.usage_alert_threshold_spin.setValue(85)
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+
+        settings = saved[0]["settings"]
+        self.assertTrue(settings["usage_alerts_enabled"])
+        self.assertEqual(settings["usage_alert_threshold"], 85)
 
     def test_checkboxes_use_cross_platform_painted_indicator(self):
         item = self._provider_item("antigravity")

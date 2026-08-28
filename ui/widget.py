@@ -36,34 +36,14 @@ from .icon import (
 EDGE_SNAP_DISTANCE = 48
 ResizeAnchor = tuple[QPoint, bool, bool]
 
-SIZE_PRESETS = {
-    "Small": {
-        "width": 300,
-        "title_size": 11,
-        "name_size": 11,
-        "val_size": 10,
-        "pbar_height": 6,
-        "badge_size": 26,
-        "card_padding": 8,
-    },
-    "Medium": {
-        "width": 300,
-        "title_size": 13,
-        "name_size": 12,
-        "val_size": 11,
-        "pbar_height": 8,
-        "badge_size": 30,
-        "card_padding": 10,
-    },
-    "Large": {
-        "width": 350,
-        "title_size": 15,
-        "name_size": 14,
-        "val_size": 12,
-        "pbar_height": 10,
-        "badge_size": 34,
-        "card_padding": 12,
-    },
+EXPANDED_BASE_METRICS = {
+    "width": 300,
+    "title_size": 13,
+    "name_size": 12,
+    "val_size": 11,
+    "pbar_height": 8,
+    "badge_size": 30,
+    "card_padding": 10,
 }
 
 
@@ -163,6 +143,7 @@ class SynapCapWidget(QWidget):
     refresh_requested = Signal()
     quit_requested = Signal()
     update_requested = Signal(str)
+    diagnostics_requested = Signal(str)
     view_mode_changed = Signal(str)
 
     def __init__(self, config_data: dict, providers: list[BaseAIProvider]):
@@ -206,9 +187,9 @@ class SynapCapWidget(QWidget):
         settings = self.config_data.get("settings", {})
         preset = self._expanded_preset(settings)
 
-        width = max(300, preset["width"])
+        width = self._responsive_expanded_width(preset)
         self._expanded_width = width
-        self.setFixedWidth(width)
+        self._set_fixed_window_width(width)
 
         # Outer Frame with Rounded Corners & Modern Styling
         outer_layout = QVBoxLayout(self)
@@ -402,8 +383,7 @@ class SynapCapWidget(QWidget):
 
     @staticmethod
     def _expanded_preset(settings: dict) -> dict:
-        size_key = settings.get("widget_size", "Medium")
-        preset = dict(SIZE_PRESETS.get(size_key, SIZE_PRESETS["Medium"]))
+        preset = dict(EXPANDED_BASE_METRICS)
         font_size = max(10, min(18, int(settings.get("expanded_font_size", 13))))
         preset.update(
             {
@@ -419,6 +399,23 @@ class SynapCapWidget(QWidget):
         )
         preset["width"] = max(preset["width"], 300 + max(0, font_size - 13) * 12)
         return preset
+
+    def _responsive_expanded_width(self, preset: dict) -> int:
+        name_font = QFont("Segoe UI", preset["name_size"])
+        name_font.setWeight(QFont.Weight.Bold)
+        metrics = QFontMetrics(name_font)
+        longest_name = max(
+            (metrics.horizontalAdvance(provider.name) for provider in self.providers),
+            default=0,
+        )
+        provider_header_width = longest_name + preset["badge_size"] + 132
+        return min(480, max(300, preset["width"], provider_header_width))
+
+    def _set_fixed_window_width(self, width: int) -> None:
+        """Keep the visible root frame in lockstep with the frameless window."""
+        self.setFixedWidth(width)
+        if hasattr(self, "frame"):
+            self.frame.setFixedWidth(width)
 
     def _compact_metrics(self) -> dict:
         settings = self.config_data.get("settings", {})
@@ -491,7 +488,7 @@ class SynapCapWidget(QWidget):
             # Qt may recalculate a narrower size hint after the compact bar is
             # hidden (notably with Windows DPI/layout updates). The selected
             # expanded preset remains the source of truth across the round trip.
-            self.setFixedWidth(self._expanded_width)
+            self._set_fixed_window_width(self._expanded_width)
         if self._pending_resize_anchor is not None:
             self._move_to_resize_anchor(self._pending_resize_anchor)
             self._pending_resize_anchor = None
@@ -623,30 +620,38 @@ class SynapCapWidget(QWidget):
             return
         resize_anchor = self._capture_resize_anchor()
         self.is_compact = True
-        self.header_widget.hide()
-        self.cards_frame.hide()
-        self.compact_bar.show()
-        compact_margin = max(8, self._compact_metrics()["vertical_margin"] + 6)
-        self.frame_layout.setContentsMargins(
-            compact_margin,
-            compact_margin,
-            max(7, compact_margin - 1),
-            compact_margin,
-        )
-        self.frame_layout.setSpacing(0)
+        self._apply_layout_visibility()
         self._refresh_compact_values(resize_anchor)
+
+    def _apply_layout_visibility(self) -> None:
+        """Apply one coherent layout state before measuring or resizing."""
+        if self.is_compact:
+            self.header_widget.hide()
+            self.cards_frame.hide()
+            self.compact_bar.show()
+            compact_margin = max(8, self._compact_metrics()["vertical_margin"] + 6)
+            self.frame_layout.setContentsMargins(
+                compact_margin,
+                compact_margin,
+                max(7, compact_margin - 1),
+                compact_margin,
+            )
+            self.frame_layout.setSpacing(0)
+            return
+
+        self.compact_bar.hide()
+        self.header_widget.show()
+        self.cards_frame.show()
+        self.frame_layout.setContentsMargins(12, 14, 12, 12)
+        self.frame_layout.setSpacing(10)
 
     def exit_compact_mode(self) -> None:
         if not self.is_compact:
             return
         resize_anchor = self._capture_resize_anchor()
         self.is_compact = False
-        self.compact_bar.hide()
-        self.header_widget.show()
-        self.cards_frame.show()
-        self.setFixedWidth(self._expanded_width)
-        self.frame_layout.setContentsMargins(12, 14, 12, 12)
-        self.frame_layout.setSpacing(10)
+        self._apply_layout_visibility()
+        self._set_fixed_window_width(self._expanded_width)
         self._schedule_fit_to_content(resize_anchor)
 
     def _apply_compact_width(self) -> None:
@@ -659,7 +664,7 @@ class SynapCapWidget(QWidget):
         responsive_width = max(
             150, content_width + margins.left() + margins.right() + 2
         )
-        self.setFixedWidth(responsive_width)
+        self._set_fixed_window_width(responsive_width)
 
     @staticmethod
     def _fit_compact_value_label(value_label: QLabel, font_size: int) -> None:
@@ -780,12 +785,14 @@ class SynapCapWidget(QWidget):
             self.update_requested.emit(self._update_url)
 
     def _toggle_usage_view(self):
+        resize_anchor = self._capture_resize_anchor()
         self.usage_view = "ring" if self.usage_view == "bar" else "bar"
         self.config_data.setdefault("settings", {})["usage_view"] = self.usage_view
         self._update_view_button()
         self.view_mode_changed.emit(self.usage_view)
         if self.latest_usage:
             self.update_data(self.latest_usage, force=True)
+        self._schedule_fit_to_content(resize_anchor)
 
     def _build_provider_cards(self):
         self.provider_ui_map.clear()
@@ -848,9 +855,12 @@ class SynapCapWidget(QWidget):
             title_row.addWidget(loading_spinner)
             loading_spinner.start()
 
-            status_label = QLabel()
-            status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            status_label = QPushButton()
             self._enable_instant_tooltip(status_label, "조회 상태")
+            status_label.clicked.connect(
+                lambda _checked=False, provider_id=provider.provider_id:
+                self.diagnostics_requested.emit(provider_id)
+            )
             self._set_status_badge(status_label, "waiting", preset)
             status_label.hide()
             title_row.addWidget(status_label)
@@ -888,7 +898,7 @@ class SynapCapWidget(QWidget):
         self._schedule_fit_to_content()
 
     @staticmethod
-    def _set_status_badge(label: QLabel, state: str, preset: dict) -> None:
+    def _set_status_badge(label: QWidget, state: str, preset: dict) -> None:
         colors = {
             "waiting": ("#F9E2AF", "#323040"),
             "error": ("#F38BA8", "#3B2735"),
@@ -897,7 +907,7 @@ class SynapCapWidget(QWidget):
         foreground, background = colors.get(state, ("#A6E3A1", "#26372F"))
         label.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
-            "border-radius: 5px; padding: 3px 7px; "
+            "border: none; border-radius: 5px; padding: 3px 7px; "
             f"font-size: {max(9, preset['val_size'] - 1)}px; font-weight: 700;"
         )
 
@@ -921,9 +931,9 @@ class SynapCapWidget(QWidget):
             self._update_view_button()
         preset = self._expanded_preset(settings)
 
-        width = max(300, preset["width"])
+        width = self._responsive_expanded_width(preset)
         self._expanded_width = width
-        self.setFixedWidth(width)
+        self._set_fixed_window_width(width)
         self.set_always_on_top(settings.get("always_on_top", True))
 
         self._apply_compact_metrics()
@@ -932,11 +942,10 @@ class SynapCapWidget(QWidget):
         if preserved_usage:
             self.update_data(preserved_usage, force=True)
         if self.is_compact:
-            self.header_widget.hide()
-            self.cards_frame.hide()
-            self.compact_bar.show()
+            self._apply_layout_visibility()
             self._refresh_compact_values(resize_anchor)
         else:
+            self._apply_layout_visibility()
             self._schedule_fit_to_content()
 
     def set_loading(self) -> None:
@@ -1137,7 +1146,22 @@ class SynapCapWidget(QWidget):
         return relative, tooltip
 
     @staticmethod
-    def _usage_source_tooltip(usage: ModelUsage, provider_type: str) -> str:
+    def _data_freshness_text(
+        fetched_at: datetime,
+        refresh_interval_sec: int,
+        now: datetime | None = None,
+    ) -> str:
+        current = now or datetime.now().astimezone()
+        fetched = fetched_at.astimezone()
+        age_seconds = max(0, int((current - fetched).total_seconds()))
+        stale_after = max(300, int(refresh_interval_sec) * 3)
+        if age_seconds < stale_after:
+            return "데이터 상태: 최신"
+        if age_seconds < 3600:
+            return f"데이터 상태: {max(1, age_seconds // 60)}분 전 · 새로고침 권장"
+        return f"데이터 상태: {age_seconds // 3600}시간 전 · 새로고침 권장"
+
+    def _usage_source_tooltip(self, usage: ModelUsage, provider_type: str) -> str:
         lines: list[str] = []
         if provider_type == "claude":
             lines.append("Claude CLI 기준 사용량")
@@ -1147,6 +1171,16 @@ class SynapCapWidget(QWidget):
             lines.append(
                 f"마지막 조회: {fetched_at.month}/{fetched_at.day} "
                 f"{fetched_at:%H:%M:%S}"
+            )
+            refresh_interval = self.config_data.get("settings", {}).get(
+                "refresh_interval_sec",
+                30,
+            )
+            lines.append(
+                self._data_freshness_text(
+                    fetched_at,
+                    refresh_interval,
+                )
             )
 
         if provider_type == "claude":
@@ -1290,7 +1324,9 @@ class SynapCapWidget(QWidget):
                 else:
                     error_label = "조회 오류"
                 ui["status"].setText(error_label)
-                ui["status"].setToolTip(usage.error)
+                ui["status"].setToolTip(
+                    f"{usage.error}\n클릭하여 진단 정보 보기"
+                )
                 self._set_status_badge(ui["status"], "error", preset)
                 self._clear_usage_rows(ui)
             else:
@@ -1301,7 +1337,9 @@ class SynapCapWidget(QWidget):
                 ui["name"].setToolTip(success_tooltip)
                 if provider_type == "claude":
                     ui["status"].setText("CLI 기준")
-                    ui["status"].setToolTip(source_tooltip)
+                    ui["status"].setToolTip(
+                        f"{source_tooltip}\n클릭하여 진단 정보 보기"
+                    )
                     self._set_status_badge(ui["status"], "source", preset)
                     ui["status"].show()
                 else:
@@ -1327,7 +1365,10 @@ class SynapCapWidget(QWidget):
                 else:
                     ui["status"].show()
                     ui["status"].setText("한도 정보 없음")
-                    ui["status"].setToolTip("선택한 표시 한도를 서비스에서 제공하지 않았습니다.")
+                    ui["status"].setToolTip(
+                        "선택한 표시 한도를 서비스에서 제공하지 않았습니다."
+                        "\n클릭하여 진단 정보 보기"
+                    )
                     self._set_status_badge(ui["status"], "waiting", preset)
                     self._clear_usage_rows(ui)
 

@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -50,6 +51,18 @@ class TrayTests(unittest.TestCase):
         tray.set_update_checking(False)
         self.assertTrue(tray.check_update_action.isEnabled())
         self.assertEqual(tray.check_update_action.text(), "업데이트 확인")
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
+    def test_usage_threshold_notification_is_actionable(self):
+        tray = SynapCapTray()
+        with patch.object(tray.tray_icon, "showMessage") as show_message:
+            tray.show_usage_alert("Claude", "5시간", 92, 90)
+
+        title, message = show_message.call_args.args[:2]
+        self.assertIn("Claude", title)
+        self.assertIn("92%", message)
+        self.assertIn("90%", message)
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()
 
