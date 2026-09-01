@@ -915,10 +915,20 @@ class WidgetTests(unittest.TestCase):
         metrics = self.widget._compact_metrics()
         compact_value = self.widget.compact_ui_map["codex"]["value"]
         self.assertEqual(compact_value.font().pointSize(), 12)
-        self.assertEqual(compact_value.font().weight(), 600)
+        self.assertEqual(compact_value.font().weight(), 500)
+        self.assertGreaterEqual(metrics["provider_spacing"], 9)
+        self.assertGreaterEqual(metrics["vertical_margin"], 2)
         self.assertEqual(self.widget.compact_layout.spacing(), metrics["logo_spacing"])
         self.assertEqual(
             self.widget.compact_items_layout.spacing(), metrics["provider_spacing"]
+        )
+        self.assertEqual(
+            self.widget.compact_brand_layout.spacing(),
+            metrics["logo_divider_spacing"],
+        )
+        self.assertEqual(
+            self.widget.compact_logo_divider.objectName(),
+            "compactLogoDivider",
         )
 
     def test_apply_theme_preserves_graph_and_compact_state(self):
@@ -936,6 +946,8 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("#F7F8FB", self.widget.frame.styleSheet())
 
     def test_compact_bar_uses_white_normally_and_warning_colors_at_thresholds(self):
+        self.widget.config_data["settings"]["widget_scale"] = "medium"
+        self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
         self.widget.update_data([self.usage])
         self.widget.enter_compact_mode()
         self.app.processEvents()
@@ -947,6 +959,11 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data([high_usage])
         self.assertEqual(compact_value.text(), "92%")
         self.assertIn("color: #F38BA8", compact_value.styleSheet())
+        self.assertEqual(compact_value.font().weight(), 700)
+
+        warning_usage = ModelUsage("codex", "Codex", "Codex", 80, 100, "%")
+        self.widget.update_data([warning_usage])
+        self.assertEqual(compact_value.font().weight(), 600)
 
     def test_dock_above_taskbar_uses_the_bottom_of_available_geometry(self):
         self.widget.config_data["settings"]["dock_above_taskbar"] = True

@@ -495,11 +495,22 @@ class SynapCapWidget(QWidget):
         self.compact_layout.setSpacing(8)
         self.compact_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
+        self.compact_brand_layout = QHBoxLayout()
+        self.compact_brand_layout.setContentsMargins(0, 0, 0, 0)
+        self.compact_brand_layout.setSpacing(5)
+
         self.compact_logo = QLabel()
         self.compact_logo.setPixmap(create_app_pixmap(20))
         self.compact_logo.setFixedSize(20, 20)
         self.compact_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.compact_layout.addWidget(self.compact_logo)
+        self.compact_brand_layout.addWidget(self.compact_logo)
+
+        self.compact_logo_divider = self._make_compact_divider(
+            self._compact_metrics()
+        )
+        self.compact_logo_divider.setObjectName("compactLogoDivider")
+        self.compact_brand_layout.addWidget(self.compact_logo_divider)
+        self.compact_layout.addLayout(self.compact_brand_layout)
 
         self.compact_items_layout = QHBoxLayout()
         self.compact_items_layout.setContentsMargins(0, 0, 0, 0)
@@ -691,7 +702,7 @@ class SynapCapWidget(QWidget):
         scale = settings.get("widget_scale")
         if scale in WIDGET_SCALE_PRESETS:
             font_size = WIDGET_SCALE_PRESETS[scale]["compact_font_size"]
-            font_weight = 600
+            font_weight = 500
         else:
             font_size = max(9, min(16, int(settings.get("compact_font_size", 12))))
             font_weight = 700 if settings.get("compact_font_bold", True) else 400
@@ -705,13 +716,14 @@ class SynapCapWidget(QWidget):
             "logo_size": max(17, font_size + 5),
             "button_size": max(20, font_size + 9),
             "glyph_size": max(11, font_size),
-            # Keep each icon/value pair compact. A hairline divider (not spacing
-            # alone) separates provider groups, so the inter-group gap only has
-            # to give the divider a little breathing room on each side.
+            # Keep icon/value pairs compact while giving each provider group a
+            # distinct visual boundary. Layout spacing applies on both sides
+            # of the divider, so 9 px yields an intentionally roomier break.
             "item_spacing": max(4, round(font_size * 0.34)),
             "logo_spacing": max(9, round(font_size * 0.75)),
-            "provider_spacing": max(5, round(font_size * 0.4)),
-            "vertical_margin": max(1, round((font_size - 9) * 0.34)),
+            "logo_divider_spacing": max(5, round(font_size * 0.42)),
+            "provider_spacing": max(9, round(font_size * 0.65)),
+            "vertical_margin": max(2, round((font_size - 9) * 0.34) + 1),
         }
 
     @staticmethod
@@ -726,6 +738,8 @@ class SynapCapWidget(QWidget):
             weight = QFont.Weight.Bold
         elif font_weight >= 550:
             weight = QFont.Weight.DemiBold
+        elif font_weight >= 450:
+            weight = QFont.Weight.Medium
         else:
             weight = QFont.Weight.Normal
         font.setWeight(weight)
@@ -736,19 +750,39 @@ class SynapCapWidget(QWidget):
         label: QLabel,
         color: str,
         metrics: dict,
+        font_weight: int | None = None,
     ) -> None:
         label.setStyleSheet(f"color: {color};")
-        self._set_label_font(label, metrics["font_size"], metrics["font_weight"])
+        self._set_label_font(
+            label,
+            metrics["font_size"],
+            metrics["font_weight"] if font_weight is None else font_weight,
+        )
+
+    @staticmethod
+    def _compact_value_weight(used: float, metrics: dict) -> int:
+        if used >= USAGE_CRIT:
+            return max(700, metrics["font_weight"])
+        if used >= USAGE_WARN:
+            return max(600, metrics["font_weight"])
+        return metrics["font_weight"]
 
     def _apply_compact_metrics(self) -> None:
         metrics = self._compact_metrics()
         vertical = metrics["vertical_margin"]
         self.compact_layout.setContentsMargins(3, vertical, 1, vertical)
         self.compact_layout.setSpacing(metrics["logo_spacing"])
+        self.compact_brand_layout.setSpacing(metrics["logo_divider_spacing"])
         self.compact_items_layout.setSpacing(metrics["provider_spacing"])
         logo_size = metrics["logo_size"]
         self.compact_logo.setFixedSize(logo_size, logo_size)
         self.compact_logo.setPixmap(create_app_pixmap(logo_size))
+        self.compact_logo_divider.setFixedHeight(
+            max(14, metrics["font_size"] + 2)
+        )
+        self.compact_logo_divider.setStyleSheet(
+            f"background-color: {t('compact_divider')}; border: none;"
+        )
         button_size = metrics["button_size"]
         glyph_size = metrics["glyph_size"]
         self.expand_btn.setFixedSize(button_size, button_size)
@@ -1111,7 +1145,12 @@ class SynapCapWidget(QWidget):
             if usage.error:
                 value_label.setText("!")
                 value_label.setProperty("compactPlainText", "!")
-                self._apply_compact_value_style(value_label, t("usage_crit"), metrics)
+                self._apply_compact_value_style(
+                    value_label,
+                    t("usage_crit"),
+                    metrics,
+                    700,
+                )
                 self._fit_compact_value_label(value_label, metrics["font_size"])
                 compact_ui["item"].setToolTip(usage.error)
                 continue
@@ -1136,18 +1175,29 @@ class SynapCapWidget(QWidget):
                 slash = f'<span style="color:{t("ink_faintest")}">/</span>'
                 value_label.setText(
                     slash.join(
-                        f'<span style="color:{color}">{window.used:.0f}</span>'
+                        f'<span style="color:{color};font-weight:'
+                        f'{self._compact_value_weight(window.used, metrics)}">'
+                        f'{window.used:.0f}</span>'
                         for window, color in zip(windows, window_colors, strict=True)
                     )
-                    + f'<span style="color:{window_colors[-1]}">%</span>'
+                    + f'<span style="color:{window_colors[-1]};font-weight:'
+                    f'{self._compact_value_weight(windows[-1].used, metrics)}">%</span>'
                 )
             elif len(windows) > 1:
                 value_label.setText(plain_value)
-                self._apply_compact_value_style(value_label, window_colors[0], metrics)
+                self._apply_compact_value_style(
+                    value_label,
+                    window_colors[0],
+                    metrics,
+                    max(self._compact_value_weight(w.used, metrics) for w in windows),
+                )
             else:
                 value_label.setText(plain_value)
                 self._apply_compact_value_style(
-                    value_label, self._compact_usage_color(used), metrics
+                    value_label,
+                    self._compact_usage_color(used),
+                    metrics,
+                    self._compact_value_weight(used, metrics),
                 )
             self._fit_compact_value_label(value_label, metrics["font_size"])
             tooltip_lines = [
