@@ -141,7 +141,7 @@ LIGHT: dict[str, str] = {
     "on_accent": "#FFFFFF",
     "usage_calm": "#7C8296",       # < 60 % — muted, plenty of headroom
     "usage_ok": "#1857C9",         # 60-74 % — worth noting
-    "usage_warn": "#9A5200",       # 75-89 % — amber, closing in
+    "usage_warn": "#C2410C",       # 75-89 % — burnt orange (AA on light, not the old ocher)
     "usage_crit": "#B42352",       # >= 90 % — red, plus ▲
     "warn_soft": "#805400",
     "good": "#2E6F37",
