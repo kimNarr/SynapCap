@@ -63,6 +63,7 @@ DARK: dict[str, str] = {
     # ── component specifics ──────────────────────────────────────────
     "bar_track": "#1C2130",
     "bar_track_edge": "#3A4152",
+    "compact_divider": "#272C38",  # hairline between compact provider groups
     "segment_off": "#23283A",
     "ring_track": "#2B303D",
     "skeleton": "#1A1F2A",
@@ -148,6 +149,7 @@ LIGHT: dict[str, str] = {
     # ── component specifics ──────────────────────────────────────────
     "bar_track": "#E0E4EC",
     "bar_track_edge": "#AEB6C6",
+    "compact_divider": "#9CA0B0",  # hairline between compact provider groups
     "segment_off": "#D8DDE7",
     "ring_track": "#C8CEDA",
     "skeleton": "#E0E4EC",

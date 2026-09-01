@@ -886,7 +886,9 @@ class SynapCapWidget(QWidget):
         divider.setObjectName("compactDivider")
         divider.setFixedWidth(1)
         divider.setFixedHeight(max(12, metrics["font_size"] + 2))
-        divider.setStyleSheet(f"background-color: {t('line')}; border: none;")
+        divider.setStyleSheet(
+            f"background-color: {t('compact_divider')}; border: none;"
+        )
         return divider
 
     def _build_compact_items(self) -> None:
