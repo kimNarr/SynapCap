@@ -528,6 +528,19 @@ class SynapCapWidget(QWidget):
         self._build_compact_items()
 
         self.frame_layout.addWidget(self.cards_frame)
+
+        # A quiet "how old is this data" line — the numbers above are only
+        # trustworthy if you know when they were fetched.
+        self.freshness_label = QLabel("")
+        self.freshness_label.setObjectName("freshnessCaption")
+        self.freshness_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.freshness_label.setStyleSheet(f"color: {t('ink_faint')};")
+        self._set_label_font(self.freshness_label, 9)
+        self.freshness_label.hide()
+        self.frame_layout.addWidget(self.freshness_label)
+
         outer_layout.addWidget(self.frame)
 
         self._schedule_fit_to_content()
@@ -552,6 +565,7 @@ class SynapCapWidget(QWidget):
         self.settings_btn.setIcon(create_settings_icon(14, t("ink_mid")))
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
         self.close_btn.setIcon(create_close_icon(14, t("danger_soft")))
+        self.freshness_label.setStyleSheet(f"color: {t('ink_faint')};")
         self._set_version_badge_style(bool(self._update_url))
         self._apply_compact_metrics()
 
@@ -949,6 +963,7 @@ class SynapCapWidget(QWidget):
             self._set_compact_frame_style(True)
             self.header_widget.hide()
             self.cards_frame.hide()
+            self.freshness_label.hide()
             self.compact_bar.show()
             compact_margin = max(4, self._compact_metrics()["vertical_margin"] + 3)
             self.frame_layout.setContentsMargins(
@@ -964,6 +979,7 @@ class SynapCapWidget(QWidget):
         self.compact_bar.hide()
         self.header_widget.show()
         self.cards_frame.show()
+        self._update_freshness_caption()
         self.frame_layout.setContentsMargins(12, 14, 12, 12)
         self.frame_layout.setSpacing(10)
 
@@ -1666,6 +1682,41 @@ class SynapCapWidget(QWidget):
             return f"데이터 상태: {max(1, age_seconds // 60)}분 전 · 새로고침 권장"
         return f"데이터 상태: {age_seconds // 3600}시간 전 · 새로고침 권장"
 
+    @staticmethod
+    def _freshness_caption(
+        fetched_at: datetime,
+        refresh_interval_sec: int,
+        now: datetime | None = None,
+    ) -> str:
+        """Compact, always-visible version of :meth:`_data_freshness_text`."""
+        current = now or datetime.now().astimezone()
+        age_seconds = max(0, int((current - fetched_at.astimezone()).total_seconds()))
+        stale = age_seconds >= max(300, int(refresh_interval_sec) * 3)
+        tail = " · 새로고침 권장" if stale else ""
+        if age_seconds < 45:
+            return "방금 갱신됨"
+        if age_seconds < 3600:
+            return f"{max(1, age_seconds // 60)}분 전 갱신{tail}"
+        return f"{age_seconds // 3600}시간 전 갱신{tail}"
+
+    def _update_freshness_caption(self) -> None:
+        fetched_times = [
+            usage.fetched_at
+            for usage in self.latest_usage
+            if usage.fetched_at is not None and not usage.error
+        ]
+        if not fetched_times:
+            self.freshness_label.clear()
+            self.freshness_label.hide()
+            return
+        interval = self.config_data.get("settings", {}).get(
+            "refresh_interval_sec", 30
+        )
+        self.freshness_label.setText(
+            self._freshness_caption(min(fetched_times), interval)
+        )
+        self.freshness_label.setVisible(not self.is_compact)
+
     def _usage_source_tooltip(self, usage: ModelUsage, provider_type: str) -> str:
         lines: list[str] = []
         if provider_type == "claude":
@@ -1692,12 +1743,47 @@ class SynapCapWidget(QWidget):
             lines.append("Claude 화면과 일시적으로 차이가 날 수 있습니다.")
         return "\n".join(lines)
 
+    def _usage_column_header(self, preset: dict) -> QWidget:
+        """One quiet caption row so the two trailing numbers are unambiguous:
+        the left one is time until reset, the right one is usage percent."""
+        vs = preset["val_size"]
+        pad = max(3, round(vs * 0.25))
+        header = QWidget()
+        header.setObjectName("usageColumnHeader")
+        header.setStyleSheet(
+            "QWidget#usageColumnHeader { background: transparent; }"
+        )
+        row = QHBoxLayout(header)
+        row.setContentsMargins(pad, 0, pad, 1)
+        row.setSpacing(max(6, round(vs * 0.45)))
+        row.addStretch(1)
+        for text, align, width in (
+            (
+                "리셋까지",
+                Qt.AlignmentFlag.AlignLeft,
+                max(52, round(vs * 4.6)),
+            ),
+            (
+                "사용률",
+                Qt.AlignmentFlag.AlignRight,
+                max(48, vs * 4 + 10),
+            ),
+        ):
+            label = QLabel(text)
+            label.setStyleSheet(f"color: {t('ink_faint')};")
+            self._set_label_font(label, max(8, vs - 4), 600)
+            label.setFixedWidth(width)
+            label.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(label)
+        return header
+
     def _render_usage_rows(
         self,
         ui: dict,
         windows: list[UsageWindow],
         preset: dict,
         source_tooltip: str = "",
+        show_column_header: bool = False,
     ):
         self._clear_usage_rows(ui)
         settings = self.config_data.get("settings", {})
@@ -1709,6 +1795,12 @@ class SynapCapWidget(QWidget):
         normal_weight = 600 if usage_value_bold else 400
         graph = self.usage_view
         vs = preset["val_size"]
+
+        row_offset = 0
+        if show_column_header and not self._horizontal_ring_active:
+            header = self._usage_column_header(preset)
+            ui["windows_layout"].addWidget(header, 0, 0, 1, 2)
+            row_offset = 1
 
         for index, window in enumerate(windows):
             remaining = (
@@ -1810,7 +1902,7 @@ class SynapCapWidget(QWidget):
             value_label.setFixedWidth(max(48, vs * 4 + 10))
             tile_layout.addWidget(value_label)
 
-            ui["windows_layout"].addWidget(tile, index, 0, 1, 2)
+            ui["windows_layout"].addWidget(tile, index + row_offset, 0, 1, 2)
             ui["window_rows"].append(tile)
 
     def update_data(
@@ -1880,11 +1972,15 @@ class SynapCapWidget(QWidget):
                 ]
                 visible_windows = self._visible_usage_windows(ui, windows)
                 if visible_windows:
+                    is_first_card = bool(self.providers) and (
+                        usage.provider_id == self.providers[0].provider_id
+                    )
                     self._render_usage_rows(
                         ui,
                         visible_windows,
                         preset,
                         source_tooltip,
+                        show_column_header=is_first_card,
                     )
                 else:
                     ui["status"].show()
@@ -1895,6 +1991,8 @@ class SynapCapWidget(QWidget):
                     )
                     self._set_status_badge(ui["status"], "waiting", preset)
                     self._clear_usage_rows(ui)
+
+        self._update_freshness_caption()
 
         if not rendered_provider:
             self._refresh_compact_values()

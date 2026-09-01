@@ -1,6 +1,6 @@
 import os
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -407,6 +407,78 @@ class WidgetTests(unittest.TestCase):
 
         self.assertIn("12분 전", text)
         self.assertIn("새로고침 권장", text)
+
+    def test_freshness_caption_reads_fresh_then_stale(self):
+        base = datetime(2026, 8, 27, 8, 0, tzinfo=UTC)
+        self.assertEqual(
+            self.widget._freshness_caption(base, 30, now=base + timedelta(seconds=10)),
+            "방금 갱신됨",
+        )
+        self.assertEqual(
+            self.widget._freshness_caption(base, 30, now=base + timedelta(minutes=2)),
+            "2분 전 갱신",
+        )
+        self.assertIn(
+            "새로고침 권장",
+            self.widget._freshness_caption(base, 30, now=base + timedelta(minutes=15)),
+        )
+
+    def test_freshness_caption_shows_after_data_and_hides_in_compact(self):
+        self.usage.fetched_at = datetime.now().astimezone() - timedelta(minutes=3)
+        self.widget.update_data([self.usage], force=True)
+        self.app.processEvents()
+
+        self.assertTrue(self.widget.freshness_label.isVisible())
+        self.assertIn("분 전 갱신", self.widget.freshness_label.text())
+
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        self.assertFalse(self.widget.freshness_label.isVisible())
+
+    def test_first_card_labels_the_reset_and_usage_columns(self):
+        providers = [
+            CodexProvider({"id": "codex", "name": "Codex"}),
+            AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+        ]
+        self.widget.rebuild_ui(
+            self.widget.config_data, providers, preserve_usage=False
+        )
+        self.widget.update_data(
+            [
+                ModelUsage(
+                    "codex", "Codex", "Codex", 49, 100, "%",
+                    windows=[UsageWindow("주간", 49, "8/12 09:49", 51)],
+                ),
+                ModelUsage(
+                    "gemini", "Gemini", "Gemini", 20, 100, "%",
+                    windows=[UsageWindow("주간", 20, "", 80)],
+                ),
+            ],
+            force=True,
+        )
+        self.app.processEvents()
+
+        codex_layout = self.widget.provider_ui_map["codex"]["windows_layout"]
+        gemini_layout = self.widget.provider_ui_map["gemini"]["windows_layout"]
+        codex_headers = [
+            codex_layout.itemAt(i).widget()
+            for i in range(codex_layout.count())
+            if codex_layout.itemAt(i).widget() is not None
+            and codex_layout.itemAt(i).widget().objectName() == "usageColumnHeader"
+        ]
+        gemini_headers = [
+            gemini_layout.itemAt(i).widget()
+            for i in range(gemini_layout.count())
+            if gemini_layout.itemAt(i).widget() is not None
+            and gemini_layout.itemAt(i).widget().objectName() == "usageColumnHeader"
+        ]
+        self.assertEqual(len(codex_headers), 1)
+        self.assertEqual(len(gemini_headers), 0)
+        labels = [
+            child.text() for child in codex_headers[0].findChildren(QLabel)
+        ]
+        self.assertIn("리셋까지", labels)
+        self.assertIn("사용률", labels)
 
     def test_status_badge_requests_provider_diagnostics(self):
         usage = ModelUsage(

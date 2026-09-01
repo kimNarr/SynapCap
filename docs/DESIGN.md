@@ -217,12 +217,20 @@ README도 새 SVG/PNG로 교체. 기존 3D 래스터 자산 제거.
 
 ```
 ┌───────────────────────────────┐
+│                     리셋까지    사용률 │  ← 첫 카드에만 (컬럼 레전드)
 │ [5h] [ 그래프 · Expanding ] 6d 20h  28% │  ← 그래프·리셋·수치를 한 행에
 └───────────────────────────────┘
 ```
 
 - 한 행: `5h`/`7d` 기간 배지(`#8397BE`, 투명 배경·`1px #2E3550` 아웃라인) · 그래프 · `_condensed_reset`(`#8087A0`, `font−2`, `objectName="resetCountdown"`) · `%`.
   그래프가 없는 `number` 보기만 배지 뒤 공간을 비워 가장 조밀하게 표시한다.
+- **컬럼 레전드** (`_usage_column_header`, `objectName="usageColumnHeader"`): 뒤쪽 두 숫자가
+  각각 "리셋까지 남은 시간"과 "사용률"임을 알려주는 한 줄. `ink_faint` · `font−4`. **첫 프로바이더
+  카드에만** (컬럼 폭이 카드마다 같아 한 번이면 충분). 가로 링 배치에선 생략.
+- **갱신 캡션** (`freshness_label`, `objectName="freshnessCaption"`): 프레임 맨 아래 한 줄,
+  `방금 갱신됨` / `N분 전 갱신` / (`refresh × 3`·최소 5분 초과 시) `· 새로고침 권장`.
+  `ink_faint` · `9px`. 성공 데이터가 하나도 없으면 숨김. 컴팩트 모드에서도 숨김.
+  `_freshness_caption` / `_update_freshness_caption`.
 - 그래프 종류 (`usage_view` ∈ `USAGE_VIEWS = ("bar","segment","ring","number")`):
   - `bar` — `UsageBar` (트랙 `#1C2130`/`#3A4152`, 최소 3px 채움)
   - `segment` — `SegmentBar` (10칸, `used>0`이면 최소 1칸, 색 = 스케일)
