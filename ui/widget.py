@@ -81,6 +81,14 @@ WIDGET_SCALE_PRESETS = {
 # identity colours while the numbers stay readable on every dark desktop theme.
 COMPACT_VALUE_COLOR = "#F8FAFC"
 
+# Long reset-status strings do not fit the fixed-width reset column; the full
+# wording stays in the tooltip (see SynapCapWidget._reset_hint).
+_RESET_STATUS_SHORT = {
+    "초기화 확인 중": "확인 중",
+    "리셋 시각 미상": "미상",
+    "": "미상",
+}
+
 
 class UsageRing(QWidget):
     def __init__(
@@ -1357,8 +1365,10 @@ class SynapCapWidget(QWidget):
     def _condensed_reset(relative: str) -> str:
         """Use compact English time units for every usage-view countdown."""
         text = relative.strip()
-        if not text or text in {"곧", "초기화 확인 중", "리셋 시각 미상"}:
-            return text or "리셋 시각 미상"
+        if text in _RESET_STATUS_SHORT:
+            return _RESET_STATUS_SHORT[text]
+        if text == "곧":
+            return "곧"
 
         match = re.fullmatch(
             r"(?:(\d+)일)?(?:\s*(\d+)시간)?(?:\s*(\d+)분)?\s*후",
@@ -1376,6 +1386,17 @@ class SynapCapWidget(QWidget):
         if minutes:
             parts.append(f"{minutes}m")
         return " ".join(parts) or "곧"
+
+    @staticmethod
+    def _reset_hint(reset_display: str, reset_tooltip: str) -> str:
+        """Tooltip for the reset label — keeps the full wording the column truncates."""
+        if reset_tooltip:
+            return reset_tooltip
+        if not reset_display:
+            return "리셋 시각을 알 수 없습니다."
+        if reset_display == "초기화 확인 중":
+            return "한도 초기화 시각을 확인하는 중입니다."
+        return reset_display
 
     @staticmethod
     def _data_freshness_text(
@@ -1474,12 +1495,11 @@ class SynapCapWidget(QWidget):
                 )
                 details_layout.addWidget(window_label)
 
-                reset_caption = self._condensed_reset(
-                    reset_display or "리셋 시각 미상"
-                )
-                reset_label = QLabel(reset_caption)
+                reset_label = QLabel(self._condensed_reset(reset_display))
                 reset_label.setWordWrap(False)
-                self._enable_instant_tooltip(reset_label, reset_tooltip)
+                self._enable_instant_tooltip(
+                    reset_label, self._reset_hint(reset_display, reset_tooltip)
+                )
                 reset_label.setStyleSheet("color: #8087A0;")
                 self._set_label_font(
                     reset_label,
@@ -1531,12 +1551,12 @@ class SynapCapWidget(QWidget):
                 self._enable_instant_tooltip(marker_label, window.label)
                 row_layout.addWidget(marker_label)
 
-                reset_label = QLabel(
-                    self._condensed_reset(reset_display or "리셋 시각 미상")
-                )
+                reset_label = QLabel(self._condensed_reset(reset_display))
                 reset_label.setObjectName("resetCountdown")
                 reset_label.setWordWrap(False)
-                self._enable_instant_tooltip(reset_label, reset_tooltip)
+                self._enable_instant_tooltip(
+                    reset_label, self._reset_hint(reset_display, reset_tooltip)
+                )
                 reset_label.setStyleSheet("color: #8087A0;")
                 self._set_label_font(
                     reset_label,

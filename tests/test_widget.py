@@ -90,7 +90,10 @@ class WidgetTests(unittest.TestCase):
     def test_condensed_reset_drops_the_relative_suffix(self):
         self.assertEqual(self.widget._condensed_reset("3시간 17분 후"), "3h 17m")
         self.assertEqual(self.widget._condensed_reset("6일 16시간 후"), "6d 16h")
-        self.assertEqual(self.widget._condensed_reset(""), "리셋 시각 미상")
+        # Long status strings collapse to short forms that fit the reset column.
+        self.assertEqual(self.widget._condensed_reset(""), "미상")
+        self.assertEqual(self.widget._condensed_reset("리셋 시각 미상"), "미상")
+        self.assertEqual(self.widget._condensed_reset("초기화 확인 중"), "확인 중")
         self.assertEqual(self.widget._usage_window_marker("5시간"), "5h")
         self.assertEqual(self.widget._usage_window_marker("주간"), "7d")
 
@@ -907,7 +910,27 @@ class WidgetTests(unittest.TestCase):
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
         self.assertIn("5h", labels)
-        self.assertIn("리셋 시각 미상", labels)
+        reset_label = row.findChild(QLabel, "resetCountdown")
+        self.assertIsNotNone(reset_label)
+        assert reset_label is not None
+        # Column is narrow, so the label is short but the tooltip is explicit.
+        self.assertEqual(reset_label.text(), "미상")
+        self.assertIn("알 수 없", reset_label.toolTip())
+        self.assertGreaterEqual(reset_label.width(), reset_label.sizeHint().width())
+
+    def test_stale_reset_shows_short_label_with_full_tooltip(self):
+        self.widget.provider_ui_map["codex"]["show_five_hour"] = True
+        self.usage.windows = [UsageWindow("5시간", 40, "8/12 13:00", 60)]
+        self.widget.update_data([self.usage])
+
+        reset_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            QLabel, "resetCountdown"
+        )
+        self.assertIsNotNone(reset_label)
+        assert reset_label is not None
+        self.assertEqual(reset_label.text(), "확인 중")
+        self.assertIn("8/12 13:00", reset_label.toolTip())
+        self.assertGreaterEqual(reset_label.width(), reset_label.sizeHint().width())
 
     def test_visual_rebuild_reuses_latest_usage(self):
         self.widget.update_data([self.usage])
