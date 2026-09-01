@@ -548,6 +548,63 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("QFrame#rootFrame", self.widget.frame.styleSheet())
         self.assertIn("border-radius: 6px", self.widget.frame.styleSheet())
 
+    def test_compact_bar_separates_provider_groups_with_hairline_dividers(self):
+        providers = [
+            CodexProvider({"id": "codex", "name": "Codex"}),
+            AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+            ClaudeProvider({"id": "claude", "name": "Claude"}),
+        ]
+        self.widget.rebuild_ui(
+            self.widget.config_data, providers, preserve_usage=False
+        )
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        layout = self.widget.compact_items_layout
+        dividers = [
+            layout.itemAt(i).widget()
+            for i in range(layout.count())
+            if layout.itemAt(i).widget() is not None
+            and layout.itemAt(i).widget().objectName() == "compactDivider"
+        ]
+        self.assertEqual(len(dividers), 2)
+        self.assertTrue(all(d.width() == 1 for d in dividers))
+
+    def test_compact_bar_prints_a_single_percent_sign_for_two_windows(self):
+        provider = AntigravityProvider(
+            {
+                "id": "gemini",
+                "name": "Gemini",
+                "show_five_hour": True,
+                "show_weekly": True,
+            }
+        )
+        self.widget.rebuild_ui(
+            self.widget.config_data, [provider], preserve_usage=False
+        )
+        self.widget.update_data(
+            [
+                ModelUsage(
+                    "gemini",
+                    "Gemini",
+                    "Gemini",
+                    72,
+                    100,
+                    "%",
+                    windows=[
+                        UsageWindow("5시간", 8, "", 92),
+                        UsageWindow("주간", 72, "", 28),
+                    ],
+                )
+            ]
+        )
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        compact_value = self.widget.compact_ui_map["gemini"]["value"]
+        self.assertEqual(compact_value.property("compactPlainText"), "8/72%")
+        self.assertEqual(compact_value.text().count("%"), 1)
+
     def test_loading_uses_animation_and_keeps_existing_rows(self):
         ui = self.widget.provider_ui_map["codex"]
 
@@ -601,7 +658,7 @@ class WidgetTests(unittest.TestCase):
 
         compact_value = self.widget.compact_ui_map["gemini"]["value"]
         compact_item = self.widget.compact_ui_map["gemini"]["item"]
-        self.assertEqual(compact_value.text(), "15%/49%")
+        self.assertEqual(compact_value.text(), "15/49%")
         self.assertGreaterEqual(compact_value.width(), compact_value.sizeHint().width())
         self.assertIn("5시간 15% 사용", compact_item.toolTip())
         self.assertIn("주간 49% 사용", compact_item.toolTip())

@@ -669,11 +669,12 @@ class SynapCapWidget(QWidget):
             "logo_size": max(17, font_size + 5),
             "button_size": max(20, font_size + 9),
             "glyph_size": max(11, font_size),
-            # Keep each icon/value pair compact, but leave enough air between
-            # provider groups that consecutive percentages do not read as one.
+            # Keep each icon/value pair compact. A hairline divider (not spacing
+            # alone) separates provider groups, so the inter-group gap only has
+            # to give the divider a little breathing room on each side.
             "item_spacing": max(4, round(font_size * 0.34)),
             "logo_spacing": max(9, round(font_size * 0.75)),
-            "provider_spacing": max(8, round(font_size * 0.66)),
+            "provider_spacing": max(5, round(font_size * 0.4)),
             "vertical_margin": max(1, round((font_size - 9) * 0.34)),
         }
 
@@ -878,6 +879,16 @@ class SynapCapWidget(QWidget):
         y = available.bottom() - geometry.height() + 1
         self.move(x, max(available.top(), y))
 
+    @staticmethod
+    def _make_compact_divider(metrics: dict) -> QFrame:
+        """A hairline that groups each provider's icon+value into one unit."""
+        divider = QFrame()
+        divider.setObjectName("compactDivider")
+        divider.setFixedWidth(1)
+        divider.setFixedHeight(max(12, metrics["font_size"] + 2))
+        divider.setStyleSheet(f"background-color: {t('line')}; border: none;")
+        return divider
+
     def _build_compact_items(self) -> None:
         metrics = self._compact_metrics()
         self.compact_ui_map.clear()
@@ -890,7 +901,11 @@ class SynapCapWidget(QWidget):
                 widget.setParent(None)
                 widget.deleteLater()
 
-        for provider in self.providers:
+        for index, provider in enumerate(self.providers):
+            if index > 0:
+                self.compact_items_layout.addWidget(
+                    self._make_compact_divider(metrics)
+                )
             provider_type = provider.config.get("type", provider.provider_id)
             item_widget = QWidget()
             item_layout = QHBoxLayout(item_widget)
@@ -1012,7 +1027,17 @@ class SynapCapWidget(QWidget):
         plain_text = str(
             value_label.property("compactPlainText") or value_label.text()
         )
-        text_width = QFontMetrics(value_label.font()).horizontalAdvance(plain_text)
+        # Reserve width for the widest value this label can hold (every number
+        # run padded to at least two digits) so the strip does not reflow as a
+        # percentage ticks from "9%" to "76%".
+        stable_text = re.sub(
+            r"\d+", lambda m: "8" * max(2, len(m.group())), plain_text
+        )
+        font_metrics = QFontMetrics(value_label.font())
+        text_width = max(
+            font_metrics.horizontalAdvance(plain_text),
+            font_metrics.horizontalAdvance(stable_text),
+        )
         safety_padding = max(6, round(font_size * 0.5))
         value_label.setMinimumWidth(
             max(
@@ -1056,23 +1081,25 @@ class SynapCapWidget(QWidget):
             used = max((window.used for window in windows), default=usage.used)
             window_colors = [self._compact_usage_color(w.used) for w in windows]
             plain_value = (
-                "/".join(f"{window.used:.0f}%" for window in windows)
+                "/".join(f"{window.used:.0f}" for window in windows) + "%"
                 if len(windows) > 1
                 else f"{used:.0f}%"
             )
             value_label.setProperty("compactPlainText", plain_value)
             if len(windows) > 1 and len(set(window_colors)) > 1:
-                # Colour each window on its own so "90%/20%" doesn't paint the
-                # calm 20% red just because the 5h window is hot.
+                # Colour each window on its own so "90/20%" doesn't paint the
+                # calm 20 red just because the 5h window is hot. The single
+                # trailing "%" tracks the last window so it reads as one unit.
                 self._apply_compact_value_style(
                     value_label, t("compact_value"), metrics
                 )
                 slash = f'<span style="color:{t("ink_faintest")}">/</span>'
                 value_label.setText(
                     slash.join(
-                        f'<span style="color:{color}">{window.used:.0f}%</span>'
+                        f'<span style="color:{color}">{window.used:.0f}</span>'
                         for window, color in zip(windows, window_colors, strict=True)
                     )
+                    + f'<span style="color:{window_colors[-1]}">%</span>'
                 )
             elif len(windows) > 1:
                 value_label.setText(plain_value)
