@@ -635,6 +635,11 @@ class WidgetTests(unittest.TestCase):
                 resets[1].mapTo(second, resets[1].rect().topLeft()).x(),
                 view,
             )
+            self.assertEqual(resets[0].width(), resets[1].width(), view)
+            if view == "segment":
+                segments = [tile.findChild(SegmentBar) for tile in (first, second)]
+                self.assertEqual(segments[0].width(), segments[1].width())
+                self.assertLessEqual(segments[0].width(), 124)
 
     def test_horizontal_ring_layout_places_provider_cards_in_one_row(self):
         providers: list[BaseAIProvider] = [

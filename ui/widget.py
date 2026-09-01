@@ -1759,7 +1759,12 @@ class SynapCapWidget(QWidget):
             if graph == "segment":
                 graph_widget = SegmentBar(window.used, color)
                 graph_widget.setFixedHeight(max(9, round(vs * 0.68)))
-                tile_layout.addWidget(graph_widget, 1)
+                # A fixed, deliberately compact segment track keeps all ten
+                # cells on one ruler.  The following stretch absorbs spare
+                # width instead of letting short reset text widen the graph.
+                graph_widget.setFixedWidth(max(108, round(vs * 9.4)))
+                tile_layout.addWidget(graph_widget)
+                tile_layout.addStretch(1)
             elif graph == "ring":
                 graph_widget = UsageRing(
                     window.used, color, usage_value_bold, vs, show_value=False
@@ -1781,6 +1786,13 @@ class SynapCapWidget(QWidget):
             )
             reset_label.setStyleSheet(f"color: {t('ink_dim')};")
             self._set_label_font(reset_label, max(9, vs - 2))
+            reset_label.setAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
+            # Reserve one shared reset column for every graph mode.  Without
+            # this, values such as `2m` and `18h 40m` make the graph endpoints
+            # appear ragged even though the percentage column is fixed.
+            reset_label.setFixedWidth(max(52, round(vs * 4.6)))
             tile_layout.addWidget(reset_label)
 
             value_label = QLabel(
