@@ -6,6 +6,8 @@ from pathlib import Path
 from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
 
+from theme import on_change, t
+
 try:
     from PySide6.QtSvg import QSvgRenderer
 except ImportError:  # pragma: no cover - PySide6 desktop builds include QtSvg.
@@ -14,18 +16,16 @@ except ImportError:  # pragma: no cover - PySide6 desktop builds include QtSvg.
 
 # Brand paths are pinned from Simple Icons so the packaged app never fetches
 # remote assets. OpenAI: v15.21.0, Google Gemini: v16.21.0,
-# Claude Code: v16.28.0 (CC0-1.0).
+# Claude Code: v16.28.0 (CC0-1.0).  Colours live in theme.py.
 _PROVIDER_BRANDS = {
     "codex": {
         "path": "M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z",
-        "foreground": "#B4BEFE",
-        "background": "#252B3F",
+        "token": "codex",
         "fallback": "Cx",
     },
     "antigravity": {
         "path": "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81",
-        "foreground": "#A6E3A1",
-        "background": "#26372F",
+        "token": "gemini",
         "fallback": "G",
     },
     "claude": {
@@ -33,38 +33,37 @@ _PROVIDER_BRANDS = {
             "M21 10.5h3v3h-3v3h-1.5v3H18v-3h-1.5v3H15v-3H9v3H7.5v-3"
             "H6v3H4.5v-3H3v-3H0v-3h3v-6h18Zm-15 0h1.5v-3H6Zm10.5 0H18v-3h-1.5z"
         ),
-        "foreground": "#FAB387",
-        "background": "#3A2B2B",
+        "token": "claude",
         "fallback": "Cl",
     },
 }
 
 
+def _brand_colors(token: str | None) -> tuple[str, str]:
+    if token:
+        return t(f"provider_{token}_fg"), t(f"provider_{token}_bg")
+    return t("provider_fallback_fg"), t("provider_fallback_bg")
+
+
 @lru_cache(maxsize=24)
 def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
     """Render a local, network-free brand badge for a usage provider."""
-    brand = _PROVIDER_BRANDS.get(provider_type)
-    if brand is None:
-        brand = {
-            "path": "",
-            "foreground": "#CDD6F4",
-            "background": "#313244",
-            "fallback": "AI",
-        }
+    brand = _PROVIDER_BRANDS.get(provider_type, {"path": "", "token": None, "fallback": "AI"})
+    foreground, background = _brand_colors(brand["token"])
 
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(QColor(brand["background"]))
+    painter.setBrush(QColor(background))
     radius = max(5.0, size * 0.24)
     painter.drawRoundedRect(QRectF(0, 0, size, size), radius, radius)
 
     if QSvgRenderer is not None and brand["path"]:
         svg = (
             '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">'
-            f'<path fill="{brand["foreground"]}" d="{brand["path"]}"/>'
+            f'<path fill="{foreground}" d="{brand["path"]}"/>'
             "</svg>"
         )
         renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
@@ -74,7 +73,7 @@ def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
             QRectF(inset, inset, size - (inset * 2), size - (inset * 2)),
         )
     else:
-        painter.setPen(QColor(brand["foreground"]))
+        painter.setPen(QColor(foreground))
         painter.setFont(QFont("Segoe UI", max(7, round(size * 0.28)), QFont.Weight.Bold))
         painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, brand["fallback"])
 
@@ -86,13 +85,9 @@ def create_provider_icon(provider_type: str, size: int = 24) -> QIcon:
     return QIcon(create_provider_pixmap(provider_type, size))
 
 
-def create_app_icon(size: int = 32) -> QIcon:
-    pixmap = create_app_pixmap(size)
-    return QIcon(pixmap)
-
-
-@lru_cache(maxsize=1)
-def _app_logo_source() -> QPixmap:
+@lru_cache(maxsize=8)
+def _asset_bytes(name: str) -> bytes:
+    """Read an SVG/asset from the PyInstaller bundle or the repo, network-free."""
     roots: list[Path] = []
     bundle_root = getattr(sys, "_MEIPASS", None)
     if bundle_root:
@@ -100,61 +95,104 @@ def _app_logo_source() -> QPixmap:
     roots.append(Path(__file__).resolve().parents[1])
 
     for root in roots:
-        source = QPixmap(str(root / "assets" / "synapcap-logo-source.png"))
-        if not source.isNull():
-            return source
-    return QPixmap()
+        try:
+            return (root / "assets" / name).read_bytes()
+        except OSError:
+            continue
+    return b""
 
 
-def create_app_pixmap(size: int = 32) -> QPixmap:
-    pixmap = QPixmap(size, size)
+def _render_svg(data: bytes, width: int, height: int) -> QPixmap | None:
+    """Rasterise an SVG into a transparent pixmap, preserving its aspect ratio."""
+    if not data or QSvgRenderer is None:
+        return None
+    renderer = QSvgRenderer(QByteArray(data))
+    if not renderer.isValid():
+        return None
+
+    pixmap = QPixmap(max(1, width), max(1, height))
     pixmap.fill(QColor(0, 0, 0, 0))
 
-    source = _app_logo_source()
-    if not source.isNull():
-        # The supplied artwork has intentionally transparent export margins.
-        # Crop only those margins so small tray icons stay optically centered.
-        cropped = source.copy(50, 15, 1199, 1199)
-        target_size = max(1, round(size * 0.96))
-        scaled = cropped.scaled(
-            target_size,
-            target_size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+    view_box = renderer.viewBoxF()
+    if view_box.width() > 0 and view_box.height() > 0:
+        scale = min(width / view_box.width(), height / view_box.height())
+        drawn_w = view_box.width() * scale
+        drawn_h = view_box.height() * scale
+        target = QRectF(
+            (width - drawn_w) / 2.0,
+            (height - drawn_h) / 2.0,
+            drawn_w,
+            drawn_h,
         )
-        painter = QPainter(pixmap)
-        painter.drawPixmap(
-            (size - scaled.width()) // 2,
-            (size - scaled.height()) // 2,
-            scaled,
-        )
-        painter.end()
-        return pixmap
+    else:
+        target = QRectF(0, 0, width, height)
 
-    # Keep a code-rendered fallback for incomplete source checkouts.
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    renderer.render(painter, target)
+    painter.end()
+    return pixmap
 
-    # Background Circle (Catppuccin Base #1E1E2E)
-    painter.setBrush(QColor("#1E1E2E"))
-    painter.setPen(QColor("#89B4FA"))
-    painter.drawEllipse(1, 1, size - 2, size - 2)
 
-    # 'S' Text Logo (Catppuccin Blue #89B4FA)
-    painter.setPen(QColor("#89B4FA"))
-    font_size = int(size * 0.45)
-    font = QFont("Segoe UI", font_size, QFont.Weight.Bold)
+def _themed_brand_asset(name: str) -> bytes:
+    """Recolour in-app logo art while leaving the packaged app tile fixed."""
+    data = _asset_bytes(name)
+    replacements = {
+        b"#5B8DEF": t("logo_mark").encode("ascii"),
+        b"#EAEEF7": t("logo_text").encode("ascii"),
+        b"#363B4D": t("logo_track").encode("ascii"),
+    }
+    for source, replacement in replacements.items():
+        data = data.replace(source, replacement)
+    return data
+
+
+@lru_cache(maxsize=16)
+def create_app_pixmap(size: int = 32) -> QPixmap:
+    """The transparent gauge mark, for in-app use (compact bar, etc.)."""
+    rendered = _render_svg(_themed_brand_asset("logo.svg"), size, size)
+    if rendered is not None:
+        return rendered
+
+    # Code-drawn fallback for checkouts without the SVG assets.
+    pixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QColor(t("logo_mark")))
+    font = QFont("Segoe UI", max(1, int(size * 0.5)), QFont.Weight.Bold)
     painter.setFont(font)
-    # Font metrics make the glyph look slightly low even with AlignCenter.
-    # Shift only the visual glyph upward while keeping the circle centered.
-    text_offset = max(1.0, size * 0.03)
     painter.drawText(
-        QRectF(0, -text_offset, size, size),
+        QRectF(0, -max(1.0, size * 0.03), size, size),
         Qt.AlignmentFlag.AlignCenter,
         "S",
     )
-
     painter.end()
+    return pixmap
+
+
+@lru_cache(maxsize=16)
+def create_app_icon_pixmap(size: int = 32) -> QPixmap:
+    """The mark on its near-black tile — for window / tray / installer icons,
+    where it must read on both light and dark system chrome."""
+    rendered = _render_svg(_asset_bytes("logo-icon.svg"), size, size)
+    if rendered is not None:
+        return rendered
+    return create_app_pixmap(size)
+
+
+def create_app_icon(size: int = 32) -> QIcon:
+    return QIcon(create_app_icon_pixmap(size))
+
+
+@lru_cache(maxsize=12)
+def create_wordmark_pixmap(width: int = 96, height: int = 30) -> QPixmap:
+    """The SynapCap wordmark, scaled for title bars."""
+    rendered = _render_svg(_themed_brand_asset("wordmark.svg"), width, height)
+    if rendered is not None:
+        return rendered
+    pixmap = QPixmap(width, height)
+    pixmap.fill(QColor(0, 0, 0, 0))
     return pixmap
 
 
@@ -166,14 +204,13 @@ def create_status_dot_pixmap(status_type: str = "success", size: int = 12) -> QP
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
     if status_type in ("success", "connected", "active"):
-        main_color = QColor("#A6E3A1")  # Green
-        glow_color = QColor(166, 227, 161, 80)
+        main_color = QColor(t("good"))  # Green
     elif status_type in ("error", "failed"):
-        main_color = QColor("#F38BA8")  # Red
-        glow_color = QColor(243, 139, 168, 80)
+        main_color = QColor(t("danger"))  # Red
     else:  # warning / demo / no_key
-        main_color = QColor("#F9E2AF")  # Yellow
-        glow_color = QColor(249, 226, 175, 80)
+        main_color = QColor(t("warn_soft"))  # Yellow
+    glow_color = QColor(main_color)
+    glow_color.setAlpha(80)
 
     center = size / 2.0
 
@@ -195,8 +232,9 @@ def create_status_dot_pixmap(status_type: str = "success", size: int = 12) -> QP
 # ==========================================
 
 
-def create_plus_icon(size: int = 16, color: str = "#11111B") -> QIcon:
+def create_plus_icon(size: int = 16, color: str | None = None) -> QIcon:
     """플러스(+) 아이콘"""
+    color = color or t("on_accent")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -214,8 +252,9 @@ def create_plus_icon(size: int = 16, color: str = "#11111B") -> QIcon:
     return QIcon(pixmap)
 
 
-def create_arrow_up_icon(size: int = 16, color: str = "#CDD6F4") -> QIcon:
+def create_arrow_up_icon(size: int = 16, color: str | None = None) -> QIcon:
     """위로 화살표(▲) 아이콘 (대칭 Center Y 정밀 정렬)"""
+    color = color or t("ink")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -235,8 +274,9 @@ def create_arrow_up_icon(size: int = 16, color: str = "#CDD6F4") -> QIcon:
     return QIcon(pixmap)
 
 
-def create_arrow_down_icon(size: int = 16, color: str = "#CDD6F4") -> QIcon:
+def create_arrow_down_icon(size: int = 16, color: str | None = None) -> QIcon:
     """아래로 화살표(▼) 아이콘 (대칭 Center Y 정밀 정렬)"""
+    color = color or t("ink")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -256,8 +296,9 @@ def create_arrow_down_icon(size: int = 16, color: str = "#CDD6F4") -> QIcon:
     return QIcon(pixmap)
 
 
-def create_trash_icon(size: int = 16, color: str = "#11111B") -> QIcon:
+def create_trash_icon(size: int = 16, color: str | None = None) -> QIcon:
     """쓰레기통 삭제 아이콘"""
+    color = color or t("on_accent")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -279,8 +320,9 @@ def create_trash_icon(size: int = 16, color: str = "#11111B") -> QIcon:
     return QIcon(pixmap)
 
 
-def create_power_icon(size: int = 16, color: str = "#EBA0AC") -> QIcon:
+def create_power_icon(size: int = 16, color: str | None = None) -> QIcon:
     """프로그램 종료(Power/Quit) 전원 아이콘 (차분한 모던 톤)"""
+    color = color or t("danger_soft")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -301,8 +343,9 @@ def create_power_icon(size: int = 16, color: str = "#EBA0AC") -> QIcon:
     return QIcon(pixmap)
 
 
-def create_refresh_icon(size: int = 16, color: str = "#89B4FA") -> QIcon:
+def create_refresh_icon(size: int = 16, color: str | None = None) -> QIcon:
     """지금 새로고침(Refresh) 순환 아이콘"""
+    color = color or t("accent")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -330,9 +373,10 @@ def create_refresh_icon(size: int = 16, color: str = "#89B4FA") -> QIcon:
 def create_usage_view_icon(
     target_view: str = "ring",
     size: int = 16,
-    color: str = "#A6ADC8",
+    color: str | None = None,
 ) -> QIcon:
     """Icon for switching between the compact bar and ring usage views."""
+    color = color or t("ink_mid")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -344,14 +388,28 @@ def create_usage_view_icon(
     if target_view == "ring":
         rect = QRectF(size * 0.18, size * 0.18, size * 0.64, size * 0.64)
         painter.drawEllipse(rect)
-        accent_pen = QPen(QColor("#89B4FA"), 2.2)
+        accent_pen = QPen(QColor(t("accent")), 2.2)
         accent_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(accent_pen)
         painter.drawArc(rect, 90 * 16, -130 * 16)
-    else:
+    elif target_view == "segment":
+        seg_w = size * 0.14
+        for i in range(4):
+            x = size * 0.16 + i * (seg_w + size * 0.06)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(t("accent") if i < 2 else color))
+            painter.drawRoundedRect(
+                QRectF(x, size * 0.4, seg_w, size * 0.2), 1.5, 1.5
+            )
+    elif target_view == "number":
+        painter.setPen(QColor(color))
+        font = QFont("Segoe UI", max(6, round(size * 0.5)), QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "%")
+    else:  # bar
         starts = (0.26, 0.50, 0.74)
         lengths = (0.42, 0.68, 0.54)
-        for y, length in zip(starts, lengths):
+        for y, length in zip(starts, lengths, strict=True):
             painter.drawLine(
                 QPointF(size * 0.18, size * y),
                 QPointF(size * (0.18 + length), size * y),
@@ -361,8 +419,9 @@ def create_usage_view_icon(
     return QIcon(pixmap)
 
 
-def create_settings_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
+def create_settings_icon(size: int = 16, color: str | None = None) -> QIcon:
     """누가 봐도 명확한 6-Teeth 톱니바퀴(Gear Cog) 백터 아이콘"""
+    color = color or t("ink_mid")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -419,8 +478,9 @@ def create_settings_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
     return QIcon(pixmap)
 
 
-def create_close_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
+def create_close_icon(size: int = 16, color: str | None = None) -> QIcon:
     """창 숨기기/닫기(✕) 백터 아이콘 (정밀 정렬용)"""
+    color = color or t("ink_mid")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -438,8 +498,9 @@ def create_close_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
     return QIcon(pixmap)
 
 
-def create_minimize_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
+def create_minimize_icon(size: int = 16, color: str | None = None) -> QIcon:
     """작업 표시줄/Dock 최소화용 가로선 아이콘."""
+    color = color or t("ink_mid")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
@@ -455,3 +516,10 @@ def create_minimize_icon(size: int = 16, color: str = "#A6ADC8") -> QIcon:
 
     painter.end()
     return QIcon(pixmap)
+
+
+# Drop cached pixmaps that bake in palette colours when the theme swaps.
+on_change(create_provider_pixmap.cache_clear)
+on_change(create_app_pixmap.cache_clear)
+on_change(create_app_icon_pixmap.cache_clear)
+on_change(create_wordmark_pixmap.cache_clear)

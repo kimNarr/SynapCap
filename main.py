@@ -11,6 +11,7 @@ from diagnostics import build_diagnostic_report
 from providers import load_providers_from_config
 from release_notes import consume_whats_new, release_url
 from single_instance import SingleInstanceGuard
+from theme import apply_theme_setting, current_setting, palette
 from ui import SettingsDialog, SynapCapTray, SynapCapWidget, create_app_icon
 from updates import UpdateCheckWorker, UpdateDownloadWorker, UpdateInfo
 from usage_alerts import update_usage_alert_state
@@ -18,6 +19,35 @@ from version import APP_VERSION
 from workers import UsageWorker
 
 UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+
+_CONFIRM_QUIT_QSS = """
+    QMessageBox {
+        background-color: %(ground)s;
+    }
+    QMessageBox QLabel {
+        color: %(ink)s;
+    }
+    QMessageBox QLabel#qt_msgbox_label,
+    QMessageBox QLabel#qt_msgbox_informativelabel {
+        min-width: 240px;
+    }
+    QMessageBox QPushButton {
+        min-width: 60px;
+        padding: 5px 10px;
+        border: 1px solid %(settings_border)s;
+        border-radius: 5px;
+        background-color: %(control)s;
+        color: %(ink)s;
+    }
+    QMessageBox QPushButton:hover {
+        border-color: %(accent)s;
+        background-color: %(separator)s;
+    }
+    QMessageBox QPushButton:default {
+        border-color: %(accent)s;
+        color: %(accent)s;
+    }
+"""
 
 
 def _provider_settings_changed(previous: dict, current: dict) -> bool:
@@ -77,34 +107,7 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
     dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
     dialog.setDefaultButton(QMessageBox.StandardButton.No)
     dialog.setEscapeButton(QMessageBox.StandardButton.No)
-    dialog.setStyleSheet("""
-        QMessageBox {
-            background-color: #1E1E2E;
-        }
-        QMessageBox QLabel {
-            color: #CDD6F4;
-        }
-        QMessageBox QLabel#qt_msgbox_label,
-        QMessageBox QLabel#qt_msgbox_informativelabel {
-            min-width: 240px;
-        }
-        QMessageBox QPushButton {
-            min-width: 60px;
-            padding: 5px 10px;
-            border: 1px solid #45475A;
-            border-radius: 5px;
-            background-color: #313244;
-            color: #CDD6F4;
-        }
-        QMessageBox QPushButton:hover {
-            border-color: #89B4FA;
-            background-color: #45475A;
-        }
-        QMessageBox QPushButton:default {
-            border-color: #89B4FA;
-            color: #89B4FA;
-        }
-    """)
+    dialog.setStyleSheet(_CONFIRM_QUIT_QSS % palette())
 
     exit_button = dialog.button(QMessageBox.StandardButton.Yes)
     cancel_button = dialog.button(QMessageBox.StandardButton.No)
@@ -160,7 +163,6 @@ def main():
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("SynapCap")
     app.setApplicationVersion(APP_VERSION)
-    app.setWindowIcon(create_app_icon(64))
     single_instance = SingleInstanceGuard(parent=app)
     if not single_instance.acquire():
         return
@@ -170,6 +172,8 @@ def main():
     show_whats_new = consume_whats_new(config_data)
     save_config(config_data)
     settings = config_data.get("settings", {})
+    apply_theme_setting(settings.get("theme", "auto"))
+    app.setWindowIcon(create_app_icon(64))
     refresh_interval = settings.get("refresh_interval_sec", 30)
     always_on_top = settings.get("always_on_top", True)
 
@@ -182,6 +186,21 @@ def main():
 
     # 4. System Tray 생성
     tray = SynapCapTray(parent_widget=widget, always_on_top=always_on_top)
+    active_settings_dialog: SettingsDialog | None = None
+
+    def apply_active_theme() -> None:
+        widget.apply_theme()
+        tray.apply_theme()
+        app.setWindowIcon(create_app_icon(64))
+        if active_settings_dialog is not None:
+            active_settings_dialog.restyle()
+
+    def on_system_scheme_changed(_scheme=None) -> None:
+        if current_setting() == "auto":
+            apply_theme_setting("auto")
+            apply_active_theme()
+
+    app.styleHints().colorSchemeChanged.connect(on_system_scheme_changed)
 
     def show_widget():
         if widget.isMinimized():
@@ -264,10 +283,26 @@ def main():
 
     # 6. GUI Settings Dialog 오픈 및 Hot-Reload 연결
     def open_settings_dialog():
+        nonlocal active_settings_dialog
         dialog = SettingsDialog(config_data, parent=widget)
+        active_settings_dialog = dialog
         dialog.feedback_requested.connect(
             lambda url: QDesktopServices.openUrl(QUrl(url))
         )
+
+        def apply_preview(preview_config: dict):
+            # Preview is deliberately visual-only. Provider edits still require
+            # Save so no accidental CLI query or config write can occur.
+            preview_theme = preview_config.get("settings", {}).get("theme", "auto")
+            apply_theme_setting(preview_theme)
+            widget.rebuild_ui(preview_config, providers, preserve_usage=True)
+            apply_active_theme()
+
+        def revert_preview():
+            saved_theme = config_data.get("settings", {}).get("theme", "auto")
+            apply_theme_setting(saved_theme)
+            widget.rebuild_ui(config_data, providers, preserve_usage=True)
+            apply_active_theme()
 
         def handle_config_saved(new_config: dict):
             nonlocal config_data, providers
@@ -280,6 +315,7 @@ def main():
                 new_config,
                 "check_updates",
             )
+            theme_changed = _setting_changed(previous_config, new_config, "theme")
             config_data = new_config
 
             # synapcap.json 저장
@@ -297,6 +333,11 @@ def main():
                 providers,
                 preserve_usage=not provider_query_changed,
             )
+            if theme_changed:
+                apply_theme_setting(
+                    config_data.get("settings", {}).get("theme", "auto")
+                )
+                apply_active_theme()
 
             if interval_changed:
                 worker.set_interval(config_data.get("settings", {}).get("refresh_interval_sec", 30))
@@ -314,7 +355,12 @@ def main():
             tray.always_top_action.setChecked(new_always_top)
 
         dialog.config_saved.connect(handle_config_saved)
-        dialog.exec()
+        dialog.preview_requested.connect(apply_preview)
+        dialog.preview_reverted.connect(revert_preview)
+        try:
+            dialog.exec()
+        finally:
+            active_settings_dialog = None
 
     def open_provider_diagnostics(provider_id: str):
         provider_config = next(
@@ -367,10 +413,6 @@ def main():
         config_data["settings"]["always_on_top"] = checked
         save_config(config_data)
         widget.set_always_on_top(checked)
-
-    def handle_view_mode_changed(mode: str):
-        config_data.setdefault("settings", {})["usage_view"] = mode
-        save_config(config_data)
 
     quit_in_progress = False
 
@@ -495,7 +537,6 @@ def main():
 
     widget.settings_requested.connect(open_settings_dialog)
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
-    widget.view_mode_changed.connect(handle_view_mode_changed)
     widget.update_requested.connect(start_one_click_update)
     widget.diagnostics_requested.connect(open_provider_diagnostics)
     widget.quit_requested.connect(request_quit)

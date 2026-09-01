@@ -49,6 +49,12 @@ class UpdateInstallerTests(unittest.TestCase):
 
 
 class SettingsChangeTests(unittest.TestCase):
+    def test_theme_setting_change_is_detected(self):
+        previous = {"settings": {"theme": "dark"}}
+        current = {"settings": {"theme": "light"}}
+
+        self.assertTrue(_setting_changed(previous, current, "theme"))
+
     def test_visual_setting_does_not_change_providers(self):
         previous = {
             "settings": {"usage_value_bold": True},

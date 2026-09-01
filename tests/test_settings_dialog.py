@@ -5,7 +5,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import QApplication, QDialog, QFormLayout
+from PySide6.QtWidgets import QApplication, QDialog, QFormLayout, QLabel, QPushButton
 
 from config import get_default_config
 from ui.settings_dialog import SettingsDialog, StyledCheckBox
@@ -62,6 +62,7 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertTrue(self.dialog.windowFlags() & Qt.WindowType.FramelessWindowHint)
         self.assertEqual(self.dialog.title_bar.height(), 38)
         self.assertEqual(self.dialog.title_bar.close_button.text(), "×")
+        self.assertFalse(self.dialog.title_bar.findChild(QLabel).pixmap().isNull())
 
         self.dialog.title_bar.close_button.click()
 
@@ -90,7 +91,7 @@ class SettingsDialogTests(unittest.TestCase):
         }
 
         self.assertEqual(radii, {4, 5, 6})
-        self.assertIn("border: 2px solid #45475A", style)
+        self.assertIn("border: 2px solid #353C4B", style)
         self.assertIn("QLineEdit, QSpinBox", style)
         self.assertIn("QComboBox", style)
         self.assertIn("border-radius: 5px", style)
@@ -99,26 +100,135 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertFalse(hasattr(self.dialog, "width_spin"))
         self.assertFalse(hasattr(self.dialog, "size_combo"))
 
-    def test_expanded_and_compact_font_controls_are_independent(self):
-        self.assertEqual(self.dialog.expanded_font_spin.value(), 13)
-        self.assertTrue(self.dialog.expanded_font_bold_check.isChecked())
-        self.assertEqual(self.dialog.compact_font_spin.value(), 12)
-        self.assertTrue(self.dialog.compact_font_bold_check.isChecked())
+    def test_widget_scale_replaces_independent_font_controls(self):
+        self.assertEqual(self.dialog.widget_scale_combo.currentData(), "medium")
+        self.assertFalse(hasattr(self.dialog, "expanded_font_spin"))
+        self.assertFalse(hasattr(self.dialog, "compact_font_spin"))
 
-        self.dialog.expanded_font_spin.setValue(17)
-        self.dialog.expanded_font_bold_check.setChecked(False)
-        self.dialog.compact_font_spin.setValue(15)
-        self.dialog.compact_font_bold_check.setChecked(False)
+        self.dialog.widget_scale_combo.setCurrentIndex(
+            self.dialog.widget_scale_combo.findData("large")
+        )
 
         saved = []
         self.dialog.config_saved.connect(saved.append)
         self.dialog.on_save()
 
         settings = saved[0]["settings"]
-        self.assertEqual(settings["expanded_font_size"], 17)
-        self.assertFalse(settings["expanded_font_bold"])
-        self.assertEqual(settings["compact_font_size"], 15)
-        self.assertFalse(settings["compact_font_bold"])
+        self.assertEqual(settings["widget_scale"], "large")
+        self.assertNotIn("expanded_font_size", settings)
+        self.assertNotIn("compact_font_size", settings)
+
+    def test_theme_selector_round_trips_and_previews_immediately(self):
+        self.assertEqual(self.dialog.theme_combo.currentData(), "auto")
+        previewed = []
+        self.dialog.preview_requested.connect(previewed.append)
+
+        self.dialog.theme_combo.setCurrentIndex(
+            self.dialog.theme_combo.findData("light")
+        )
+
+        self.assertEqual(previewed[-1]["settings"]["theme"], "light")
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+        self.assertEqual(saved[0]["settings"]["theme"], "light")
+
+    def test_restyle_preserves_unsaved_form_values(self):
+        self.dialog.interval_spin.setValue(45)
+        self.dialog.restyle()
+
+        self.assertEqual(self.dialog.interval_spin.value(), 45)
+        self.assertFalse(self.dialog.title_bar.wordmark_label.pixmap().isNull())
+
+    def test_graph_shape_picker_shows_every_shape_with_a_preview_icon(self):
+        picker = self.dialog.graph_picker
+        keys = [key for key, _label in picker._SHAPES]
+        self.assertEqual(keys, ["bar", "segment", "ring", "number"])
+        for key in keys:
+            button = picker._buttons[key]
+            self.assertFalse(button.icon().isNull())
+        self.assertTrue(picker._buttons["bar"].isChecked())
+
+    def test_graph_shape_selector_round_trips_usage_view(self):
+        self.assertEqual(
+            self.dialog.graph_picker.current_data(),
+            self.dialog.config_data["settings"].get("usage_view", "bar"),
+        )
+        previewed = []
+        self.dialog.preview_requested.connect(previewed.append)
+        self.dialog.graph_picker.choose("segment")
+        self.assertEqual(previewed[-1]["settings"]["usage_view"], "segment")
+
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+        self.assertEqual(saved[0]["settings"]["usage_view"], "segment")
+
+    def test_ring_layout_selector_is_scoped_to_ring_view_and_saved(self):
+        self.assertFalse(self.dialog.ring_layout_combo.isEnabled())
+        self.dialog.graph_picker.choose("ring")
+        self.assertTrue(self.dialog.ring_layout_combo.isEnabled())
+        self.dialog.ring_layout_combo.setCurrentIndex(
+            self.dialog.ring_layout_combo.findData("horizontal")
+        )
+
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+
+        self.assertEqual(saved[0]["settings"]["ring_layout"], "horizontal")
+
+    def test_preview_applies_visual_settings_without_persisting_them(self):
+        self.dialog.widget_scale_combo.setCurrentIndex(
+            self.dialog.widget_scale_combo.findData("large")
+        )
+        previewed = []
+        self.dialog.preview_requested.connect(previewed.append)
+
+        self.dialog.on_preview()
+
+        self.assertEqual(previewed[0]["settings"]["widget_scale"], "large")
+        self.assertEqual(self.dialog.config_data["settings"]["widget_scale"], "medium")
+
+    def test_add_is_disabled_when_all_supported_providers_are_present(self):
+        self.assertEqual(len(self.dialog.provider_widgets), 3)
+        self.assertFalse(self.dialog.add_btn.isEnabled())
+        self.assertIn("각각 하나", self.dialog.add_btn.toolTip())
+
+    def test_add_enables_only_for_a_missing_provider_type(self):
+        config = get_default_config()
+        config["providers"] = config["providers"][:2]
+        dialog = SettingsDialog(config)
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertTrue(dialog.add_btn.isEnabled())
+        dialog.on_add_provider()
+        self.assertEqual(len(dialog.provider_widgets), 3)
+        self.assertEqual(dialog.provider_widgets[-1]["type_combo"].currentData(), "claude")
+        self.assertFalse(dialog.add_btn.isEnabled())
+
+    def test_provider_card_uses_a_compact_header_instead_of_a_fieldset_title(self):
+        item = self._provider_item("codex")
+
+        self.assertEqual(item["group"].title(), "")
+        self.assertEqual(item["header_title"].text(), "Codex")
+        self.assertFalse(item["header_icon"].pixmap().isNull())
+
+    def test_apply_button_applies_visual_preview_without_saving(self):
+        button = self.dialog.findChild(QPushButton, "previewBtn")
+
+        self.assertIsNotNone(button)
+        assert button is not None
+        self.assertEqual(button.text(), "적용")
+        self.assertIn("저장하지 않고", button.toolTip())
+
+    def test_cancel_after_preview_requests_a_visual_revert(self):
+        reverted = []
+        self.dialog.preview_reverted.connect(lambda: reverted.append(True))
+        self.dialog.on_preview()
+        self.dialog.reject()
+
+        self.assertEqual(reverted, [True])
 
     def test_usage_alert_threshold_is_enabled_and_saved_explicitly(self):
         self.assertFalse(self.dialog.usage_alert_check.isChecked())
@@ -138,6 +248,7 @@ class SettingsDialogTests(unittest.TestCase):
         item = self._provider_item("antigravity")
 
         self.assertIsInstance(self.dialog.always_top_check, StyledCheckBox)
+        self.assertIsInstance(self.dialog.dock_above_taskbar_check, StyledCheckBox)
         self.assertIsInstance(item["enabled_check"], StyledCheckBox)
         self.assertIsInstance(item["five_hour_check"], StyledCheckBox)
         self.assertNotIn("data:image", self.dialog.styleSheet())

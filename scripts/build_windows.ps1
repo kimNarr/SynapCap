@@ -75,7 +75,9 @@ try {
         --onedir `
         --name SynapCap `
         --icon "assets\synapcap.ico" `
-        --add-data "assets\synapcap-logo-source.png;assets" `
+        --add-data "assets\logo.svg;assets" `
+        --add-data "assets\logo-icon.svg;assets" `
+        --add-data "assets\wordmark.svg;assets" `
         --version-file $versionFile `
         main.py
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }

@@ -5,19 +5,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseScriptTests(unittest.TestCase):
-    def test_logo_source_is_packaged_for_both_desktop_builds(self):
+    def test_brand_assets_are_packaged_for_both_desktop_builds(self):
         windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(
             encoding="utf-8"
         )
         macos_script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
 
-        self.assertTrue((ROOT / "assets" / "synapcap-logo-source.png").is_file())
-        self.assertIn(
-            '--add-data "assets\\synapcap-logo-source.png;assets"', windows_script
+        for name in ("logo.svg", "logo-icon.svg", "wordmark.svg"):
+            self.assertTrue((ROOT / "assets" / name).is_file(), name)
+            self.assertIn(f'--add-data "assets\\{name};assets"', windows_script)
+            self.assertIn(f'--add-data "assets/{name}:assets"', macos_script)
+
+    def test_icon_generation_runs_before_pyinstaller_in_both_builds(self):
+        windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(
+            encoding="utf-8"
         )
-        self.assertIn(
-            '--add-data "assets/synapcap-logo-source.png:assets"', macos_script
-        )
+        macos_script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
+
+        for script in (windows_script, macos_script):
+            self.assertIn("generate_icons.py", script)
+            self.assertLess(
+                script.index("generate_icons.py"), script.index("PyInstaller")
+            )
 
     def test_windows_shortcuts_use_a_versioned_icon_path(self):
         script = (ROOT / "packaging" / "windows" / "SynapCap.iss").read_text(

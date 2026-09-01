@@ -2,9 +2,33 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 from feedback import FEEDBACK_CHOOSER_URL
+from theme import palette
 from version import APP_VERSION
 
 from .icon import create_app_icon
+
+_MENU_QSS = """
+    QMenu {
+        background-color: %(ground)s;
+        color: %(ink)s;
+        border: 1px solid %(line_strong)s;
+        border-radius: 6px;
+        padding: 4px;
+    }
+    QMenu::item {
+        padding: 6px 20px;
+        border-radius: 4px;
+    }
+    QMenu::item:selected {
+        background-color: %(hover)s;
+        color: %(accent)s;
+    }
+    QMenu::separator {
+        height: 1px;
+        background-color: %(line)s;
+        margin: 4px 0px;
+    }
+"""
 
 
 class SynapCapTray(QObject):
@@ -35,28 +59,7 @@ class SynapCapTray(QObject):
 
     def init_menu(self):
         menu = QMenu()
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1E1E2E;
-                color: #CDD6F4;
-                border: 1px solid #313244;
-                border-radius: 6px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 6px 20px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #313244;
-                color: #89B4FA;
-            }
-            QMenu::separator {
-                height: 1px;
-                background-color: #313244;
-                margin: 4px 0px;
-            }
-        """)
+        menu.setStyleSheet(_MENU_QSS % palette())
 
         self.show_hide_action = menu.addAction("위젯 표시/숨기기")
         self.show_hide_action.triggered.connect(self.toggle_widget_requested.emit)
@@ -96,6 +99,13 @@ class SynapCapTray(QObject):
         self.quit_action.triggered.connect(self.quit_requested.emit)
 
         self.tray_icon.setContextMenu(menu)
+
+    def apply_theme(self) -> None:
+        menu = self.tray_icon.contextMenu()
+        if menu is not None:
+            menu.setStyleSheet(_MENU_QSS % palette())
+            menu.update()
+        self.tray_icon.setIcon(create_app_icon(32))
 
     def _on_activated(self, reason):
         if reason in (
