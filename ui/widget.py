@@ -30,7 +30,6 @@ from .icon import (
     create_provider_pixmap,
     create_refresh_icon,
     create_settings_icon,
-    create_usage_view_icon,
     create_wordmark_pixmap,
 )
 
@@ -38,14 +37,8 @@ from .icon import (
 # zone feels natural and avoids leaving a narrow unusable gap near an edge.
 EDGE_SNAP_DISTANCE = 48
 
-# Graph shapes for the expanded usage tile, in the header-cycle order.
+# Graph shapes for the expanded usage tile. The shape is chosen in Settings.
 USAGE_VIEWS = ("bar", "segment", "ring", "number")
-USAGE_VIEW_NAMES = {
-    "bar": "막대",
-    "segment": "세그먼트",
-    "ring": "링",
-    "number": "숫자",
-}
 ResizeAnchor = tuple[QPoint, bool, bool]
 
 WIDGET_SCALE_PRESETS = {
@@ -344,7 +337,6 @@ class SynapCapWidget(QWidget):
     quit_requested = Signal()
     update_requested = Signal(str)
     diagnostics_requested = Signal(str)
-    view_mode_changed = Signal(str)
 
     def __init__(self, config_data: dict, providers: list[BaseAIProvider]):
         super().__init__()
@@ -436,15 +428,6 @@ class SynapCapWidget(QWidget):
         header_layout.addStretch()
 
         btn_style = _ICON_BTN_QSS % palette()
-
-        # Usage graph mode toggle (bar/ring)
-        self.view_btn = QPushButton()
-        self.view_btn.setFixedSize(22, 22)
-        self.view_btn.setStyleSheet(btn_style)
-        self.view_btn.clicked.connect(self._toggle_usage_view)
-        self._update_view_button()
-        self._enable_instant_tooltip(self.view_btn, self.view_btn.toolTip())
-        header_layout.addWidget(self.view_btn)
 
         # 1) 지금 새로고침 버튼 (Refresh Now Vector Icon Button)
         self.refresh_btn = QPushButton()
@@ -546,7 +529,6 @@ class SynapCapWidget(QWidget):
         self.frame.setStyleSheet(_ROOT_FRAME_QSS % palette())
         button_style = _ICON_BTN_QSS % palette()
         for button in (
-            self.view_btn,
             self.refresh_btn,
             self.settings_btn,
             self.minimize_btn,
@@ -562,7 +544,6 @@ class SynapCapWidget(QWidget):
         self.settings_btn.setIcon(create_settings_icon(14, t("ink_mid")))
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
         self.close_btn.setIcon(create_close_icon(14, t("danger_soft")))
-        self._update_view_button()
         self._set_version_badge_style(bool(self._update_url))
         self._apply_compact_metrics()
 
@@ -1129,17 +1110,6 @@ class SynapCapWidget(QWidget):
                 self._update_expand_direction(resize_anchor)
                 self._schedule_fit_to_content(resize_anchor)
 
-    def _next_usage_view(self) -> str:
-        order = USAGE_VIEWS
-        return order[(order.index(self.usage_view) + 1) % len(order)]
-
-    def _update_view_button(self):
-        nxt = self._next_usage_view()
-        self.view_btn.setIcon(create_usage_view_icon(nxt, 14))
-        self.view_btn.setToolTip(
-            f"그래프: {USAGE_VIEW_NAMES[self.usage_view]} → {USAGE_VIEW_NAMES[nxt]}"
-        )
-
     def _set_version_badge_style(self, update_available: bool) -> None:
         if update_available:
             foreground = t("on_accent")
@@ -1174,17 +1144,6 @@ class SynapCapWidget(QWidget):
     def _open_update(self):
         if self._update_url:
             self.update_requested.emit(self._update_url)
-
-    def _toggle_usage_view(self):
-        resize_anchor = self._capture_resize_anchor()
-        self.usage_view = self._next_usage_view()
-        self.config_data.setdefault("settings", {})["usage_view"] = self.usage_view
-        self._update_view_button()
-        self.view_mode_changed.emit(self.usage_view)
-        # Ring orientation can change the provider-card topology and window
-        # width, so rebuild the visual layer while preserving fetched usage.
-        self.rebuild_ui(self.config_data, self.providers, preserve_usage=True)
-        self._schedule_fit_to_content(resize_anchor)
 
     def _build_provider_cards(self):
         self.provider_ui_map.clear()
@@ -1368,7 +1327,6 @@ class SynapCapWidget(QWidget):
         configured_view = settings.get("usage_view", self.usage_view)
         if configured_view in USAGE_VIEWS:
             self.usage_view = configured_view
-            self._update_view_button()
         preset = self._expanded_preset(settings)
 
         width = self._responsive_expanded_width(preset)

@@ -414,10 +414,6 @@ def main():
         save_config(config_data)
         widget.set_always_on_top(checked)
 
-    def handle_view_mode_changed(mode: str):
-        config_data.setdefault("settings", {})["usage_view"] = mode
-        save_config(config_data)
-
     quit_in_progress = False
 
     def handle_quit():
@@ -541,7 +537,6 @@ def main():
 
     widget.settings_requested.connect(open_settings_dialog)
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
-    widget.view_mode_changed.connect(handle_view_mode_changed)
     widget.update_requested.connect(start_one_click_update)
     widget.diagnostics_requested.connect(open_provider_diagnostics)
     widget.quit_requested.connect(request_quit)

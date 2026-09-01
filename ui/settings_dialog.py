@@ -2,10 +2,11 @@ import copy
 import sys
 import uuid
 
-from PySide6.QtCore import QPoint, Qt, QTimer, Signal
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPolygon
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QStyleOptionComboBox,
     QStyleOptionSpinBox,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -41,6 +43,7 @@ from .icon import (
     create_plus_icon,
     create_provider_icon,
     create_trash_icon,
+    create_usage_view_icon,
     create_wordmark_pixmap,
 )
 
@@ -324,6 +327,108 @@ _PROVIDERS_SCROLL_QSS = """
     }
 """
 
+_GRAPH_PICKER_QSS = """
+    QToolButton {
+        background-color: %(control)s;
+        border: 1px solid %(control_edge)s;
+        border-radius: 8px;
+        color: %(ink_mid)s;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 7px 2px 5px;
+    }
+    QToolButton:hover {
+        border-color: %(accent_soft)s;
+    }
+    QToolButton:checked {
+        border: 1px solid %(accent)s;
+        color: %(ink)s;
+    }
+"""
+
+
+class GraphShapePicker(QWidget):
+    """Segmented control that previews each usage-graph shape inline.
+
+    Replaces the cryptic header toggle: the shape is chosen here, where every
+    option shows a small live glyph of what the widget will render.
+    """
+
+    changed = Signal(str)
+
+    _SHAPES = (
+        ("bar", "막대"),
+        ("segment", "세그먼트"),
+        ("ring", "링"),
+        ("number", "숫자만"),
+    )
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._current = "bar"
+        self._buttons: dict[str, QToolButton] = {}
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        for key, label in self._SHAPES:
+            button = QToolButton(self)
+            button.setText(label)
+            button.setCheckable(True)
+            button.setToolButtonStyle(
+                Qt.ToolButtonStyle.ToolButtonTextUnderIcon
+            )
+            button.setIconSize(QSize(34, 34))
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+            button.clicked.connect(
+                lambda _checked, k=key: self._on_pick(k)
+            )
+            self._group.addButton(button)
+            layout.addWidget(button, 1)
+            self._buttons[key] = button
+        self._buttons["bar"].setChecked(True)
+        self.apply_theme()
+
+    def _on_pick(self, key: str) -> None:
+        if key == self._current:
+            return
+        self.choose(key)
+
+    def choose(self, key: str) -> None:
+        """Select a shape as if the user clicked it (updates UI + emits)."""
+        if key not in self._buttons:
+            return
+        self._current = key
+        self._buttons[key].setChecked(True)
+        self._sync_icons()
+        self.changed.emit(key)
+
+    def current_data(self) -> str:
+        return self._current
+
+    def set_current_data(self, key: str) -> None:
+        if key not in self._buttons:
+            key = "bar"
+        self._current = key
+        self._buttons[key].setChecked(True)
+        self._sync_icons()
+
+    def apply_theme(self) -> None:
+        self.setStyleSheet(_GRAPH_PICKER_QSS % palette())
+        self._sync_icons()
+
+    def _sync_icons(self) -> None:
+        for key, button in self._buttons.items():
+            chosen = key == self._current
+            button.setIcon(
+                create_usage_view_icon(
+                    key, 34, t("accent") if chosen else t("ink_mid")
+                )
+            )
+
 
 class NoWheelComboBox(QComboBox):
     """마우스 휠 스크롤 시 선택 항목이 실수로 변경되지 않도록 휠 이벤트를 무시하는 콤보박스"""
@@ -531,6 +636,8 @@ class SettingsDialog(QDialog):
         if hasattr(self, "providers_scroll"):
             self.providers_scroll.setStyleSheet(_PROVIDERS_SCROLL_QSS % palette())
         self.title_bar.restyle()
+        if hasattr(self, "graph_picker"):
+            self.graph_picker.apply_theme()
         for widget in self.findChildren(QWidget):
             template = widget.property("synapcapThemeStyle")
             if isinstance(template, str) and template:
@@ -689,18 +796,13 @@ class SettingsDialog(QDialog):
         )
         form.addRow("위젯 크기:", self.widget_scale_combo)
 
-        self.graph_combo = NoWheelComboBox()
-        self.graph_combo.addItem("막대", "bar")
-        self.graph_combo.addItem("세그먼트", "segment")
-        self.graph_combo.addItem("링", "ring")
-        self.graph_combo.addItem("숫자만", "number")
-        selected_graph = settings.get("usage_view", "bar")
-        graph_index = self.graph_combo.findData(selected_graph)
-        self.graph_combo.setCurrentIndex(max(graph_index, 0))
-        self.graph_combo.setToolTip(
-            "사용량을 어떤 그래프로 표시할지 고릅니다. 위젯 헤더의 전환 버튼으로도 순환합니다."
+        self.graph_picker = GraphShapePicker()
+        self.graph_picker.set_current_data(settings.get("usage_view", "bar"))
+        self.graph_picker.setToolTip(
+            "사용량을 어떤 그래프로 표시할지 고릅니다. 누르면 현재 창에 바로 적용해 볼 수 있습니다."
         )
-        form.addRow("그래프 모양:", self.graph_combo)
+        self.graph_picker.changed.connect(lambda _key: self.on_preview())
+        form.addRow("그래프 모양:", self.graph_picker)
 
         self.ring_layout_combo = NoWheelComboBox()
         self.ring_layout_combo.addItem("세로 · 좁은 화면", "vertical")
@@ -712,9 +814,7 @@ class SettingsDialog(QDialog):
             "링 그래프에서 모델 카드를 세로 또는 가로로 배치합니다. "
             "화면 폭이 부족하면 가로 배치도 자동으로 세로로 표시됩니다."
         )
-        self.graph_combo.currentIndexChanged.connect(
-            self._update_ring_layout_control
-        )
+        self.graph_picker.changed.connect(self._update_ring_layout_control)
         self._update_ring_layout_control()
         form.addRow("링 배치:", self.ring_layout_combo)
 
@@ -738,9 +838,9 @@ class SettingsDialog(QDialog):
         )
         form.addRow("알림 기준:", self.usage_alert_threshold_spin)
 
-    def _update_ring_layout_control(self, _index: int | None = None) -> None:
+    def _update_ring_layout_control(self, _key: object = None) -> None:
         self.ring_layout_combo.setEnabled(
-            self.graph_combo.currentData() == "ring"
+            self.graph_picker.current_data() == "ring"
         )
 
     def init_feedback_tab(self):
@@ -1153,7 +1253,7 @@ class SettingsDialog(QDialog):
         settings["check_updates"] = self.update_check.isChecked()
         settings["theme"] = self.theme_combo.currentData() or "dark"
         settings["widget_scale"] = self.widget_scale_combo.currentData() or "medium"
-        settings["usage_view"] = self.graph_combo.currentData() or "bar"
+        settings["usage_view"] = self.graph_picker.current_data() or "bar"
         settings["ring_layout"] = (
             self.ring_layout_combo.currentData() or "vertical"
         )

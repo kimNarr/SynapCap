@@ -101,7 +101,15 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(self.widget._usage_window_marker("5시간"), "5h")
         self.assertEqual(self.widget._usage_window_marker("주간"), "7d")
 
-    def test_graph_views_cycle_through_all_four_shapes(self):
+    def _select_usage_view(self, view: str) -> None:
+        """The graph shape is chosen in Settings now, not a header toggle."""
+        self.widget.config_data.setdefault("settings", {})["usage_view"] = view
+        self.widget.rebuild_ui(
+            self.widget.config_data, self.widget.providers, preserve_usage=True
+        )
+        self.app.processEvents()
+
+    def test_graph_views_render_all_four_shapes(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
@@ -121,15 +129,13 @@ class WidgetTests(unittest.TestCase):
         )
         self.assertEqual(value_label.font().weight(), 600)
 
-        self.widget._toggle_usage_view()
-        self.app.processEvents()
+        self._select_usage_view("segment")
         self.assertEqual(self.widget.usage_view, "segment")
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         self.assertIsNotNone(row.findChild(SegmentBar))
         self.assertEqual(len(self.widget.findChildren(UsageBar)), 0)
 
-        self.widget._toggle_usage_view()
-        self.app.processEvents()
+        self._select_usage_view("ring")
         self.assertEqual(self.widget.usage_view, "ring")
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         self.assertEqual(len(row.findChildren(UsageRing)), 1)
@@ -137,8 +143,7 @@ class WidgetTests(unittest.TestCase):
             "49%", [label.text() for label in row.findChildren(QLabel)]
         )
 
-        self.widget._toggle_usage_view()
-        self.app.processEvents()
+        self._select_usage_view("number")
         self.assertEqual(self.widget.usage_view, "number")
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
@@ -147,8 +152,7 @@ class WidgetTests(unittest.TestCase):
             "49%", [label.text() for label in row.findChildren(QLabel)]
         )
 
-        self.widget._toggle_usage_view()
-        self.app.processEvents()
+        self._select_usage_view("bar")
         self.assertEqual(self.widget.usage_view, "bar")
         self.assertEqual(self.widget.config_data["settings"]["usage_view"], "bar")
 
@@ -502,6 +506,18 @@ class WidgetTests(unittest.TestCase):
         self.assertTrue(self.widget.cards_frame.isVisible())
         self.widget.close_btn.click()
         self.assertEqual(quit_requests, [True])
+
+    def test_header_has_no_graph_view_toggle(self):
+        # The graph shape is chosen in Settings; the cryptic header cycle button
+        # is gone.
+        self.assertFalse(hasattr(self.widget, "view_btn"))
+        self.assertFalse(hasattr(self.widget, "_toggle_usage_view"))
+
+    def test_settings_change_still_drives_the_graph_view(self):
+        self.widget.update_data([self.usage])
+        self._select_usage_view("ring")
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        self.assertEqual(len(row.findChildren(UsageRing)), 1)
 
     def test_macos_tool_window_stays_visible_when_application_deactivates(self):
         provider = CodexProvider({"id": "codex", "name": "Codex"})
@@ -979,9 +995,9 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data(usages)
         self.app.processEvents()
 
+        self._select_usage_view("segment")
+        self._select_usage_view("ring")
         for action in (
-            self.widget._toggle_usage_view,
-            self.widget._toggle_usage_view,
             self.widget.enter_compact_mode,
             self.widget.exit_compact_mode,
         ):

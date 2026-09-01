@@ -140,14 +140,25 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(self.dialog.interval_spin.value(), 45)
         self.assertFalse(self.dialog.title_bar.wordmark_label.pixmap().isNull())
 
+    def test_graph_shape_picker_shows_every_shape_with_a_preview_icon(self):
+        picker = self.dialog.graph_picker
+        keys = [key for key, _label in picker._SHAPES]
+        self.assertEqual(keys, ["bar", "segment", "ring", "number"])
+        for key in keys:
+            button = picker._buttons[key]
+            self.assertFalse(button.icon().isNull())
+        self.assertTrue(picker._buttons["bar"].isChecked())
+
     def test_graph_shape_selector_round_trips_usage_view(self):
         self.assertEqual(
-            self.dialog.graph_combo.currentData(),
+            self.dialog.graph_picker.current_data(),
             self.dialog.config_data["settings"].get("usage_view", "bar"),
         )
-        self.dialog.graph_combo.setCurrentIndex(
-            self.dialog.graph_combo.findData("segment")
-        )
+        previewed = []
+        self.dialog.preview_requested.connect(previewed.append)
+        self.dialog.graph_picker.choose("segment")
+        self.assertEqual(previewed[-1]["settings"]["usage_view"], "segment")
+
         saved = []
         self.dialog.config_saved.connect(saved.append)
         self.dialog.on_save()
@@ -155,9 +166,7 @@ class SettingsDialogTests(unittest.TestCase):
 
     def test_ring_layout_selector_is_scoped_to_ring_view_and_saved(self):
         self.assertFalse(self.dialog.ring_layout_combo.isEnabled())
-        self.dialog.graph_combo.setCurrentIndex(
-            self.dialog.graph_combo.findData("ring")
-        )
+        self.dialog.graph_picker.choose("ring")
         self.assertTrue(self.dialog.ring_layout_combo.isEnabled())
         self.dialog.ring_layout_combo.setCurrentIndex(
             self.dialog.ring_layout_combo.findData("horizontal")
