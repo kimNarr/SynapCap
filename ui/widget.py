@@ -919,22 +919,29 @@ class SynapCapWidget(QWidget):
             provider_ui = self.provider_ui_map.get(provider_id, {})
             windows = self._visible_usage_windows(provider_ui, usage.windows or [])
             used = max((window.used for window in windows), default=usage.used)
-            value_color = self._compact_usage_color(used)
-            if len(windows) > 1:
+            window_colors = [self._compact_usage_color(w.used) for w in windows]
+            if len(windows) > 1 and len(set(window_colors)) > 1:
+                # Colour each window on its own so "90%/20%" doesn't paint the
+                # calm 20% red just because the 5h window is hot.
+                self._apply_compact_value_style(
+                    value_label, COMPACT_VALUE_COLOR, metrics
+                )
+                slash = '<span style="color:#5B6274">/</span>'
+                value_label.setText(
+                    slash.join(
+                        f'<span style="color:{color}">{window.used:.0f}%</span>'
+                        for window, color in zip(windows, window_colors, strict=True)
+                    )
+                )
+            elif len(windows) > 1:
                 value_label.setText(
                     "/".join(f"{window.used:.0f}%" for window in windows)
                 )
-                self._apply_compact_value_style(
-                    value_label,
-                    value_color,
-                    metrics,
-                )
+                self._apply_compact_value_style(value_label, window_colors[0], metrics)
             else:
                 value_label.setText(f"{used:.0f}%")
                 self._apply_compact_value_style(
-                    value_label,
-                    value_color,
-                    metrics,
+                    value_label, self._compact_usage_color(used), metrics
                 )
             self._fit_compact_value_label(value_label, metrics["font_size"])
             tooltip_lines = [

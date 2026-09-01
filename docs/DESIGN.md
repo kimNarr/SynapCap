@@ -342,7 +342,7 @@ Regular 굵기, 딤 블루 필(`#8FB6E8 on #141A28`), 폭은 2글자 맞게 확�
 | I-12 | 내부 프레임 테두리 | ✅ **적용** — `QFrame#providersFrame` 테두리 제거(bg 단차로 충분) |
 | I-13 | 로딩 스피너 | 수치 영역 전체를 스피너로 교체 → 레이아웃 순간 흔들림 | 막대 모양 스켈레톤/시머로 자리 유지 | `set_loading`, `LoadingSpinner`, `_render_usage_rows` |
 | I-14 | 링뷰 `%` 크기 | 작은 링 안 `%` 텍스트가 글꼴 10px에서 읽기 힘듦 | 링 최소 크기 ↑ (`max(116, val_size × 9)` 상향), 또는 `%`를 링 옆으로 | `UsageRing`, 링뷰 `content_width` |
-| I-15 | 컴팩트 바 단일 색 | `90%/20%` 전체가 한 색 → 어느 창이 위험한지 안 보임 | 위험한 쪽 값만 강조(rich text), 또는 아이콘 옆 작은 점 | `_build_compact_items` / `_refresh_compact_values`, `_compact_usage_color` |
+| I-15 | 컴팩트 바 단일 색 | ✅ **적용** — 창별 색이 다를 때 `%`마다 rich-text 스팬으로 색 분리(`/`는 딤). 같은 색이면 평문 유지 |
 | I-16 | 버전 배지 대비 | ✅ **적용** — 텍스트 `#7F849C` → `#97A0B6`, 테두리 `#3A3F55`로 살짝 대비 ↑ |
 
 ---
