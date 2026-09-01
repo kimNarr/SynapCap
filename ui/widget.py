@@ -1352,6 +1352,9 @@ class SynapCapWidget(QWidget):
         colors = {
             "waiting": (t("warn_soft"), t("badge_waiting_bg")),
             "error": (t("danger"), t("badge_error_bg")),
+            # "dormant" = the CLI just isn't here. Not an alarm — most likely
+            # the user doesn't use this provider, so keep it grey and quiet.
+            "dormant": (t("ink_dim"), t("panel_sunken")),
         }
         foreground, background = colors.get(state, (t("good"), t("badge_ok_bg")))
         label.setStyleSheet(
@@ -1960,12 +1963,16 @@ class SynapCapWidget(QWidget):
             ui = self.provider_ui_map[usage.provider_id]
             provider_type = ui.get("provider_type", usage.provider_id)
             source_tooltip = self._usage_source_tooltip(usage, provider_type)
+            dormant = bool(usage.error) and "찾을 수 없음" in usage.error
+            ui["name"].setStyleSheet(
+                f"color: {t('ink_dim') if dormant else t('ink')};"
+            )
 
             if usage.error:
                 ui["badge"].setToolTip(f"조회 실패: {usage.error}")
                 ui["status"].show()
-                if "찾을 수 없음" in usage.error:
-                    error_label = "설치 필요"
+                if dormant:
+                    error_label = "미설치"
                 elif "로그인" in usage.error:
                     error_label = "로그인 필요"
                 elif "시간 초과" in usage.error:
@@ -1973,10 +1980,17 @@ class SynapCapWidget(QWidget):
                 else:
                     error_label = "조회 오류"
                 ui["status"].setText(error_label)
-                ui["status"].setToolTip(
-                    f"{usage.error}\n클릭하여 진단 정보 보기"
+                hint = (
+                    "\n사용하지 않는 서비스는 설정에서 숨길 수 있습니다."
+                    if dormant
+                    else ""
                 )
-                self._set_status_badge(ui["status"], "error", preset)
+                ui["status"].setToolTip(
+                    f"{usage.error}\n클릭하여 진단 정보 보기{hint}"
+                )
+                self._set_status_badge(
+                    ui["status"], "dormant" if dormant else "error", preset
+                )
                 self._clear_usage_rows(ui)
             else:
                 success_tooltip = usage.provider_name

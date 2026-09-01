@@ -17,7 +17,7 @@ from providers import (
     ModelUsage,
     UsageWindow,
 )
-from theme import apply_theme_setting
+from theme import apply_theme_setting, t
 from ui.widget import SegmentBar, SynapCapWidget, UsageBar, UsageRing
 from version import APP_VERSION
 
@@ -321,7 +321,7 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(self.widget.width(), 360)
         self.assertEqual(self.widget._expanded_preset({"widget_scale": "medium"})["val_size"], 13)
 
-    def test_missing_cli_is_labeled_as_install_required(self):
+    def test_missing_cli_reads_as_dormant_not_an_alarm(self):
         usage = ModelUsage(
             "codex",
             "Codex",
@@ -334,10 +334,30 @@ class WidgetTests(unittest.TestCase):
 
         self.widget.update_data([usage])
 
-        status = self.widget.provider_ui_map["codex"]["status"]
-        self.assertEqual(status.text(), "설치 필요")
+        ui = self.widget.provider_ui_map["codex"]
+        status = ui["status"]
+        self.assertEqual(status.text(), "미설치")
         self.assertIn(usage.error, status.toolTip())
         self.assertIn("진단 정보 보기", status.toolTip())
+        self.assertIn("설정에서 숨길 수 있습니다", status.toolTip())
+        # Dormant styling: grey badge, dimmed provider name — not the red alarm.
+        self.assertIn(t("ink_dim"), status.styleSheet())
+        self.assertNotIn(t("danger"), status.styleSheet())
+        self.assertIn(t("ink_dim"), ui["name"].styleSheet())
+
+    def test_login_required_stays_an_actionable_error(self):
+        self.widget.update_data(
+            [
+                ModelUsage(
+                    "codex", "Codex", "Codex", 0, 100, "%",
+                    error="codex 로그인이 필요합니다",
+                )
+            ]
+        )
+        ui = self.widget.provider_ui_map["codex"]
+        self.assertEqual(ui["status"].text(), "로그인 필요")
+        self.assertIn(t("danger"), ui["status"].styleSheet())
+        self.assertIn(t("ink"), ui["name"].styleSheet())
 
     def test_progress_tooltip_is_shown_on_enter(self):
         self.widget.update_data([self.usage])
