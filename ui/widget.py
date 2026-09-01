@@ -455,6 +455,21 @@ class SynapCapWidget(QWidget):
         self._enable_instant_tooltip(self.settings_btn, "설정")
         header_layout.addWidget(self.settings_btn)
 
+        # Keep app actions (refresh/settings) visually apart from the window
+        # controls (minimize/close) so "close" is never a mis-click away.
+        header_layout.addSpacing(5)
+        self.header_control_divider = QFrame()
+        self.header_control_divider.setObjectName("headerDivider")
+        self.header_control_divider.setFixedWidth(1)
+        self.header_control_divider.setFixedHeight(14)
+        self.header_control_divider.setStyleSheet(
+            f"background-color: {t('line')}; border: none;"
+        )
+        header_layout.addWidget(
+            self.header_control_divider, 0, Qt.AlignmentFlag.AlignVCenter
+        )
+        header_layout.addSpacing(5)
+
         self.minimize_btn = QPushButton()
         self.minimize_btn.setFixedSize(22, 22)
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
@@ -500,6 +515,21 @@ class SynapCapWidget(QWidget):
         self.expand_btn.clicked.connect(self.exit_compact_mode)
         self._enable_instant_tooltip(self.expand_btn, "전체 위젯 펼치기")
         self.compact_layout.addWidget(self.expand_btn)
+
+        # Same guard as the expanded header: a hairline before the quit button
+        # so "close" is not flush against "expand".
+        self.compact_control_divider = QFrame()
+        self.compact_control_divider.setObjectName("headerDivider")
+        self.compact_control_divider.setFixedWidth(1)
+        self.compact_control_divider.setFixedHeight(14)
+        self.compact_control_divider.setStyleSheet(
+            f"background-color: {t('line')}; border: none;"
+        )
+        self.compact_layout.addSpacing(3)
+        self.compact_layout.addWidget(
+            self.compact_control_divider, 0, Qt.AlignmentFlag.AlignVCenter
+        )
+        self.compact_layout.addSpacing(3)
 
         self.compact_close_btn = QPushButton()
         self.compact_close_btn.setFixedSize(24, 24)
@@ -566,6 +596,9 @@ class SynapCapWidget(QWidget):
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
         self.close_btn.setIcon(create_close_icon(14, t("danger_soft")))
         self.freshness_label.setStyleSheet(f"color: {t('ink_faint')};")
+        divider_style = f"background-color: {t('line')}; border: none;"
+        self.header_control_divider.setStyleSheet(divider_style)
+        self.compact_control_divider.setStyleSheet(divider_style)
         self._set_version_badge_style(bool(self._update_url))
         self._apply_compact_metrics()
 
@@ -1828,18 +1861,18 @@ class SynapCapWidget(QWidget):
             tile_layout.setSpacing(max(6, round(vs * 0.45)))
             window_label = QLabel(self._usage_window_marker(window.label))
             window_label.setObjectName("windowBadge")
-            window_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            # Period is metadata, just like the CLI source. Use the same
-            # restrained outline treatment so the coloured usage value stays
-            # the visual headline.
+            window_label.setAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
+            # The period is a plain row label, not a control. An outlined pill
+            # reads as a button, so keep it borderless and dim — the coloured
+            # usage value stays the headline.
             window_label.setStyleSheet(
-                f"color: {t('cli_badge_fg')}; background-color: transparent; "
-                f"border: 1px solid {t('cli_badge_edge')}; border-radius: 4px; "
-                "padding: 1px 5px;"
+                f"color: {t('ink_dim')}; background: transparent; border: none;"
             )
             self._set_label_font(window_label, max(8, vs - 2), 600)
             window_label.setFixedWidth(
-                max(30, QFontMetrics(window_label.font()).horizontalAdvance("7d") + 10)
+                max(24, QFontMetrics(window_label.font()).horizontalAdvance("7d") + 4)
             )
             self._enable_instant_tooltip(window_label, window.label)
             tile_layout.addWidget(window_label)

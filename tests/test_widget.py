@@ -122,8 +122,10 @@ class WidgetTests(unittest.TestCase):
         period_badge = row.findChild(QLabel, "windowBadge")
         self.assertIsNotNone(period_badge)
         assert period_badge is not None
-        self.assertIn("border: 1px solid", period_badge.styleSheet())
-        self.assertIn("background-color: transparent", period_badge.styleSheet())
+        # The period is a plain dim label, not an outlined chip (that reads as
+        # a button).
+        self.assertIn("border: none", period_badge.styleSheet())
+        self.assertIn("#8087A0", period_badge.styleSheet())
         value_label = next(
             label for label in row.findChildren(QLabel) if label.text() == "49%"
         )
@@ -588,6 +590,15 @@ class WidgetTests(unittest.TestCase):
         self.assertTrue(self.widget.cards_frame.isVisible())
         self.widget.close_btn.click()
         self.assertEqual(quit_requests, [True])
+
+    def test_window_controls_are_split_off_from_app_actions(self):
+        header_children = self.widget.header_widget.children()
+        self.assertIn(self.widget.header_control_divider, header_children)
+        self.assertEqual(self.widget.header_control_divider.width(), 1)
+        self.assertIn(
+            self.widget.compact_control_divider,
+            self.widget.compact_bar.children(),
+        )
 
     def test_header_has_no_graph_view_toggle(self):
         # The graph shape is chosen in Settings; the cryptic header cycle button
