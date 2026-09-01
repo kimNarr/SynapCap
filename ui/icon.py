@@ -374,10 +374,24 @@ def create_usage_view_icon(
         accent_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(accent_pen)
         painter.drawArc(rect, 90 * 16, -130 * 16)
-    else:
+    elif target_view == "segment":
+        seg_w = size * 0.14
+        for i in range(4):
+            x = size * 0.16 + i * (seg_w + size * 0.06)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#89B4FA" if i < 2 else color))
+            painter.drawRoundedRect(
+                QRectF(x, size * 0.4, seg_w, size * 0.2), 1.5, 1.5
+            )
+    elif target_view == "number":
+        painter.setPen(QColor(color))
+        font = QFont("Segoe UI", max(6, round(size * 0.5)), QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "%")
+    else:  # bar
         starts = (0.26, 0.50, 0.74)
         lengths = (0.42, 0.68, 0.54)
-        for y, length in zip(starts, lengths):
+        for y, length in zip(starts, lengths, strict=True):
             painter.drawLine(
                 QPointF(size * 0.18, size * y),
                 QPointF(size * (0.18 + length), size * y),

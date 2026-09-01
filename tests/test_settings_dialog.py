@@ -118,6 +118,19 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertNotIn("expanded_font_size", settings)
         self.assertNotIn("compact_font_size", settings)
 
+    def test_graph_shape_selector_round_trips_usage_view(self):
+        self.assertEqual(
+            self.dialog.graph_combo.currentData(),
+            self.dialog.config_data["settings"].get("usage_view", "bar"),
+        )
+        self.dialog.graph_combo.setCurrentIndex(
+            self.dialog.graph_combo.findData("segment")
+        )
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+        self.assertEqual(saved[0]["settings"]["usage_view"], "segment")
+
     def test_preview_applies_visual_settings_without_persisting_them(self):
         self.dialog.widget_scale_combo.setCurrentIndex(
             self.dialog.widget_scale_combo.findData("large")

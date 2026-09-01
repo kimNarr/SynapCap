@@ -36,6 +36,15 @@ from .icon import (
 # A frameless widget has no visible resize border, so a slightly wider magnetic
 # zone feels natural and avoids leaving a narrow unusable gap near an edge.
 EDGE_SNAP_DISTANCE = 48
+
+# Graph shapes for the expanded usage tile, in the header-cycle order.
+USAGE_VIEWS = ("bar", "segment", "ring", "number")
+USAGE_VIEW_NAMES = {
+    "bar": "막대",
+    "segment": "세그먼트",
+    "ring": "링",
+    "number": "숫자",
+}
 ResizeAnchor = tuple[QPoint, bool, bool]
 
 WIDGET_SCALE_PRESETS = {
@@ -101,45 +110,53 @@ class UsageRing(QWidget):
         bold: bool = True,
         font_size: int = 13,
         parent=None,
+        show_value: bool = True,
     ):
         super().__init__(parent)
         self.used = max(0.0, min(100.0, float(used)))
         self.color = QColor(color)
         self.bold = bold
+        self.show_value = show_value
         self.value_text = f"{self.used:.0f}%"
         self.font_size = font_size
-        self.ring_size = max(50, font_size + 38)
+        if show_value:
+            self.ring_size = max(50, font_size + 38)
+        else:
+            self.ring_size = max(26, font_size + 12)
         self.setFixedSize(self.ring_size, self.ring_size)
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        stroke = 4.5 if self.show_value else 3.4
+        inset = stroke / 2.0 + 1.0
         ring_rect = QRectF(
-            3.5,
-            3.5,
-            self.ring_size - 7,
-            self.ring_size - 7,
+            inset,
+            inset,
+            self.ring_size - inset * 2,
+            self.ring_size - inset * 2,
         )
 
-        background_pen = QPen(QColor("#2B303D"), 4.5)
+        background_pen = QPen(QColor("#2B303D"), stroke)
         background_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(background_pen)
         painter.drawArc(ring_rect, 90 * 16, -360 * 16)
 
-        usage_pen = QPen(self.color, 4.5)
+        usage_pen = QPen(self.color, stroke)
         usage_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(usage_pen)
         painter.drawArc(ring_rect, 90 * 16, round(-360 * 16 * self.used / 100))
 
-        painter.setPen(QColor("#CDD6F4"))
-        value_weight = QFont.Weight.Bold if self.bold else QFont.Weight.Normal
-        value_size = max(9, self.font_size + 1 - (4 if self.used >= 99.5 else 0))
-        painter.setFont(QFont("Segoe UI", value_size, value_weight))
-        painter.drawText(
-            QRectF(4, 4, self.ring_size - 8, self.ring_size - 8),
-            Qt.AlignmentFlag.AlignCenter,
-            self.value_text,
-        )
+        if self.show_value:
+            painter.setPen(QColor("#CDD6F4"))
+            value_weight = QFont.Weight.Bold if self.bold else QFont.Weight.Normal
+            value_size = max(9, self.font_size + 1 - (4 if self.used >= 99.5 else 0))
+            painter.setFont(QFont("Segoe UI", value_size, value_weight))
+            painter.drawText(
+                QRectF(4, 4, self.ring_size - 8, self.ring_size - 8),
+                Qt.AlignmentFlag.AlignCenter,
+                self.value_text,
+            )
 
         painter.end()
 
@@ -182,6 +199,48 @@ class UsageBar(QWidget):
             painter.setBrush(self.fill_color)
             painter.drawRoundedRect(fill, max(1.5, radius - 1), max(1.5, radius - 1))
 
+        painter.end()
+
+
+class SegmentBar(QWidget):
+    """A 10-segment capacity meter — one lit segment per ~10% of usage."""
+
+    SEGMENTS = 10
+
+    def __init__(self, used: float, color: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setObjectName("usageSegments")
+        self.usage_used = max(0.0, min(100.0, float(used)))
+        self.fill_color = QColor(color)
+        self.lit_segments = 0
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
+        self.setMinimumWidth(64)
+
+    def paintEvent(self, event) -> None:
+        del event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        count = self.SEGMENTS
+        gap = 3.0
+        seg_width = (self.width() - gap * (count - 1)) / count
+        seg_height = min(float(self.height()), 9.0)
+        top = (self.height() - seg_height) / 2.0
+
+        self.lit_segments = round(self.usage_used / 100.0 * count)
+        if self.usage_used > 0:
+            self.lit_segments = max(1, self.lit_segments)
+
+        for index in range(count):
+            rect = QRectF(index * (seg_width + gap), top, seg_width, seg_height)
+            painter.setBrush(
+                self.fill_color if index < self.lit_segments else QColor("#23283A")
+            )
+            painter.drawRoundedRect(rect, 2.0, 2.0)
         painter.end()
 
 
@@ -249,7 +308,7 @@ class SynapCapWidget(QWidget):
         self._docked_to_bottom = True
         self._pending_resize_anchor: ResizeAnchor | None = None
         configured_view = self.config_data.get("settings", {}).get("usage_view", "bar")
-        self.usage_view = configured_view if configured_view in {"bar", "ring"} else "bar"
+        self.usage_view = configured_view if configured_view in USAGE_VIEWS else "bar"
         self.latest_usage: list[ModelUsage] = []
         self._fit_timer = QTimer(self)
         self._fit_timer.setSingleShot(True)
@@ -511,17 +570,9 @@ class SynapCapWidget(QWidget):
             default=0,
         )
         provider_header_width = longest_name + preset["badge_size"] + 132
-        if self.usage_view == "ring":
-            content_width = (
-                2 * max(116, preset["val_size"] * 9)
-                + 2 * preset["card_padding"]
-                + 42
-            )
-        else:
-            # The CLI-style bar view is intentionally a single column.  It
-            # should remain compact even when users choose a large font, but
-            # needs room for the marker, reset text and the trailing % column.
-            content_width = max(268, preset["val_size"] * 16 + 52)
+        # Every graph type stacks full-width tiles now, so one compact minimum
+        # covers them all.
+        content_width = max(268, preset["val_size"] * 16 + 52)
         return min(480, max(300, preset["width"], provider_header_width, content_width))
 
     def _set_fixed_window_width(self, width: int) -> None:
@@ -961,11 +1012,16 @@ class SynapCapWidget(QWidget):
                 self._update_expand_direction(resize_anchor)
                 self._schedule_fit_to_content(resize_anchor)
 
+    def _next_usage_view(self) -> str:
+        order = USAGE_VIEWS
+        return order[(order.index(self.usage_view) + 1) % len(order)]
+
     def _update_view_button(self):
-        target_view = "ring" if self.usage_view == "bar" else "bar"
-        self.view_btn.setIcon(create_usage_view_icon(target_view, 14))
-        target_name = "링" if target_view == "ring" else "막대"
-        self.view_btn.setToolTip(f"{target_name} 그래프로 변경")
+        nxt = self._next_usage_view()
+        self.view_btn.setIcon(create_usage_view_icon(nxt, 14))
+        self.view_btn.setToolTip(
+            f"그래프: {USAGE_VIEW_NAMES[self.usage_view]} → {USAGE_VIEW_NAMES[nxt]}"
+        )
 
     def _set_version_badge_style(self, update_available: bool) -> None:
         if update_available:
@@ -1004,7 +1060,7 @@ class SynapCapWidget(QWidget):
 
     def _toggle_usage_view(self):
         resize_anchor = self._capture_resize_anchor()
-        self.usage_view = "ring" if self.usage_view == "bar" else "bar"
+        self.usage_view = self._next_usage_view()
         self.config_data.setdefault("settings", {})["usage_view"] = self.usage_view
         self._update_view_button()
         self.view_mode_changed.emit(self.usage_view)
@@ -1164,7 +1220,7 @@ class SynapCapWidget(QWidget):
 
         settings = self.config_data.get("settings", {})
         configured_view = settings.get("usage_view", self.usage_view)
-        if configured_view in {"bar", "ring"}:
+        if configured_view in USAGE_VIEWS:
             self.usage_view = configured_view
             self._update_view_button()
         preset = self._expanded_preset(settings)
@@ -1220,43 +1276,48 @@ class SynapCapWidget(QWidget):
         ui["window_rows"] = []
 
     def _render_skeleton_rows(self, ui: dict, preset: dict) -> None:
-        """Reserve the usage rows' height before the first fetch lands, so the
+        """Reserve the usage tiles' height before the first fetch lands, so the
         card doesn't jump when real values replace the loading state."""
         self._clear_usage_rows(ui)
-        tile_padding = max(5, round(preset["val_size"] * 0.42))
-        marker_size = max(20, preset["val_size"] + 8)
+        vs = preset["val_size"]
+        pad = max(4, round(vs * 0.34))
         bar_height = max(14, preset["pbar_height"] + 5)
         for index in range(2):
-            row = QWidget()
-            row.setObjectName("usageMetric")
-            row.setStyleSheet("QWidget#usageMetric { background: transparent; }")
-            row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(
-                tile_padding,
-                max(2, tile_padding // 2),
-                tile_padding,
-                max(2, tile_padding // 2),
-            )
-            row_layout.setSpacing(max(7, round(preset["val_size"] * 0.55)))
+            tile = QWidget()
+            tile.setObjectName("usageMetric")
+            tile.setStyleSheet("QWidget#usageMetric { background: transparent; }")
+            tile_layout = QVBoxLayout(tile)
+            tile_layout.setContentsMargins(pad, pad, pad, pad)
+            tile_layout.setSpacing(max(3, round(vs * 0.3)))
 
-            chip = QLabel()
-            chip.setFixedSize(marker_size + 6, marker_size)
-            chip.setStyleSheet("background-color: #1B212D; border-radius: 5px;")
-            row_layout.addWidget(chip)
+            meta = QHBoxLayout()
+            meta.setContentsMargins(0, 0, 0, 0)
+            name = QLabel()
+            name.setFixedSize(round(vs * 2.6), max(9, vs - 1))
+            name.setStyleSheet("background-color: #1B212D; border-radius: 3px;")
+            meta.addWidget(name)
+            meta.addStretch()
+            hint = QLabel()
+            hint.setFixedSize(round(vs * 3.4), max(8, vs - 3))
+            hint.setStyleSheet("background-color: #1A1F2A; border-radius: 3px;")
+            meta.addWidget(hint)
+            tile_layout.addLayout(meta)
 
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(max(7, round(vs * 0.6)))
             track = QLabel()
             track.setFixedHeight(bar_height)
             track.setStyleSheet("background-color: #1A1F2A; border-radius: 4px;")
-            row_layout.addWidget(track, 1)
-
+            row.addWidget(track, 1)
             value = QLabel()
-            value.setFixedWidth(max(38, preset["val_size"] * 3 + 6))
-            value.setFixedHeight(max(10, preset["val_size"] - 2))
+            value.setFixedSize(max(38, vs * 3 + 6), max(10, vs - 2))
             value.setStyleSheet("background-color: #1A1F2A; border-radius: 3px;")
-            row_layout.addWidget(value)
+            row.addWidget(value)
+            tile_layout.addLayout(row)
 
-            ui["windows_layout"].addWidget(row, index, 0, 1, 2)
-            ui["window_rows"].append(row)
+            ui["windows_layout"].addWidget(tile, index, 0, 1, 2)
+            ui["window_rows"].append(tile)
 
     def _enable_instant_tooltip(self, widget: QWidget, text: str) -> None:
         if not text:
@@ -1416,21 +1477,6 @@ class SynapCapWidget(QWidget):
         return relative, tooltip
 
     @staticmethod
-    def _usage_window_marker(label: str) -> str:
-        """Return a compact, recognisable marker for a usage window."""
-        normalized = label.lower().replace(" ", "")
-        if (
-            "5시간" in normalized
-            or "5hour" in normalized
-            or "현재세션" in normalized
-            or "currentsession" in normalized
-        ):
-            return "5h"
-        if "주간" in normalized or "week" in normalized:
-            return "7d"
-        return "•"
-
-    @staticmethod
     def _condensed_reset(relative: str) -> str:
         """Use compact English time units for every usage-view countdown."""
         text = relative.strip()
@@ -1517,165 +1563,110 @@ class SynapCapWidget(QWidget):
         source_tooltip: str = "",
     ):
         self._clear_usage_rows(ui)
+        settings = self.config_data.get("settings", {})
         usage_value_bold = (
             True
-            if self.config_data.get("settings", {}).get("widget_scale")
-            in WIDGET_SCALE_PRESETS
-            else self.config_data.get("settings", {}).get("expanded_font_bold", True)
+            if settings.get("widget_scale") in WIDGET_SCALE_PRESETS
+            else settings.get("expanded_font_bold", True)
         )
-        usage_value_weight = 700 if usage_value_bold else 400
+        normal_weight = 600 if usage_value_bold else 400
+        graph = self.usage_view
+        vs = preset["val_size"]
 
         for index, window in enumerate(windows):
-            row_widget = QWidget()
-            row_widget.setObjectName("usageMetric")
-            tile_padding = max(5, round(preset["val_size"] * 0.42))
             remaining = (
-                window.remaining if window.remaining is not None else max(0.0, 100.0 - window.used)
+                window.remaining
+                if window.remaining is not None
+                else max(0.0, 100.0 - window.used)
             )
             usage_tooltip = f"{window.used:.0f}% 사용 · {remaining:.0f}% 남음"
             if source_tooltip:
-                usage_tooltip += f"\n{source_tooltip}"
+                usage_tooltip += "\n" + source_tooltip
             reset_display, reset_tooltip = self._reset_presentation(window.reset_text)
             color = self._usage_color(window.used)
+            is_warning = window.used >= 60
+            is_critical = window.used >= 80
 
-            if self.usage_view == "ring":
-                row_widget.setStyleSheet(
-                    "QWidget#usageMetric { background-color: #0D0E12; border-radius: 5px; }"
-                )
-                row_layout = QHBoxLayout(row_widget)
-                row_layout.setContentsMargins(
-                    tile_padding,
-                    tile_padding,
-                    tile_padding,
-                    tile_padding,
-                )
-                row_layout.setSpacing(max(6, round(preset["val_size"] * 0.5)))
+            # Every graph type shares the same tile: an invariant meta row
+            # (window name + reset) and a swappable graph row.  Only the graph
+            # widget changes, so the layout never shifts between views.
+            tile = QWidget()
+            tile.setObjectName("usageMetric")
+            tile.setStyleSheet("QWidget#usageMetric { background: transparent; }")
+            tile_layout = QVBoxLayout(tile)
+            pad = max(4, round(vs * 0.34))
+            tile_layout.setContentsMargins(pad, pad, pad, pad)
+            tile_layout.setSpacing(max(3, round(vs * 0.3)))
 
-                details_layout = QVBoxLayout()
-                details_layout.setContentsMargins(0, 0, 0, 0)
-                details_layout.setSpacing(1)
+            meta = QHBoxLayout()
+            meta.setContentsMargins(0, 0, 0, 0)
+            meta.setSpacing(8)
+            window_label = QLabel(window.label)
+            window_label.setObjectName("windowLabel")
+            window_label.setStyleSheet("color: #BAC2DE;")
+            self._set_label_font(window_label, max(9, vs - 1), 600)
+            meta.addWidget(window_label)
+            meta.addStretch()
+            reset_label = QLabel(self._condensed_reset(reset_display))
+            reset_label.setObjectName("resetCountdown")
+            reset_label.setWordWrap(False)
+            self._enable_instant_tooltip(
+                reset_label, self._reset_hint(reset_display, reset_tooltip)
+            )
+            reset_label.setStyleSheet("color: #8087A0;")
+            self._set_label_font(reset_label, max(9, vs - 2))
+            meta.addWidget(reset_label)
 
-                window_label = QLabel(window.label)
-                window_label.setStyleSheet("color: #CDD6F4;")
-                self._set_label_font(
-                    window_label,
-                    preset["val_size"],
-                    usage_value_weight,
-                )
-                details_layout.addWidget(window_label)
+            value_label = QLabel(
+                f"▲ {window.used:.0f}%" if is_critical else f"{window.used:.0f}%"
+            )
+            value_label.setObjectName("usageValue")
+            value_label.setStyleSheet(f"color: {color};")
+            value_weight = 700 if is_warning else normal_weight
+            self._enable_instant_tooltip(value_label, usage_tooltip)
 
-                reset_label = QLabel(self._condensed_reset(reset_display))
-                reset_label.setWordWrap(False)
-                self._enable_instant_tooltip(
-                    reset_label, self._reset_hint(reset_display, reset_tooltip)
-                )
-                reset_label.setStyleSheet("color: #8087A0;")
-                self._set_label_font(
-                    reset_label,
-                    max(9, preset["val_size"] - 1),
-                )
-                details_layout.addWidget(reset_label)
-                row_layout.addLayout(details_layout)
-                row_layout.addStretch()
-
-                ring = UsageRing(
-                    window.used,
-                    color,
-                    usage_value_bold,
-                    preset["val_size"],
-                )
-                self._enable_instant_tooltip(ring, usage_tooltip)
-                row_layout.addWidget(ring)
-            else:
-                # The bar view follows the compact information density of a
-                # CLI status line: a small window badge, reset countdown, and
-                # one progress bar whose centered text is the only percentage.
-                row_widget.setStyleSheet(
-                    "QWidget#usageMetric { background-color: transparent; border-radius: 4px; }"
-                )
-                row_layout = QHBoxLayout(row_widget)
-                row_layout.setContentsMargins(
-                    tile_padding,
-                    max(2, tile_padding // 2),
-                    tile_padding,
-                    max(2, tile_padding // 2),
-                )
-                row_layout.setSpacing(max(7, round(preset["val_size"] * 0.55)))
-
-                marker_label = QLabel(self._usage_window_marker(window.label))
-                marker_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                marker_size = max(20, preset["val_size"] + 8)
-                marker_label.setFixedSize(marker_size + 6, marker_size)
-                marker_label.setStyleSheet(
-                    "color: #8FB6E8; background-color: #141A28; "
-                    "border: none; border-radius: 5px;"
-                )
-                # A quiet label, not data — keep it at regular weight so the
-                # provider name and any high usage % stay the only bold marks.
-                self._set_label_font(
-                    marker_label,
-                    max(9, preset["val_size"] - 2),
-                    400,
-                )
-                self._enable_instant_tooltip(marker_label, window.label)
-                row_layout.addWidget(marker_label)
-
-                reset_label = QLabel(self._condensed_reset(reset_display))
-                reset_label.setObjectName("resetCountdown")
-                reset_label.setWordWrap(False)
-                self._enable_instant_tooltip(
-                    reset_label, self._reset_hint(reset_display, reset_tooltip)
-                )
-                reset_label.setStyleSheet("color: #8087A0;")
-                self._set_label_font(
-                    reset_label,
-                    max(9, preset["val_size"] - 2),
-                )
-                reset_label.setFixedWidth(
-                    max(
-                        48,
-                        QFontMetrics(reset_label.font()).horizontalAdvance("00d 00h") + 4,
-                    )
-                )
-                row_layout.addWidget(reset_label)
-
-                usage_bar = UsageBar(window.used, color)
-                usage_bar.setFixedHeight(max(14, preset["pbar_height"] + 5))
-                self._enable_instant_tooltip(usage_bar, usage_tooltip)
-                row_layout.addWidget(usage_bar, 1)
-
-                # The percentage sits outside the bar in a fixed-width column so
-                # it keeps full contrast at any fill level and every row's number
-                # lines up on the same right edge.
-                is_warning = window.used >= 60
-                is_critical = window.used >= 80
-                value_label = QLabel(
-                    f"▲ {window.used:.0f}%" if is_critical else f"{window.used:.0f}%"
-                )
-                value_label.setObjectName("usageValue")
+            if graph == "number":
+                # No graph to align, so the % joins the meta row and the tile
+                # stays a single compact line.
+                self._set_label_font(value_label, vs + 1, value_weight)
                 value_label.setAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                 )
-                value_label.setFixedWidth(max(48, preset["val_size"] * 4 + 10))
-                value_label.setStyleSheet(f"color: {color};")
-                # Weight hierarchy: provider name (bold) > normal % (demibold) is
-                # calm; a warning/critical % jumps back to bold so weight itself
-                # signals "getting high", on top of colour and the ▲ mark.
-                self._set_label_font(
-                    value_label,
-                    preset["val_size"],
-                    700
-                    if is_warning
-                    else (600 if usage_value_weight >= 680 else usage_value_weight),
-                )
-                self._enable_instant_tooltip(value_label, usage_tooltip)
-                row_layout.addWidget(value_label)
-
-            if self.usage_view == "ring":
-                ui["windows_layout"].addWidget(row_widget, index // 2, index % 2)
+                value_label.setFixedWidth(max(48, vs * 4 + 10))
+                meta.addSpacing(4)
+                meta.addWidget(value_label)
+                tile_layout.addLayout(meta)
             else:
-                ui["windows_layout"].addWidget(row_widget, index, 0, 1, 2)
-            ui["window_rows"].append(row_widget)
+                tile_layout.addLayout(meta)
+                row = QHBoxLayout()
+                row.setContentsMargins(0, 0, 0, 0)
+                row.setSpacing(max(7, round(vs * 0.6)))
+                if graph == "segment":
+                    graph_widget = SegmentBar(window.used, color)
+                    graph_widget.setFixedHeight(max(10, round(vs * 0.72)))
+                    row.addWidget(graph_widget, 1)
+                elif graph == "ring":
+                    graph_widget = UsageRing(
+                        window.used, color, usage_value_bold, vs, show_value=False
+                    )
+                    row.addWidget(graph_widget)
+                    row.addStretch()
+                else:  # bar
+                    graph_widget = UsageBar(window.used, color)
+                    graph_widget.setFixedHeight(max(14, preset["pbar_height"] + 5))
+                    row.addWidget(graph_widget, 1)
+                self._enable_instant_tooltip(graph_widget, usage_tooltip)
+
+                self._set_label_font(value_label, vs, value_weight)
+                value_label.setAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                value_label.setFixedWidth(max(48, vs * 4 + 10))
+                row.addWidget(value_label)
+                tile_layout.addLayout(row)
+
+            ui["windows_layout"].addWidget(tile, index, 0, 1, 2)
+            ui["window_rows"].append(tile)
 
     def update_data(
         self,

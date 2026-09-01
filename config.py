@@ -162,7 +162,7 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 "compact_font_bold",
             ):
                 settings.pop(legacy_key, None)
-            if settings.get("usage_view") not in {"bar", "ring"}:
+            if settings.get("usage_view") not in {"bar", "segment", "ring", "number"}:
                 settings["usage_view"] = "bar"
             if not isinstance(settings.get("dock_above_taskbar"), bool):
                 settings["dock_above_taskbar"] = False

@@ -597,6 +597,19 @@ class SettingsDialog(QDialog):
         )
         form.addRow("위젯 크기:", self.widget_scale_combo)
 
+        self.graph_combo = NoWheelComboBox()
+        self.graph_combo.addItem("막대", "bar")
+        self.graph_combo.addItem("세그먼트", "segment")
+        self.graph_combo.addItem("링", "ring")
+        self.graph_combo.addItem("숫자만", "number")
+        selected_graph = settings.get("usage_view", "bar")
+        graph_index = self.graph_combo.findData(selected_graph)
+        self.graph_combo.setCurrentIndex(max(graph_index, 0))
+        self.graph_combo.setToolTip(
+            "사용량을 어떤 그래프로 표시할지 고릅니다. 위젯 헤더의 전환 버튼으로도 순환합니다."
+        )
+        form.addRow("그래프 모양:", self.graph_combo)
+
         self.usage_alert_check = StyledCheckBox("설정한 사용량 이상에서 알림")
         self.usage_alert_check.setChecked(
             settings.get("usage_alerts_enabled", False)
@@ -1031,6 +1044,7 @@ class SettingsDialog(QDialog):
         )
         settings["check_updates"] = self.update_check.isChecked()
         settings["widget_scale"] = self.widget_scale_combo.currentData() or "medium"
+        settings["usage_view"] = self.graph_combo.currentData() or "bar"
         settings["usage_alerts_enabled"] = (
             self.usage_alert_check.isChecked()
         )

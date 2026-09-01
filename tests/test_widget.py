@@ -16,7 +16,7 @@ from providers import (
     ModelUsage,
     UsageWindow,
 )
-from ui.widget import SynapCapWidget, UsageBar, UsageRing
+from ui.widget import SegmentBar, SynapCapWidget, UsageBar, UsageRing
 from version import APP_VERSION
 
 
@@ -94,47 +94,52 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(self.widget._condensed_reset(""), "미상")
         self.assertEqual(self.widget._condensed_reset("리셋 시각 미상"), "미상")
         self.assertEqual(self.widget._condensed_reset("초기화 확인 중"), "확인 중")
-        self.assertEqual(self.widget._usage_window_marker("5시간"), "5h")
-        self.assertEqual(self.widget._usage_window_marker("주간"), "7d")
 
-    def test_bar_and_ring_views_can_be_toggled(self):
+    def test_graph_views_cycle_through_all_four_shapes(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
 
-        self.assertNotIn("사용 49%", labels)
-        self.assertIn("7d", labels)
+        # Every tile carries the window name, the reset, and the % — only the
+        # graph widget differs between views.
+        self.assertIn("주간", labels)
         self.assertIn("49%", labels)
-        usage_bar = row.findChild(UsageBar)
-        self.assertIsNotNone(usage_bar)
-        assert usage_bar is not None
-        self.assertEqual(usage_bar.usage_used, 49)
+        self.assertIsNotNone(row.findChild(UsageBar))
         value_label = next(
             label for label in row.findChildren(QLabel) if label.text() == "49%"
         )
-        # A normal (< 60%) value is demibold — calmer than the bold provider
-        # name and the bold warning/critical values.
         self.assertEqual(value_label.font().weight(), 600)
-        marker_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "7d"
-        )
-        self.assertEqual(marker_label.font().weight(), 400)
 
         self.widget._toggle_usage_view()
         self.app.processEvents()
+        self.assertEqual(self.widget.usage_view, "segment")
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-
-        self.assertEqual(self.widget.usage_view, "ring")
-        rings = row.findChildren(UsageRing)
-        self.assertEqual(len(rings), 1)
-        self.assertEqual(rings[0].value_text, "49%")
+        self.assertIsNotNone(row.findChild(SegmentBar))
         self.assertEqual(len(self.widget.findChildren(UsageBar)), 0)
-        self.assertEqual(self.widget.config_data["settings"]["usage_view"], "ring")
+
+        self.widget._toggle_usage_view()
+        self.app.processEvents()
+        self.assertEqual(self.widget.usage_view, "ring")
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        self.assertEqual(len(row.findChildren(UsageRing)), 1)
+        self.assertIn(
+            "49%", [label.text() for label in row.findChildren(QLabel)]
+        )
+
+        self.widget._toggle_usage_view()
+        self.app.processEvents()
+        self.assertEqual(self.widget.usage_view, "number")
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
+        self.assertEqual(len(self.widget.findChildren(SegmentBar)), 0)
+        self.assertIn(
+            "49%", [label.text() for label in row.findChildren(QLabel)]
+        )
 
         self.widget._toggle_usage_view()
         self.app.processEvents()
         self.assertEqual(self.widget.usage_view, "bar")
-        self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
+        self.assertEqual(self.widget.config_data["settings"]["usage_view"], "bar")
 
     def test_usage_bar_keeps_a_minimum_fill_for_nonzero_usage(self):
         self.usage.windows = [UsageWindow("5시간", 1, "8/12 09:49", 99)]
@@ -159,6 +164,29 @@ class WidgetTests(unittest.TestCase):
         assert usage_bar is not None
         usage_bar.grab()
         self.assertEqual(usage_bar.fill_width, 0)
+
+    def test_segment_bar_lights_one_segment_per_ten_percent(self):
+        self.usage.windows = [UsageWindow("5시간", 1, "8/12 09:49", 99)]
+        self.widget.config_data["settings"]["usage_view"] = "segment"
+        self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
+        self.widget.update_data([self.usage], force=True)
+        seg = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            SegmentBar
+        )
+        self.assertIsNotNone(seg)
+        assert seg is not None
+        seg.resize(120, 12)
+        seg.grab()
+        self.assertEqual(seg.lit_segments, 1)  # non-zero always lights at least one
+
+        self.usage.windows = [UsageWindow("5시간", 74, "8/12 09:49", 26)]
+        self.widget.update_data([self.usage], force=True)
+        seg = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            SegmentBar
+        )
+        seg.resize(120, 12)
+        seg.grab()
+        self.assertEqual(seg.lit_segments, 7)
 
     def test_usage_scale_uses_blue_peach_red(self):
         self.assertEqual(self.widget._usage_color(10), "#89B4FA")
@@ -571,23 +599,30 @@ class WidgetTests(unittest.TestCase):
         self.widget._refresh_compact_values()
         self.assertEqual(compact_value.text(), "49%")
 
-    def test_expanded_bar_stacks_cli_rows_and_ring_arranges_tiles_side_by_side(self):
+    def test_every_graph_view_stacks_window_tiles_in_one_column(self):
         self.usage.windows = [
             UsageWindow("5시간", 41, "8/12 09:49", 59),
             UsageWindow("주간", 12, "8/18 09:49", 88),
         ]
-        self.widget.update_data([self.usage])
-        self.app.processEvents()
+        for view in ("bar", "segment", "ring", "number"):
+            self.widget.config_data["settings"]["usage_view"] = view
+            self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
+            self.widget.update_data([self.usage], force=True)
+            self.app.processEvents()
 
-        first, second = self.widget.provider_ui_map["codex"]["window_rows"]
-        self.assertLess(first.geometry().top(), second.geometry().top())
-        self.assertEqual(first.geometry().left(), second.geometry().left())
-
-        self.widget._toggle_usage_view()
-        self.app.processEvents()
-        first, second = self.widget.provider_ui_map["codex"]["window_rows"]
-        self.assertEqual(first.geometry().top(), second.geometry().top())
-        self.assertLess(first.geometry().left(), second.geometry().left())
+            first, second = self.widget.provider_ui_map["codex"]["window_rows"]
+            self.assertLess(first.geometry().top(), second.geometry().top(), view)
+            self.assertEqual(first.geometry().left(), second.geometry().left(), view)
+            # The reset column starts at the same x in both tiles.
+            resets = [
+                t.findChild(QLabel, "resetCountdown")
+                for t in (first, second)
+            ]
+            self.assertEqual(
+                resets[0].mapTo(first, resets[0].rect().topLeft()).x(),
+                resets[1].mapTo(second, resets[1].rect().topLeft()).x(),
+                view,
+            )
 
     def test_compact_bar_uses_white_normally_and_warning_colors_at_thresholds(self):
         self.widget.update_data([self.usage])
@@ -915,7 +950,7 @@ class WidgetTests(unittest.TestCase):
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
-        self.assertIn("5h", labels)
+        self.assertIn("5시간", labels)
         reset_label = row.findChild(QLabel, "resetCountdown")
         self.assertIsNotNone(reset_label)
         assert reset_label is not None

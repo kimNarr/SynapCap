@@ -173,18 +173,26 @@ README도 새 SVG/PNG로 교체. 기존 3D 래스터 자산 제거.
 - `dock_above_taskbar` (선택): 하단 근처에 놓으면 작업표시줄 위 park, 다른 곳에 놓으면 유지.
   `_docked_to_bottom` 플래그로 관리. park 상태에서 높이가 커지면 위로 자란다.
 
-### 사용량 행 — 막대뷰 순서
+### 사용량 타일 — 통합 구조
 
-`_render_usage_rows` bar 분기 (`ui/widget.py` ~1471)
+`_render_usage_rows` (`ui/widget.py`). 모든 그래프 종류가 **같은 타일**을 쓴다.
+세로 1열로 쌓이고, 그래프 위젯만 교체되므로 뷰 전환 시 레이아웃이 안 흔들린다.
 
 ```
-[표식 20px] [리셋 텍스트] [진행 막대 · Expanding · 텍스트 없음] [% · 고정폭 우측정렬 · 스케일 색]
+┌───────────────────────────────┐
+│ 5시간              6일 20시간  │  ← 불변 메타 줄 (window.label 좌 · 리셋 우, 둘 다 딤)
+│ [ 그래프 · Expanding ]   28%   │  ← 그래프 줄 (그래프 + % 우측 고정폭)
+└───────────────────────────────┘
 ```
 
-- 표식: `_usage_window_marker(label)` → `"5h"`(5시간) / `"7d"`(주간) / `"•"`. 딤 블루 필(`#8FB6E8 on #141A28`), Regular.
-- 리셋: `_condensed_reset(relative)` → 현재 영어 축약 `"3h 44m"` / `"6d 22h"`. 고정폭 열(`~48px`).
-- `%`: `value_label`, `objectName="usageValue"`, `setFixedWidth(max(38, val_size × 3 + 6))`
-- 툴팁: 진행 막대와 `%` 둘 다 `usage_tooltip` (`"49% 사용 · 51% 남음"` [+ CLI 출처])
+- 메타 줄: `window.label`(`#BAC2DE`, 600, `font−1`) · `_condensed_reset`(`#8087A0`, `font−2`, `objectName="resetCountdown"`)
+- 그래프 종류 (`usage_view` ∈ `USAGE_VIEWS = ("bar","segment","ring","number")`):
+  - `bar` — `UsageBar` (트랙 `#1C2130`/`#3A4152`, 최소 3px 채움)
+  - `segment` — `SegmentBar` (10칸, `used>0`이면 최소 1칸, 색 = 스케일)
+  - `ring` — `UsageRing(show_value=False)` — 순수 아크 게이지, % 는 오른쪽 열
+  - `number` — 그래프 없음. % 를 메타 줄에 합쳐 1줄로 (가장 컴팩트)
+- `%`: `objectName="usageValue"`, 스케일 색 + 굵기 위계 + `▲`(≥80). 고정폭 `max(48, val_size × 4 + 10)`
+- 전환: 헤더 `view_btn`이 4종 순환, 환경설정 "그래프 모양" 셀렉터가 주 컨트롤. `config.py`가 4값 검증.
 
 ### 모션
 
@@ -349,15 +357,12 @@ Regular 굵기, 딤 블루 필(`#8FB6E8 on #141A28`), 폭은 2글자 맞게 확�
 
 ## 권장 실행 순서
 
-1. ~~**PR 1 (P1)**: I-01 → I-03 → I-02~~ — **완료**. `UsageBar` 기준으로 저사용률·색각 신호·
-   리셋 위계를 회귀 테스트로 고정. I-04·I-05·I-06·I-07도 함께 처리됨.
-2. **다음**: P3(I-10~I-16), 그리고 로고 자산 연동.
-3. **큰 재설계** (시안 `SynapCap UI 시안` 참고, 오너 확인 필요):
-   - 통합 타일 — 막대/링이 같은 상단 줄 공유, 그래프 줄만 교체(링 정렬 자동 해결)
-   - 그래프 4종 — 막대 / 세그먼트 / 링 / 숫자만, 환경설정에서 선택
+1. ~~P1 (I-01~I-09, I-17)~~ · ~~로고 자산 연동~~ · ~~P3 (I-11~I-16)~~ · ~~통합 타일 + 그래프 4종~~ — **완료**
+2. **큰 재설계** (시안 `SynapCap UI 시안` 참고, 오너 확인 필요):
    - **테마** — 다크/라이트/자동. 선행: `theme.py` 토큰 추출(색 하드코딩 전부 이관, 시각 변화 0)
    - 배경 — 순수 검정 `#000000` vs 근접흑 `#0B0B0E`
    - 위험 표식 — `▲` vs 타일 왼쪽 severity 스트라이프
-   - 헤더 간소화 — 버전 필·최소화 버튼 정리
+   - 헤더 간소화(I-10) — 뷰 전환은 이제 설정에 있으니 헤더에서 제거 검토, 버전 필·최소화 버튼 정리
+   - 로고/앱 accent 통일 (`#5B8DEF` vs `#89B4FA`)
 
 각 PR: `CHANGELOG.md` 갱신, `python -m unittest discover -s tests` 통과, `python main.py` 스크린샷 첨부.
