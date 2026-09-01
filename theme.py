@@ -52,9 +52,10 @@ DARK: dict[str, str] = {
     "accent": "#89B4FA",
     "accent_soft": "#AFCBFF",
     "on_accent": "#11111B",        # text on an accent fill
-    "usage_ok": "#89B4FA",
-    "usage_warn": "#FAB387",       # 60-79 %
-    "usage_crit": "#F38BA8",       # >= 80 %
+    "usage_calm": "#8087A0",       # < 60 % — muted, plenty of headroom
+    "usage_ok": "#89B4FA",         # 60-74 % — worth noting
+    "usage_warn": "#FAB387",       # 75-89 % — amber, closing in
+    "usage_crit": "#F38BA8",       # >= 90 % — red, plus ▲
     "warn_soft": "#F9E2AF",        # "waiting" badge, privacy note
     "good": "#A6E3A1",
     "danger": "#F38BA8",
@@ -138,9 +139,10 @@ LIGHT: dict[str, str] = {
     "accent": "#1857C9",
     "accent_soft": "#244F9E",
     "on_accent": "#FFFFFF",
-    "usage_ok": "#1857C9",
-    "usage_warn": "#9A5200",
-    "usage_crit": "#B42352",
+    "usage_calm": "#7C8296",       # < 60 % — muted, plenty of headroom
+    "usage_ok": "#1857C9",         # 60-74 % — worth noting
+    "usage_warn": "#9A5200",       # 75-89 % — amber, closing in
+    "usage_crit": "#B42352",       # >= 90 % — red, plus ▲
     "warn_soft": "#805400",
     "good": "#2E6F37",
     "danger": "#B42352",

@@ -203,33 +203,43 @@ class WidgetTests(unittest.TestCase):
         seg.grab()
         self.assertEqual(seg.lit_segments, 7)
 
-    def test_usage_scale_uses_blue_peach_red(self):
-        self.assertEqual(self.widget._usage_color(10), "#89B4FA")
-        self.assertEqual(self.widget._usage_color(65), "#FAB387")
-        self.assertEqual(self.widget._usage_color(88), "#F38BA8")
+    def test_usage_scale_has_four_tiers_with_a_muted_low_end(self):
+        self.assertEqual(self.widget._usage_color(10), "#8087A0")  # calm
+        self.assertEqual(self.widget._usage_color(65), "#89B4FA")  # notice
+        self.assertEqual(self.widget._usage_color(80), "#FAB387")  # warn
+        self.assertEqual(self.widget._usage_color(92), "#F38BA8")  # crit
 
     def test_warning_and_critical_values_have_non_color_signals(self):
         self.widget.config_data["settings"]["expanded_font_bold"] = False
+        # A "notice" value (60-74) stays quiet: no bold, no marker.
         self.usage.windows = [UsageWindow("5시간", 65, "8/12 09:49", 35)]
         self.widget.update_data([self.usage], force=True)
-
         value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
             QLabel, "usageValue"
         )
-        self.assertIsNotNone(value_label)
         assert value_label is not None
         self.assertEqual(value_label.text(), "65%")
+        self.assertEqual(value_label.font().weight(), 400)
+
+        # Warning (>=75) earns bold weight on top of the amber colour.
+        self.usage.windows = [UsageWindow("5시간", 78, "8/12 09:49", 22)]
+        self.widget.update_data([self.usage], force=True)
+        value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            QLabel, "usageValue"
+        )
+        assert value_label is not None
+        self.assertEqual(value_label.text(), "78%")
         self.assertEqual(value_label.font().weight(), 700)
         self.assertIn("#FAB387", value_label.styleSheet())
 
-        self.usage.windows = [UsageWindow("5시간", 85, "8/12 09:49", 15)]
+        # Critical (>=90) adds the ▲ marker.
+        self.usage.windows = [UsageWindow("5시간", 92, "8/12 09:49", 8)]
         self.widget.update_data([self.usage], force=True)
         value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
             QLabel, "usageValue"
         )
-        self.assertIsNotNone(value_label)
         assert value_label is not None
-        self.assertEqual(value_label.text(), "▲ 85%")
+        self.assertEqual(value_label.text(), "▲ 92%")
         self.assertEqual(value_label.font().weight(), 700)
 
     def test_bar_reset_countdown_uses_secondary_visual_weight(self):

@@ -39,6 +39,14 @@ EDGE_SNAP_DISTANCE = 48
 
 # Graph shapes for the expanded usage tile. The shape is chosen in Settings.
 USAGE_VIEWS = ("bar", "segment", "ring", "number")
+
+# Usage severity tiers (percent). Below NOTICE the value is deliberately quiet
+# so a low number never competes with a real one; CRIT also earns the ▲ marker
+# and bold weight starts at WARN.
+USAGE_NOTICE = 60
+USAGE_WARN = 75
+USAGE_CRIT = 90
+
 ResizeAnchor = tuple[QPoint, bool, bool]
 
 WIDGET_SCALE_PRESETS = {
@@ -1483,16 +1491,18 @@ class SynapCapWidget(QWidget):
 
     @staticmethod
     def _usage_color(used: float) -> str:
-        if used >= 80:
-            return t("usage_crit")  # red — over limit soon
-        if used >= 60:
-            return t("usage_warn")  # peach — pale yellow washed out on the dark ground
-        return t("usage_ok")  # blue — comfortable
+        if used >= USAGE_CRIT:
+            return t("usage_crit")  # red — at/over the limit
+        if used >= USAGE_WARN:
+            return t("usage_warn")  # amber — closing in
+        if used >= USAGE_NOTICE:
+            return t("usage_ok")  # blue — worth noting, not urgent
+        return t("usage_calm")  # muted — plenty of headroom
 
     @classmethod
     def _compact_usage_color(cls, used: float) -> str:
-        """Keep normal compact text white, then expose warning thresholds."""
-        if used < 60:
+        """Keep the compact strip calm until a value actually needs attention."""
+        if used < USAGE_WARN:
             return t("compact_value")
         return cls._usage_color(used)
 
@@ -1711,8 +1721,8 @@ class SynapCapWidget(QWidget):
                 usage_tooltip += "\n" + source_tooltip
             reset_display, reset_tooltip = self._reset_presentation(window.reset_text)
             color = self._usage_color(window.used)
-            is_warning = window.used >= 60
-            is_critical = window.used >= 80
+            is_warning = window.used >= USAGE_WARN
+            is_critical = window.used >= USAGE_CRIT
 
             # Keep every usage window to one line. The graph swaps in place
             # between views, avoiding the former extra meta row that made the
