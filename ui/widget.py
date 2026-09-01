@@ -108,7 +108,7 @@ class UsageRing(QWidget):
         self.bold = bold
         self.value_text = f"{self.used:.0f}%"
         self.font_size = font_size
-        self.ring_size = max(42, font_size + 32)
+        self.ring_size = max(50, font_size + 38)
         self.setFixedSize(self.ring_size, self.ring_size)
 
     def paintEvent(self, event):
@@ -121,19 +121,19 @@ class UsageRing(QWidget):
             self.ring_size - 7,
         )
 
-        background_pen = QPen(QColor("#2B303D"), 4.0)
+        background_pen = QPen(QColor("#2B303D"), 4.5)
         background_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(background_pen)
         painter.drawArc(ring_rect, 90 * 16, -360 * 16)
 
-        usage_pen = QPen(self.color, 4.0)
+        usage_pen = QPen(self.color, 4.5)
         usage_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(usage_pen)
         painter.drawArc(ring_rect, 90 * 16, round(-360 * 16 * self.used / 100))
 
         painter.setPen(QColor("#CDD6F4"))
         value_weight = QFont.Weight.Bold if self.bold else QFont.Weight.Normal
-        value_size = max(8, self.font_size - (3 if self.used >= 99.5 else 1))
+        value_size = max(9, self.font_size + 1 - (4 if self.used >= 99.5 else 0))
         painter.setFont(QFont("Segoe UI", value_size, value_weight))
         painter.drawText(
             QRectF(4, 4, self.ring_size - 8, self.ring_size - 8),
