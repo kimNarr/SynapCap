@@ -1106,6 +1106,11 @@ class SynapCapWidget(QWidget):
                 "unit": provider.unit,
             }
 
+            if not any(u.provider_id == provider.provider_id for u in self.latest_usage):
+                self._render_skeleton_rows(
+                    self.provider_ui_map[provider.provider_id], preset
+                )
+
             if index < len(self.providers) - 1:
                 separator = QFrame()
                 separator.setFixedHeight(1)
@@ -1213,6 +1218,45 @@ class SynapCapWidget(QWidget):
                 widget.setParent(None)
                 widget.deleteLater()
         ui["window_rows"] = []
+
+    def _render_skeleton_rows(self, ui: dict, preset: dict) -> None:
+        """Reserve the usage rows' height before the first fetch lands, so the
+        card doesn't jump when real values replace the loading state."""
+        self._clear_usage_rows(ui)
+        tile_padding = max(5, round(preset["val_size"] * 0.42))
+        marker_size = max(20, preset["val_size"] + 8)
+        bar_height = max(14, preset["pbar_height"] + 5)
+        for index in range(2):
+            row = QWidget()
+            row.setObjectName("usageMetric")
+            row.setStyleSheet("QWidget#usageMetric { background: transparent; }")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(
+                tile_padding,
+                max(2, tile_padding // 2),
+                tile_padding,
+                max(2, tile_padding // 2),
+            )
+            row_layout.setSpacing(max(7, round(preset["val_size"] * 0.55)))
+
+            chip = QLabel()
+            chip.setFixedSize(marker_size + 6, marker_size)
+            chip.setStyleSheet("background-color: #1B212D; border-radius: 5px;")
+            row_layout.addWidget(chip)
+
+            track = QLabel()
+            track.setFixedHeight(bar_height)
+            track.setStyleSheet("background-color: #1A1F2A; border-radius: 4px;")
+            row_layout.addWidget(track, 1)
+
+            value = QLabel()
+            value.setFixedWidth(max(38, preset["val_size"] * 3 + 6))
+            value.setFixedHeight(max(10, preset["val_size"] - 2))
+            value.setStyleSheet("background-color: #1A1F2A; border-radius: 3px;")
+            row_layout.addWidget(value)
+
+            ui["windows_layout"].addWidget(row, index, 0, 1, 2)
+            ui["window_rows"].append(row)
 
     def _enable_instant_tooltip(self, widget: QWidget, text: str) -> None:
         if not text:
