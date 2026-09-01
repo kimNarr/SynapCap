@@ -309,7 +309,7 @@ class SynapCapWidget(QWidget):
             }
             QFrame#providersFrame {
                 background-color: #090A0D;
-                border: 1px solid #272C38;
+                border: none;
                 border-radius: 6px;
             }
             QLabel {
@@ -966,9 +966,9 @@ class SynapCapWidget(QWidget):
             background = "#89B4FA"
             border = "#89B4FA"
         else:
-            foreground = "#7F849C"
+            foreground = "#97A0B6"
             background = "#252538"
-            border = "#303746"
+            border = "#3A3F55"
         self.version_btn.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
             f"border: 1px solid {border}; border-radius: 5px; "
@@ -1109,10 +1109,19 @@ class SynapCapWidget(QWidget):
 
     @staticmethod
     def _set_status_badge(label: QWidget, state: str, preset: dict) -> None:
+        if state == "source":
+            # "CLI 기준" is metadata, not an alert — an outline chip that steps
+            # back from the provider name.
+            label.setStyleSheet(
+                "color: #8397BE; background-color: transparent; "
+                "border: 1px solid #2E3550; border-radius: 5px; padding: 2px 6px; "
+                f"font-size: {max(8, preset['val_size'] - 2)}px; font-weight: 600;"
+            )
+            return
+
         colors = {
             "waiting": ("#F9E2AF", "#323040"),
             "error": ("#F38BA8", "#3B2735"),
-            "source": ("#89B4FA", "#252B3F"),
         }
         foreground, background = colors.get(state, ("#A6E3A1", "#26372F"))
         label.setStyleSheet(
