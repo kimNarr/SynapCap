@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from providers import BaseAIProvider, ModelUsage, UsageWindow
+from theme import palette, t
 from version import APP_VERSION
 
 from .icon import (
@@ -91,7 +92,60 @@ WIDGET_SCALE_PRESETS = {
 
 # The compact bar is intentionally neutral. Provider icons keep their own
 # identity colours while the numbers stay readable on every dark desktop theme.
-COMPACT_VALUE_COLOR = "#F8FAFC"
+# The value colour lives in theme.py as ``compact_value``.
+
+# Qt style sheets carry literal ``{}`` blocks, so they stay percent-style
+# templates fed by :func:`theme.palette` rather than ``str.format``.
+_ROOT_FRAME_QSS = """
+    QWidget {
+        border: none;
+        outline: none;
+        background: transparent;
+    }
+    QFrame#rootFrame {
+        background-color: %(ground)s;
+        border: 2px solid %(frame_border)s;
+        border-radius: 6px;
+    }
+    QFrame#rootFrame[compactMode="true"] {
+        background-color: %(ground_deep)s;
+        border-color: %(frame_border_deep)s;
+    }
+    QWidget#compactBar {
+        background-color: %(ground_deep)s;
+        border-radius: 4px;
+    }
+    QFrame#providersFrame {
+        background-color: %(surface)s;
+        border: none;
+        border-radius: 6px;
+    }
+    QLabel {
+        border: none;
+        outline: none;
+        background: transparent;
+    }
+"""
+
+_ICON_BTN_QSS = """
+    QPushButton {
+        border: none;
+        background: transparent;
+        border-radius: 4px;
+    }
+    QPushButton:hover {
+        background-color: %(hover)s;
+    }
+"""
+
+_COMPACT_BTN_QSS = """
+    QPushButton {
+        border: none;
+        background: transparent;
+        border-radius: 5px;
+    }
+    QPushButton:hover { background-color: %(hover)s; }
+"""
 
 # Long reset-status strings do not fit the fixed-width reset column; the full
 # wording stays in the tooltip (see SynapCapWidget._reset_hint).
@@ -137,7 +191,7 @@ class UsageRing(QWidget):
             self.ring_size - inset * 2,
         )
 
-        background_pen = QPen(QColor("#2B303D"), stroke)
+        background_pen = QPen(QColor(t("ring_track")), stroke)
         background_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(background_pen)
         painter.drawArc(ring_rect, 90 * 16, -360 * 16)
@@ -148,7 +202,7 @@ class UsageRing(QWidget):
         painter.drawArc(ring_rect, 90 * 16, round(-360 * 16 * self.used / 100))
 
         if self.show_value:
-            painter.setPen(QColor("#CDD6F4"))
+            painter.setPen(QColor(t("ink")))
             value_weight = QFont.Weight.Bold if self.bold else QFont.Weight.Normal
             value_size = max(9, self.font_size + 1 - (4 if self.used >= 99.5 else 0))
             painter.setFont(QFont("Segoe UI", value_size, value_weight))
@@ -182,8 +236,8 @@ class UsageBar(QWidget):
 
         track = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
         radius = min(4.0, max(1.0, track.height() / 2))
-        painter.setPen(QPen(QColor("#3A4152"), 1.0))
-        painter.setBrush(QColor("#1C2130"))
+        painter.setPen(QPen(QColor(t("bar_track_edge")), 1.0))
+        painter.setBrush(QColor(t("bar_track")))
         painter.drawRoundedRect(track, radius, radius)
 
         inner_width = max(0.0, track.width() - 2.0)
@@ -238,7 +292,7 @@ class SegmentBar(QWidget):
         for index in range(count):
             rect = QRectF(index * (seg_width + gap), top, seg_width, seg_height)
             painter.setBrush(
-                self.fill_color if index < self.lit_segments else QColor("#23283A")
+                self.fill_color if index < self.lit_segments else QColor(t("segment_off"))
             )
             painter.drawRoundedRect(rect, 2.0, 2.0)
         painter.end()
@@ -275,7 +329,7 @@ class LoadingSpinner(QWidget):
         del event
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor("#89B4FA"), 2.2)
+        pen = QPen(QColor(t("accent")), 2.2)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         inset = 3.5
@@ -347,36 +401,7 @@ class SynapCapWidget(QWidget):
 
         self.frame = QFrame()
         self.frame.setObjectName("rootFrame")
-        self.frame.setStyleSheet("""
-            QWidget {
-                border: none;
-                outline: none;
-                background: transparent;
-            }
-            QFrame#rootFrame {
-                background-color: #050608;
-                border: 2px solid #4A5266;
-                border-radius: 6px;
-            }
-            QFrame#rootFrame[compactMode="true"] {
-                background-color: #020304;
-                border-color: #596176;
-            }
-            QWidget#compactBar {
-                background-color: #020304;
-                border-radius: 4px;
-            }
-            QFrame#providersFrame {
-                background-color: #090A0D;
-                border: none;
-                border-radius: 6px;
-            }
-            QLabel {
-                border: none;
-                outline: none;
-                background: transparent;
-            }
-        """)
+        self.frame.setStyleSheet(_ROOT_FRAME_QSS % palette())
 
         self.frame_layout = QVBoxLayout(self.frame)
         self.frame_layout.setContentsMargins(12, 14, 12, 12)
@@ -410,16 +435,7 @@ class SynapCapWidget(QWidget):
 
         header_layout.addStretch()
 
-        btn_style = """
-            QPushButton {
-                border: none;
-                background: transparent;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #171B23;
-            }
-        """
+        btn_style = _ICON_BTN_QSS % palette()
 
         # Usage graph mode toggle (bar/ring)
         self.view_btn = QPushButton()
@@ -433,7 +449,7 @@ class SynapCapWidget(QWidget):
         # 1) 지금 새로고침 버튼 (Refresh Now Vector Icon Button)
         self.refresh_btn = QPushButton()
         self.refresh_btn.setFixedSize(22, 22)
-        self.refresh_btn.setIcon(create_refresh_icon(14, "#89B4FA"))
+        self.refresh_btn.setIcon(create_refresh_icon(14, t("accent")))
         self.refresh_btn.setStyleSheet(btn_style)
         self.refresh_btn.clicked.connect(self.refresh_requested.emit)
         self._enable_instant_tooltip(self.refresh_btn, "지금 새로고침")
@@ -442,7 +458,7 @@ class SynapCapWidget(QWidget):
         # 2) Settings Button (⚙ Vector Icon)
         self.settings_btn = QPushButton()
         self.settings_btn.setFixedSize(22, 22)
-        self.settings_btn.setIcon(create_settings_icon(14, "#A6ADC8"))
+        self.settings_btn.setIcon(create_settings_icon(14, t("ink_mid")))
         self.settings_btn.setStyleSheet(btn_style)
         self.settings_btn.clicked.connect(self.settings_requested.emit)
         self._enable_instant_tooltip(self.settings_btn, "설정")
@@ -450,7 +466,7 @@ class SynapCapWidget(QWidget):
 
         self.minimize_btn = QPushButton()
         self.minimize_btn.setFixedSize(22, 22)
-        self.minimize_btn.setIcon(create_minimize_icon(14, "#A6ADC8"))
+        self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
         self.minimize_btn.setStyleSheet(btn_style)
         self.minimize_btn.clicked.connect(self.enter_compact_mode)
         self._enable_instant_tooltip(self.minimize_btn, "가로 요약으로 접기")
@@ -458,7 +474,7 @@ class SynapCapWidget(QWidget):
 
         self.close_btn = QPushButton()
         self.close_btn.setFixedSize(22, 22)
-        self.close_btn.setIcon(create_close_icon(14, "#EBA0AC"))
+        self.close_btn.setIcon(create_close_icon(14, t("danger_soft")))
         self.close_btn.setStyleSheet(btn_style)
         self.close_btn.clicked.connect(self.quit_requested.emit)
         self._enable_instant_tooltip(self.close_btn, "SynapCap 완전 종료")
@@ -485,17 +501,10 @@ class SynapCapWidget(QWidget):
         self.compact_layout.addLayout(self.compact_items_layout)
         self.compact_layout.addStretch()
 
-        compact_btn_style = """
-            QPushButton {
-                border: none;
-                background: transparent;
-                border-radius: 5px;
-            }
-            QPushButton:hover { background-color: #171B23; }
-        """
+        compact_btn_style = _COMPACT_BTN_QSS % palette()
         self.expand_btn = QPushButton()
         self.expand_btn.setFixedSize(24, 24)
-        self.expand_btn.setIcon(create_arrow_down_icon(14, "#89B4FA"))
+        self.expand_btn.setIcon(create_arrow_down_icon(14, t("accent")))
         self.expand_btn.setStyleSheet(compact_btn_style)
         self.expand_btn.clicked.connect(self.exit_compact_mode)
         self._enable_instant_tooltip(self.expand_btn, "전체 위젯 펼치기")
@@ -503,7 +512,7 @@ class SynapCapWidget(QWidget):
 
         self.compact_close_btn = QPushButton()
         self.compact_close_btn.setFixedSize(24, 24)
-        self.compact_close_btn.setIcon(create_close_icon(14, "#EBA0AC"))
+        self.compact_close_btn.setIcon(create_close_icon(14, t("danger_soft")))
         self.compact_close_btn.setStyleSheet(compact_btn_style)
         self.compact_close_btn.clicked.connect(self.quit_requested.emit)
         self._enable_instant_tooltip(self.compact_close_btn, "SynapCap 완전 종료")
@@ -644,8 +653,8 @@ class SynapCapWidget(QWidget):
         glyph_size = metrics["glyph_size"]
         self.expand_btn.setFixedSize(button_size, button_size)
         self.compact_close_btn.setFixedSize(button_size, button_size)
-        self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, "#89B4FA"))
-        self.compact_close_btn.setIcon(create_close_icon(glyph_size, "#EBA0AC"))
+        self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, t("accent")))
+        self.compact_close_btn.setIcon(create_close_icon(glyph_size, t("danger_soft")))
 
     def _schedule_fit_to_content(
         self,
@@ -741,10 +750,10 @@ class SynapCapWidget(QWidget):
         _point, _anchor_left, anchor_top = resize_anchor
         glyph_size = self._compact_metrics()["glyph_size"]
         if anchor_top:
-            self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, "#89B4FA"))
+            self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, t("accent")))
             tooltip = "아래로 전체 위젯 펼치기"
         else:
-            self.expand_btn.setIcon(create_arrow_up_icon(glyph_size, "#89B4FA"))
+            self.expand_btn.setIcon(create_arrow_up_icon(glyph_size, t("accent")))
             tooltip = "위로 전체 위젯 펼치기"
         self._enable_instant_tooltip(self.expand_btn, tooltip)
 
@@ -838,7 +847,7 @@ class SynapCapWidget(QWidget):
             value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._apply_compact_value_style(
                 value_label,
-                COMPACT_VALUE_COLOR,
+                t("compact_value"),
                 metrics,
             )
             item_layout.addWidget(value_label)
@@ -962,7 +971,7 @@ class SynapCapWidget(QWidget):
             value_label.show()
             if usage.error:
                 value_label.setText("!")
-                self._apply_compact_value_style(value_label, "#F38BA8", metrics)
+                self._apply_compact_value_style(value_label, t("usage_crit"), metrics)
                 self._fit_compact_value_label(value_label, metrics["font_size"])
                 compact_ui["item"].setToolTip(usage.error)
                 continue
@@ -975,9 +984,9 @@ class SynapCapWidget(QWidget):
                 # Colour each window on its own so "90%/20%" doesn't paint the
                 # calm 20% red just because the 5h window is hot.
                 self._apply_compact_value_style(
-                    value_label, COMPACT_VALUE_COLOR, metrics
+                    value_label, t("compact_value"), metrics
                 )
-                slash = '<span style="color:#5B6274">/</span>'
+                slash = f'<span style="color:{t("ink_faintest")}">/</span>'
                 value_label.setText(
                     slash.join(
                         f'<span style="color:{color}">{window.used:.0f}%</span>'
@@ -1025,13 +1034,13 @@ class SynapCapWidget(QWidget):
 
     def _set_version_badge_style(self, update_available: bool) -> None:
         if update_available:
-            foreground = "#11111B"
-            background = "#89B4FA"
-            border = "#89B4FA"
+            foreground = t("on_accent")
+            background = t("accent")
+            border = t("accent")
         else:
-            foreground = "#97A0B6"
-            background = "#252538"
-            border = "#3A3F55"
+            foreground = t("version_fg")
+            background = t("version_bg")
+            border = t("version_edge")
         self.version_btn.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
             f"border: 1px solid {border}; border-radius: 5px; "
@@ -1116,7 +1125,7 @@ class SynapCapWidget(QWidget):
 
             # Provider Name
             name_label = QLabel(provider.name)
-            name_label.setStyleSheet("color: #CDD6F4;")
+            name_label.setStyleSheet(f"color: {t('ink')};")
             self._set_label_font(name_label, preset["name_size"], expanded_weight)
             title_row.addWidget(name_label)
 
@@ -1170,7 +1179,9 @@ class SynapCapWidget(QWidget):
             if index < len(self.providers) - 1:
                 separator = QFrame()
                 separator.setFixedHeight(1)
-                separator.setStyleSheet("background-color: #20242D; border: none;")
+                separator.setStyleSheet(
+                    f"background-color: {t('separator')}; border: none;"
+                )
                 self.cards_layout.addWidget(separator)
 
         self._schedule_fit_to_content()
@@ -1181,17 +1192,18 @@ class SynapCapWidget(QWidget):
             # "CLI 기준" is metadata, not an alert — an outline chip that steps
             # back from the provider name.
             label.setStyleSheet(
-                "color: #8397BE; background-color: transparent; "
-                "border: 1px solid #2E3550; border-radius: 5px; padding: 2px 6px; "
+                f"color: {t('cli_badge_fg')}; background-color: transparent; "
+                f"border: 1px solid {t('cli_badge_edge')}; border-radius: 5px; "
+                "padding: 2px 6px; "
                 f"font-size: {max(8, preset['val_size'] - 2)}px; font-weight: 600;"
             )
             return
 
         colors = {
-            "waiting": ("#F9E2AF", "#323040"),
-            "error": ("#F38BA8", "#3B2735"),
+            "waiting": (t("warn_soft"), t("badge_waiting_bg")),
+            "error": (t("danger"), t("badge_error_bg")),
         }
-        foreground, background = colors.get(state, ("#A6E3A1", "#26372F"))
+        foreground, background = colors.get(state, (t("good"), t("badge_ok_bg")))
         label.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
             "border: none; border-radius: 5px; padding: 3px 7px; "
@@ -1294,12 +1306,16 @@ class SynapCapWidget(QWidget):
             meta.setContentsMargins(0, 0, 0, 0)
             name = QLabel()
             name.setFixedSize(round(vs * 2.6), max(9, vs - 1))
-            name.setStyleSheet("background-color: #1B212D; border-radius: 3px;")
+            name.setStyleSheet(
+                f"background-color: {t('skeleton_strong')}; border-radius: 3px;"
+            )
             meta.addWidget(name)
             meta.addStretch()
             hint = QLabel()
             hint.setFixedSize(round(vs * 3.4), max(8, vs - 3))
-            hint.setStyleSheet("background-color: #1A1F2A; border-radius: 3px;")
+            hint.setStyleSheet(
+                f"background-color: {t('skeleton')}; border-radius: 3px;"
+            )
             meta.addWidget(hint)
             tile_layout.addLayout(meta)
 
@@ -1308,11 +1324,15 @@ class SynapCapWidget(QWidget):
             row.setSpacing(max(7, round(vs * 0.6)))
             track = QLabel()
             track.setFixedHeight(bar_height)
-            track.setStyleSheet("background-color: #1A1F2A; border-radius: 4px;")
+            track.setStyleSheet(
+                f"background-color: {t('skeleton')}; border-radius: 4px;"
+            )
             row.addWidget(track, 1)
             value = QLabel()
             value.setFixedSize(max(38, vs * 3 + 6), max(10, vs - 2))
-            value.setStyleSheet("background-color: #1A1F2A; border-radius: 3px;")
+            value.setStyleSheet(
+                f"background-color: {t('skeleton')}; border-radius: 3px;"
+            )
             row.addWidget(value)
             tile_layout.addLayout(row)
 
@@ -1372,16 +1392,16 @@ class SynapCapWidget(QWidget):
     @staticmethod
     def _usage_color(used: float) -> str:
         if used >= 80:
-            return "#F38BA8"  # red — over limit soon
+            return t("usage_crit")  # red — over limit soon
         if used >= 60:
-            return "#FAB387"  # peach — pale yellow washed out on the dark ground
-        return "#89B4FA"  # blue — comfortable
+            return t("usage_warn")  # peach — pale yellow washed out on the dark ground
+        return t("usage_ok")  # blue — comfortable
 
     @classmethod
     def _compact_usage_color(cls, used: float) -> str:
         """Keep normal compact text white, then expose warning thresholds."""
         if used < 60:
-            return COMPACT_VALUE_COLOR
+            return t("compact_value")
         return cls._usage_color(used)
 
     @staticmethod
@@ -1603,7 +1623,7 @@ class SynapCapWidget(QWidget):
             meta.setSpacing(8)
             window_label = QLabel(window.label)
             window_label.setObjectName("windowLabel")
-            window_label.setStyleSheet("color: #BAC2DE;")
+            window_label.setStyleSheet(f"color: {t('ink_bright')};")
             self._set_label_font(window_label, max(9, vs - 1), 600)
             meta.addWidget(window_label)
             meta.addStretch()
@@ -1613,7 +1633,7 @@ class SynapCapWidget(QWidget):
             self._enable_instant_tooltip(
                 reset_label, self._reset_hint(reset_display, reset_tooltip)
             )
-            reset_label.setStyleSheet("color: #8087A0;")
+            reset_label.setStyleSheet(f"color: {t('ink_dim')};")
             self._set_label_font(reset_label, max(9, vs - 2))
             meta.addWidget(reset_label)
 

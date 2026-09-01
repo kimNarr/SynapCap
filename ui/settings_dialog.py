@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from feedback import feedback_url
 from providers import PROVIDER_TYPE_OPTIONS
+from theme import palette, t
 from version import APP_VERSION
 
 from .icon import (
@@ -42,6 +43,286 @@ from .icon import (
     create_trash_icon,
     create_wordmark_pixmap,
 )
+
+# Qt style sheets keep their literal ``{}`` blocks, so they stay percent-style
+# templates fed by :func:`theme.palette`.
+_DIALOG_QSS = """
+    QDialog {
+        background-color: transparent;
+        color: %(ink)s;
+        font-family: 'Segoe UI', -apple-system, sans-serif;
+    }
+    QFrame#settingsFrame {
+        background-color: %(ground)s;
+        border: 2px solid %(settings_border)s;
+        border-radius: 6px;
+    }
+    QWidget#settingsTitleBar {
+        background-color: %(ground_deep)s;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        border-bottom: 1px solid %(line)s;
+    }
+    QLabel#settingsTitleLabel {
+        color: %(ink)s;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    QPushButton#settingsCloseBtn {
+        padding: 0;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: %(ink_mid)s;
+        font-size: 18px;
+        font-weight: 500;
+    }
+    QPushButton#settingsCloseBtn:hover {
+        border: none;
+        background-color: %(danger)s;
+        color: %(on_accent)s;
+    }
+    QLabel {
+        color: %(ink_bright)s;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    QGroupBox {
+        background-color: %(surface)s;
+        border: 1px solid %(line)s;
+        border-radius: 6px;
+        margin-top: 14px;
+        padding-top: 16px;
+        font-weight: bold;
+        color: %(accent)s;
+    }
+    QGroupBox::title {
+        subcontrol-origin: margin;
+        left: 12px;
+        padding: 0 6px;
+        background-color: %(surface)s;
+        border-radius: 4px;
+    }
+    QGroupBox#providerCard {
+        margin-top: 0px;
+        padding-top: 0px;
+        background-color: %(surface)s;
+        border-color: %(line_strong)s;
+    }
+    QLineEdit, QSpinBox {
+        background-color: %(ground_deep)s;
+        color: %(ink)s;
+        border: 1px solid %(line)s;
+        border-radius: 5px;
+        padding: 7px 12px;
+        font-size: 13px;
+        selection-background-color: %(control_edge)s;
+    }
+    QLineEdit:hover, QSpinBox:hover {
+        border: 1px solid %(control_edge)s;
+        background-color: %(surface)s;
+    }
+    QLineEdit:focus, QSpinBox:focus {
+        border: 2px solid %(accent)s;
+        background-color: %(ground)s;
+        color: %(text_bright)s;
+    }
+    QComboBox {
+        background-color: %(ground_deep)s;
+        color: %(ink)s;
+        border: 1px solid %(line)s;
+        border-radius: 5px;
+        padding: 7px 32px 7px 12px;
+        font-size: 13px;
+        selection-background-color: %(control_edge)s;
+    }
+    QComboBox:hover {
+        border: 1px solid %(control_edge)s;
+        background-color: %(surface)s;
+    }
+    QComboBox:focus {
+        border: 2px solid %(accent)s;
+    }
+    QComboBox::drop-down {
+        subcontrol-origin: padding;
+        subcontrol-position: top right;
+        width: 30px;
+        background-color: %(control)s;
+        border-left: 1px solid %(control_edge)s;
+        border-top-right-radius: 5px;
+        border-bottom-right-radius: 5px;
+    }
+    QComboBox::drop-down:hover {
+        background-color: %(control_edge)s;
+    }
+    QComboBox QAbstractItemView {
+        background-color: %(surface)s;
+        color: %(ink)s;
+        border: 1px solid %(control_edge)s;
+        border-radius: 5px;
+        selection-background-color: %(control_edge)s;
+        selection-color: %(text_bright)s;
+        outline: 0;
+        padding: 4px;
+    }
+    QSpinBox {
+        padding: 7px 34px 7px 12px;
+    }
+    QSpinBox::up-button {
+        subcontrol-origin: border;
+        subcontrol-position: top right;
+        width: 28px;
+        background-color: %(control)s;
+        border-left: 1px solid %(control_edge)s;
+        border-bottom: 1px solid %(control_edge)s;
+        border-top-right-radius: 5px;
+    }
+    QSpinBox::up-button:hover {
+        background-color: %(control_edge)s;
+    }
+    QSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: bottom right;
+        width: 28px;
+        background-color: %(control)s;
+        border-left: 1px solid %(control_edge)s;
+        border-bottom-right-radius: 5px;
+    }
+    QSpinBox::down-button:hover {
+        background-color: %(control_edge)s;
+    }
+    QCheckBox {
+        color: %(ink)s;
+        spacing: 8px;
+    }
+    QCheckBox::indicator {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        border: 1px solid %(control_edge)s;
+        background-color: %(ground_deep)s;
+    }
+    QCheckBox::indicator:checked {
+        background-color: %(accent)s;
+        border: 1px solid %(accent)s;
+    }
+    QTabWidget::pane {
+        border: 1px solid %(line)s;
+        border-radius: 6px;
+        background-color: %(ground)s;
+    }
+    QTabBar::tab {
+        background: %(ground_deep)s;
+        color: %(ink_mid)s;
+        padding: 9px 20px;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        margin-right: 3px;
+        font-weight: 600;
+    }
+    QTabBar::tab:selected {
+        background: %(control)s;
+        color: %(accent)s;
+        font-weight: bold;
+    }
+    QPushButton {
+        background-color: %(control)s;
+        color: %(ink)s;
+        border: 1px solid %(control_edge)s;
+        border-radius: 5px;
+        padding: 7px 14px;
+        font-weight: bold;
+    }
+    QPushButton:hover {
+        background-color: %(control_edge)s;
+        color: %(text_bright)s;
+        border: 1px solid %(accent)s;
+    }
+    QPushButton#addBtn {
+        background-color: %(control)s;
+        color: %(accent)s;
+        border: 1px solid %(accent)s;
+        padding: 7px 16px;
+    }
+    QPushButton#addBtn:hover {
+        background-color: %(control_edge)s;
+        color: %(accent)s;
+        border: 1px solid %(accent_bright)s;
+    }
+    QPushButton#addBtn:disabled {
+        background-color: %(control_disabled_bg)s;
+        color: %(control_disabled_fg)s;
+        border-color: %(line_strong)s;
+    }
+    QPushButton#iconOnlyBtn {
+        background-color: %(control)s;
+        border: 1px solid %(control_edge)s;
+        border-radius: 6px;
+        padding: 0px;
+    }
+    QPushButton#iconOnlyBtn:hover {
+        background-color: %(control_edge)s;
+        border: 1px solid %(accent)s;
+    }
+    QPushButton#deleteIconBtn {
+        background-color: %(control)s;
+        border: 1px solid %(danger)s;
+        border-radius: 6px;
+        padding: 0px;
+    }
+    QPushButton#deleteIconBtn:hover {
+        background-color: %(danger)s;
+        border: 1px solid %(danger)s;
+    }
+    QPushButton#saveBtn {
+        background-color: %(accent)s;
+        color: %(on_accent)s;
+        border: none;
+        padding: 8px 22px;
+    }
+    QPushButton#saveBtn:hover {
+        background-color: %(accent_bright)s;
+    }
+    QPushButton#previewBtn {
+        background-color: %(preview_bg)s;
+        color: %(accent_soft)s;
+        border-color: %(preview_edge)s;
+    }
+    QPushButton#previewBtn:hover {
+        background-color: %(preview_hover_bg)s;
+        border-color: %(accent)s;
+    }
+"""
+
+_PROVIDERS_SCROLL_QSS = """
+    QScrollArea, QScrollArea > QWidget > QWidget {
+        border: none;
+        background: transparent;
+    }
+    QScrollBar:vertical {
+        width: 9px;
+        margin: 2px 0;
+        border: none;
+        background: %(panel_sunken)s;
+    }
+    QScrollBar::handle:vertical {
+        min-height: 32px;
+        border-radius: 4px;
+        background: %(control_edge)s;
+    }
+    QScrollBar::handle:vertical:hover {
+        background: %(scrollbar_hover)s;
+    }
+    QScrollBar::add-line:vertical,
+    QScrollBar::sub-line:vertical {
+        height: 0;
+        background: transparent;
+    }
+    QScrollBar::add-page:vertical,
+    QScrollBar::sub-page:vertical {
+        background: transparent;
+    }
+"""
 
 
 class NoWheelComboBox(QComboBox):
@@ -111,7 +392,7 @@ class StyledCheckBox(QCheckBox):
         )
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor("#11111B"), 2.0)
+        pen = QPen(QColor(t("on_accent")), 2.0)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
@@ -152,7 +433,7 @@ def _draw_chevron(widget: QWidget, rect, direction: str) -> None:
     )
     painter = QPainter(widget)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setPen(QPen(QColor("#CDD6F4"), 1.6))
+    painter.setPen(QPen(QColor(t("ink")), 1.6))
     painter.drawPolyline(points)
     painter.end()
 
@@ -243,253 +524,7 @@ class SettingsDialog(QDialog):
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMinimumSize(560, 600)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: transparent;
-                color: #CDD6F4;
-                font-family: 'Segoe UI', -apple-system, sans-serif;
-            }
-            QFrame#settingsFrame {
-                background-color: #050608;
-                border: 2px solid #353C4B;
-                border-radius: 6px;
-            }
-            QWidget#settingsTitleBar {
-                background-color: #020304;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-                border-bottom: 1px solid #272C38;
-            }
-            QLabel#settingsTitleLabel {
-                color: #CDD6F4;
-                font-size: 11px;
-                font-weight: 700;
-            }
-            QPushButton#settingsCloseBtn {
-                padding: 0;
-                border: none;
-                border-radius: 4px;
-                background: transparent;
-                color: #A6ADC8;
-                font-size: 18px;
-                font-weight: 500;
-            }
-            QPushButton#settingsCloseBtn:hover {
-                border: none;
-                background-color: #F38BA8;
-                color: #11111B;
-            }
-            QLabel {
-                color: #BAC2DE;
-                font-size: 12px;
-                font-weight: 500;
-            }
-            QGroupBox {
-                background-color: #090A0D;
-                border: 1px solid #272C38;
-                border-radius: 6px;
-                margin-top: 14px;
-                padding-top: 16px;
-                font-weight: bold;
-                color: #89B4FA;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 6px;
-                background-color: #090A0D;
-                border-radius: 4px;
-            }
-            QGroupBox#providerCard {
-                margin-top: 0px;
-                padding-top: 0px;
-                background-color: #090A0D;
-                border-color: #303746;
-            }
-            QLineEdit, QSpinBox {
-                background-color: #020304;
-                color: #CDD6F4;
-                border: 1px solid #272C38;
-                border-radius: 5px;
-                padding: 7px 12px;
-                font-size: 13px;
-                selection-background-color: #3C4156;
-            }
-            QLineEdit:hover, QSpinBox:hover {
-                border: 1px solid #3C4156;
-                background-color: #090A0D;
-            }
-            QLineEdit:focus, QSpinBox:focus {
-                border: 2px solid #89B4FA;
-                background-color: #050608;
-                color: #FFFFFF;
-            }
-            QComboBox {
-                background-color: #020304;
-                color: #CDD6F4;
-                border: 1px solid #272C38;
-                border-radius: 5px;
-                padding: 7px 32px 7px 12px;
-                font-size: 13px;
-                selection-background-color: #3C4156;
-            }
-            QComboBox:hover {
-                border: 1px solid #3C4156;
-                background-color: #090A0D;
-            }
-            QComboBox:focus {
-                border: 2px solid #89B4FA;
-            }
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 30px;
-                background-color: #232637;
-                border-left: 1px solid #3C4156;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-            QComboBox::drop-down:hover {
-                background-color: #3C4156;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #090A0D;
-                color: #CDD6F4;
-                border: 1px solid #3C4156;
-                border-radius: 5px;
-                selection-background-color: #3C4156;
-                selection-color: #FFFFFF;
-                outline: 0;
-                padding: 4px;
-            }
-            QSpinBox {
-                padding: 7px 34px 7px 12px;
-            }
-            QSpinBox::up-button {
-                subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 28px;
-                background-color: #232637;
-                border-left: 1px solid #3C4156;
-                border-bottom: 1px solid #3C4156;
-                border-top-right-radius: 5px;
-            }
-            QSpinBox::up-button:hover {
-                background-color: #3C4156;
-            }
-            QSpinBox::down-button {
-                subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 28px;
-                background-color: #232637;
-                border-left: 1px solid #3C4156;
-                border-bottom-right-radius: 5px;
-            }
-            QSpinBox::down-button:hover {
-                background-color: #3C4156;
-            }
-            QCheckBox {
-                color: #CDD6F4;
-                spacing: 8px;
-            }
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-                border-radius: 4px;
-                border: 1px solid #3C4156;
-                background-color: #020304;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #89B4FA;
-                border: 1px solid #89B4FA;
-            }
-            QTabWidget::pane {
-                border: 1px solid #272C38;
-                border-radius: 6px;
-                background-color: #050608;
-            }
-            QTabBar::tab {
-                background: #020304;
-                color: #A6ADC8;
-                padding: 9px 20px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-                margin-right: 3px;
-                font-weight: 600;
-            }
-            QTabBar::tab:selected {
-                background: #232637;
-                color: #89B4FA;
-                font-weight: bold;
-            }
-            QPushButton {
-                background-color: #232637;
-                color: #CDD6F4;
-                border: 1px solid #3C4156;
-                border-radius: 5px;
-                padding: 7px 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #3C4156;
-                color: #FFFFFF;
-                border: 1px solid #89B4FA;
-            }
-            QPushButton#addBtn {
-                background-color: #232637;
-                color: #89B4FA;
-                border: 1px solid #89B4FA;
-                padding: 7px 16px;
-            }
-            QPushButton#addBtn:hover {
-                background-color: #3C4156;
-                color: #89B4FA;
-                border: 1px solid #B4BEFE;
-            }
-            QPushButton#addBtn:disabled {
-                background-color: #12151C;
-                color: #697187;
-                border-color: #303746;
-            }
-            QPushButton#iconOnlyBtn {
-                background-color: #232637;
-                border: 1px solid #3C4156;
-                border-radius: 6px;
-                padding: 0px;
-            }
-            QPushButton#iconOnlyBtn:hover {
-                background-color: #3C4156;
-                border: 1px solid #89B4FA;
-            }
-            QPushButton#deleteIconBtn {
-                background-color: #232637;
-                border: 1px solid #F38BA8;
-                border-radius: 6px;
-                padding: 0px;
-            }
-            QPushButton#deleteIconBtn:hover {
-                background-color: #F38BA8;
-                border: 1px solid #F38BA8;
-            }
-            QPushButton#saveBtn {
-                background-color: #89B4FA;
-                color: #11111B;
-                border: none;
-                padding: 8px 22px;
-            }
-            QPushButton#saveBtn:hover {
-                background-color: #B4BEFE;
-            }
-            QPushButton#previewBtn {
-                background-color: #1B2030;
-                color: #AFCBFF;
-                border-color: #5B80C7;
-            }
-            QPushButton#previewBtn:hover {
-                background-color: #252D43;
-                border-color: #89B4FA;
-            }
-        """)
+        self.setStyleSheet(_DIALOG_QSS % palette())
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -636,7 +671,9 @@ class SettingsDialog(QDialog):
         layout.setSpacing(12)
 
         title = QLabel("SynapCap에 의견 보내기")
-        title.setStyleSheet("color: #CDD6F4; font-size: 17px; font-weight: 750;")
+        title.setStyleSheet(
+            f"color: {t('ink')}; font-size: 17px; font-weight: 750;"
+        )
         layout.addWidget(title)
 
         description = QLabel(
@@ -644,7 +681,7 @@ class SettingsDialog(QDialog):
             "내용을 확인한 뒤 직접 등록해 주세요."
         )
         description.setWordWrap(True)
-        description.setStyleSheet("color: #A6ADC8; line-height: 1.5;")
+        description.setStyleSheet(f"color: {t('ink_mid')}; line-height: 1.5;")
         layout.addWidget(description)
 
         self.feedback_buttons = {}
@@ -670,8 +707,8 @@ class SettingsDialog(QDialog):
             card = QFrame()
             card.setObjectName("feedbackCard")
             card.setStyleSheet(
-                "QFrame#feedbackCard { background-color: #0F1017; "
-                "border: 1px solid #292D3C; border-radius: 6px; }"
+                f"QFrame#feedbackCard {{ background-color: {t('panel_sunken')}; "
+                f"border: 1px solid {t('line_soft')}; border-radius: 6px; }}"
             )
             card_layout = QHBoxLayout(card)
             card_layout.setContentsMargins(16, 14, 14, 14)
@@ -681,11 +718,11 @@ class SettingsDialog(QDialog):
             copy_layout.setSpacing(4)
             option_title = QLabel(button_text)
             option_title.setStyleSheet(
-                "color: #CDD6F4; font-size: 13px; font-weight: 700;"
+                f"color: {t('ink')}; font-size: 13px; font-weight: 700;"
             )
             option_detail = QLabel(detail_text)
             option_detail.setWordWrap(True)
-            option_detail.setStyleSheet("color: #7F849C; font-size: 11px;")
+            option_detail.setStyleSheet(f"color: {t('ink_faint')}; font-size: 11px;")
             copy_layout.addWidget(option_title)
             copy_layout.addWidget(option_detail)
             card_layout.addLayout(copy_layout, 1)
@@ -707,8 +744,8 @@ class SettingsDialog(QDialog):
         )
         privacy_note.setWordWrap(True)
         privacy_note.setStyleSheet(
-            "color: #F9E2AF; background-color: rgba(249, 226, 175, 0.06); "
-            "border: 1px solid rgba(249, 226, 175, 0.2); border-radius: 6px; "
+            f"color: {t('warn_soft')}; background-color: {t('privacy_note_bg')}; "
+            f"border: 1px solid {t('privacy_note_edge')}; border-radius: 6px; "
             "padding: 10px; font-size: 11px;"
         )
         layout.addWidget(privacy_note)
@@ -722,16 +759,18 @@ class SettingsDialog(QDialog):
         # Top Control Bar (Add Provider)
         top_bar = QHBoxLayout()
         top_label = QLabel("<b>AI 프로바이더</b>")
-        top_label.setStyleSheet("font-size: 13px; color: #CDD6F4;")
+        top_label.setStyleSheet(f"font-size: 13px; color: {t('ink')};")
         top_bar.addWidget(top_label)
         self.provider_count_label = QLabel()
-        self.provider_count_label.setStyleSheet("color: #7F849C; font-size: 11px;")
+        self.provider_count_label.setStyleSheet(
+            f"color: {t('ink_faint')}; font-size: 11px;"
+        )
         top_bar.addWidget(self.provider_count_label)
         top_bar.addStretch()
 
         self.add_btn = QPushButton("Add")
         self.add_btn.setObjectName("addBtn")
-        self.add_btn.setIcon(create_plus_icon(14, "#89B4FA"))
+        self.add_btn.setIcon(create_plus_icon(14, t("accent")))
         self.add_btn.clicked.connect(self.on_add_provider)
         top_bar.addWidget(self.add_btn)
 
@@ -741,35 +780,7 @@ class SettingsDialog(QDialog):
         self.providers_scroll = QScrollArea(self.providers_tab)
         self.providers_scroll.setWidgetResizable(True)
         self.providers_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.providers_scroll.setStyleSheet("""
-            QScrollArea, QScrollArea > QWidget > QWidget {
-                border: none;
-                background: transparent;
-            }
-            QScrollBar:vertical {
-                width: 9px;
-                margin: 2px 0;
-                border: none;
-                background: #0F1017;
-            }
-            QScrollBar::handle:vertical {
-                min-height: 32px;
-                border-radius: 4px;
-                background: #3C4156;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #4A5168;
-            }
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {
-                height: 0;
-                background: transparent;
-            }
-            QScrollBar::add-page:vertical,
-            QScrollBar::sub-page:vertical {
-                background: transparent;
-            }
-        """)
+        self.providers_scroll.setStyleSheet(_PROVIDERS_SCROLL_QSS % palette())
 
         self.container = QWidget()
         self.container_layout = QVBoxLayout(self.container)  # type: ignore
@@ -806,7 +817,9 @@ class SettingsDialog(QDialog):
         header_bar.addWidget(provider_icon)
 
         header_title = QLabel(p_data.get("name", "Provider"))
-        header_title.setStyleSheet("color: #CDD6F4; font-size: 13px; font-weight: 700;")
+        header_title.setStyleSheet(
+            f"color: {t('ink')}; font-size: 13px; font-weight: 700;"
+        )
         header_bar.addWidget(header_title)
 
         enabled_check = StyledCheckBox("사용")
@@ -818,17 +831,17 @@ class SettingsDialog(QDialog):
         up_btn.setObjectName("iconOnlyBtn")
         up_btn.setFixedSize(28, 28)
         up_btn.setToolTip("위로 이동")
-        up_btn.setIcon(create_arrow_up_icon(14, "#CDD6F4"))
+        up_btn.setIcon(create_arrow_up_icon(14, t("ink")))
 
         dn_btn = QPushButton("")
         dn_btn.setObjectName("iconOnlyBtn")
         dn_btn.setFixedSize(28, 28)
         dn_btn.setToolTip("아래로 이동")
-        dn_btn.setIcon(create_arrow_down_icon(14, "#CDD6F4"))
+        dn_btn.setIcon(create_arrow_down_icon(14, t("ink")))
 
         del_btn = HoverIconButton(
-            create_trash_icon(14, "#F38BA8"),
-            create_trash_icon(14, "#11111B"),
+            create_trash_icon(14, t("danger")),
+            create_trash_icon(14, t("on_accent")),
         )
         del_btn.setObjectName("deleteIconBtn")
         del_btn.setFixedSize(28, 28)
@@ -868,7 +881,7 @@ class SettingsDialog(QDialog):
 
         connection_label = QLabel()
         connection_label.setWordWrap(True)
-        connection_label.setStyleSheet("color: #A6E3A1; font-size: 11px;")
+        connection_label.setStyleSheet(f"color: {t('good')}; font-size: 11px;")
         g_layout.addRow("연결 방식:", connection_label)
 
         window_options = QWidget()
