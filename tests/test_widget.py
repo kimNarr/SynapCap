@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QEvent, QPoint, Qt
-from PySide6.QtWidgets import QApplication, QLabel, QProgressBar, QWidget
+from PySide6.QtCore import QEvent, QPoint, QRect, Qt
+from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from providers import (
     AntigravityProvider,
@@ -16,7 +16,7 @@ from providers import (
     ModelUsage,
     UsageWindow,
 )
-from ui.widget import SynapCapWidget, UsageRing
+from ui.widget import SynapCapWidget, UsageBar, UsageRing
 from version import APP_VERSION
 
 
@@ -64,6 +64,11 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(relative, "1일 16시간 후")
         self.assertEqual(tooltip, "8/12 09:49 초기화")
 
+    def test_expanded_header_uses_horizontal_wordmark(self):
+        self.assertTrue(hasattr(self.widget, "wordmark_label"))
+        self.assertFalse(self.widget.wordmark_label.pixmap().isNull())
+        self.assertFalse(hasattr(self.widget, "title_label"))
+
     def test_past_reset_does_not_roll_over_to_next_year(self):
         relative, tooltip = self.widget._reset_presentation(
             "8/26 13:00",
@@ -82,16 +87,35 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(relative, "1시간 후")
         self.assertEqual(tooltip, "1/1 00:30 초기화")
 
+    def test_condensed_reset_drops_the_relative_suffix(self):
+        self.assertEqual(self.widget._condensed_reset("3시간 17분 후"), "3h 17m")
+        self.assertEqual(self.widget._condensed_reset("6일 16시간 후"), "6d 16h")
+        self.assertEqual(self.widget._condensed_reset(""), "리셋 시각 미상")
+        self.assertEqual(self.widget._usage_window_marker("5시간"), "5h")
+        self.assertEqual(self.widget._usage_window_marker("주간"), "7d")
+
     def test_bar_and_ring_views_can_be_toggled(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
 
-        self.assertIn("49%", labels)
         self.assertNotIn("사용 49%", labels)
-        self.assertEqual(len(row.findChildren(QProgressBar)), 1)
-        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
-        self.assertIn("font-weight: 700", usage_label.styleSheet())
+        self.assertIn("7d", labels)
+        self.assertIn("49%", labels)
+        usage_bar = row.findChild(UsageBar)
+        self.assertIsNotNone(usage_bar)
+        assert usage_bar is not None
+        self.assertEqual(usage_bar.usage_used, 49)
+        value_label = next(
+            label for label in row.findChildren(QLabel) if label.text() == "49%"
+        )
+        # A normal (< 60%) value is demibold — calmer than the bold provider
+        # name and the bold warning/critical values.
+        self.assertEqual(value_label.font().weight(), 600)
+        marker_label = next(
+            label for label in row.findChildren(QLabel) if label.text() == "7d"
+        )
+        self.assertEqual(marker_label.font().weight(), 400)
 
         self.widget._toggle_usage_view()
         self.app.processEvents()
@@ -101,13 +125,76 @@ class WidgetTests(unittest.TestCase):
         rings = row.findChildren(UsageRing)
         self.assertEqual(len(rings), 1)
         self.assertEqual(rings[0].value_text, "49%")
-        self.assertEqual(len(self.widget.findChildren(QProgressBar)), 0)
+        self.assertEqual(len(self.widget.findChildren(UsageBar)), 0)
         self.assertEqual(self.widget.config_data["settings"]["usage_view"], "ring")
 
         self.widget._toggle_usage_view()
         self.app.processEvents()
         self.assertEqual(self.widget.usage_view, "bar")
         self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
+
+    def test_usage_bar_keeps_a_minimum_fill_for_nonzero_usage(self):
+        self.usage.windows = [UsageWindow("5시간", 1, "8/12 09:49", 99)]
+        self.widget.update_data([self.usage], force=True)
+        self.app.processEvents()
+
+        usage_bar = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            UsageBar
+        )
+        self.assertIsNotNone(usage_bar)
+        assert usage_bar is not None
+        usage_bar.grab()
+        self.assertGreaterEqual(usage_bar.fill_width, 3)
+
+        self.usage.windows = [UsageWindow("5시간", 0, "8/12 09:49", 100)]
+        self.widget.update_data([self.usage], force=True)
+        self.app.processEvents()
+        usage_bar = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            UsageBar
+        )
+        self.assertIsNotNone(usage_bar)
+        assert usage_bar is not None
+        usage_bar.grab()
+        self.assertEqual(usage_bar.fill_width, 0)
+
+    def test_warning_and_critical_values_have_non_color_signals(self):
+        self.widget.config_data["settings"]["expanded_font_bold"] = False
+        self.usage.windows = [UsageWindow("5시간", 65, "8/12 09:49", 35)]
+        self.widget.update_data([self.usage], force=True)
+
+        value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            QLabel, "usageValue"
+        )
+        self.assertIsNotNone(value_label)
+        assert value_label is not None
+        self.assertEqual(value_label.text(), "65%")
+        self.assertEqual(value_label.font().weight(), 700)
+
+        self.usage.windows = [UsageWindow("5시간", 85, "8/12 09:49", 15)]
+        self.widget.update_data([self.usage], force=True)
+        value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            QLabel, "usageValue"
+        )
+        self.assertIsNotNone(value_label)
+        assert value_label is not None
+        self.assertEqual(value_label.text(), "▲ 85%")
+        self.assertEqual(value_label.font().weight(), 700)
+
+    def test_bar_reset_countdown_uses_secondary_visual_weight(self):
+        self.widget.update_data([self.usage])
+        reset_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
+            QLabel, "resetCountdown"
+        )
+
+        self.assertIsNotNone(reset_label)
+        assert reset_label is not None
+        self.assertIn("color: #8087A0", reset_label.styleSheet())
+        preset = self.widget._expanded_preset(self.widget.config_data["settings"])
+        self.assertEqual(
+            reset_label.font().pointSize(),
+            max(9, preset["val_size"] - 2),
+        )
+        self.assertGreaterEqual(reset_label.width(), 48)
 
     def test_codex_defaults_to_five_hour_and_weekly_windows(self):
         self.usage.windows = [
@@ -119,21 +206,56 @@ class WidgetTests(unittest.TestCase):
 
         rows = self.widget.provider_ui_map["codex"]["window_rows"]
         self.assertEqual(len(rows), 2)
-        labels = [
-            label.text()
+        values = [
+            next(
+                label.text()
+                for label in row.findChildren(QLabel)
+                if label.text().endswith("%")
+            )
             for row in rows
-            for label in row.findChildren(QLabel)
         ]
-        self.assertIn("38%", labels)
-        self.assertIn("6%", labels)
+        self.assertEqual(values, ["38%", "6%"])
 
     def test_usage_value_bold_can_be_disabled(self):
         self.widget.config_data["settings"]["expanded_font_bold"] = False
         self.widget.update_data([self.usage])
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
-        self.assertIn("font-weight: 400", usage_label.styleSheet())
+        value_label = next(
+            label for label in row.findChildren(QLabel) if label.text().endswith("%")
+        )
+        self.assertEqual(value_label.font().weight(), 400)
+
+    def test_compact_usage_bold_option_changes_the_rendered_font_weight(self):
+        self.widget.config_data["settings"]["compact_font_bold"] = False
+        self.widget.update_data([self.usage])
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        compact_value = self.widget.compact_ui_map["codex"]["value"]
+        self.assertEqual(compact_value.font().weight(), 400)
+
+        self.widget.config_data["settings"]["compact_font_bold"] = True
+        self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
+        self.app.processEvents()
+        compact_value = self.widget.compact_ui_map["codex"]["value"]
+        self.assertEqual(compact_value.font().weight(), 700)
+
+    def test_medium_widget_scale_sets_a_roomier_default_width(self):
+        self.widget.rebuild_ui(
+            {
+                "settings": {
+                    "widget_scale": "medium",
+                    "always_on_top": False,
+                    "usage_view": "bar",
+                }
+            },
+            [CodexProvider({"id": "codex", "name": "Codex"})],
+            preserve_usage=False,
+        )
+
+        self.assertEqual(self.widget.width(), 360)
+        self.assertEqual(self.widget._expanded_preset({"widget_scale": "medium"})["val_size"], 13)
 
     def test_missing_cli_is_labeled_as_install_required(self):
         usage = ModelUsage(
@@ -156,11 +278,13 @@ class WidgetTests(unittest.TestCase):
     def test_progress_tooltip_is_shown_on_enter(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        progress = row.findChild(QProgressBar)
+        usage_bar = row.findChild(UsageBar)
+        self.assertIsNotNone(usage_bar)
+        assert usage_bar is not None
 
-        self.assertEqual(progress.toolTip(), "49% 사용 · 51% 남음")
+        self.assertEqual(usage_bar.toolTip(), "49% 사용 · 51% 남음")
         with patch("ui.widget.QToolTip.showText") as show_text:
-            self.widget.eventFilter(progress, QEvent(QEvent.Type.Enter))
+            self.widget.eventFilter(usage_bar, QEvent(QEvent.Type.Enter))
 
         show_text.assert_called_once()
 
@@ -198,8 +322,10 @@ class WidgetTests(unittest.TestCase):
         self.assertTrue(ui["status"].property("instantTooltip"))
         self.assertIn("마지막 조회: 8/14 13:20:30", ui["status"].toolTip())
         self.assertIn("일시적으로 차이가 날 수 있습니다", ui["status"].toolTip())
-        progress = ui["window_rows"][0].findChild(QProgressBar)
-        self.assertIn("Claude CLI 기준 사용량", progress.toolTip())
+        usage_bar = ui["window_rows"][0].findChild(UsageBar)
+        self.assertIsNotNone(usage_bar)
+        assert usage_bar is not None
+        self.assertIn("Claude CLI 기준 사용량", usage_bar.toolTip())
 
         self.widget.enter_compact_mode()
         compact_item = self.widget.compact_ui_map["claude"]["item"]
@@ -364,11 +490,13 @@ class WidgetTests(unittest.TestCase):
         compact_item = self.widget.compact_ui_map["codex"]["item"]
         self.assertEqual(compact_value.text(), "49%")
         self.assertIn("Codex", compact_item.toolTip())
-        self.assertIn("font-size: 12px", compact_value.styleSheet())
-        self.assertEqual(self.widget.compact_logo.size().width(), 20)
-        self.assertEqual(self.widget.expand_btn.height(), 26)
-        self.assertGreaterEqual(self.widget.frame.height(), 40)
-        self.assertIn("border: 2px solid #585B70", self.widget.frame.styleSheet())
+        self.assertEqual(compact_value.font().pointSize(), 12)
+        self.assertIn("color: #F8FAFC", compact_value.styleSheet())
+        self.assertEqual(self.widget.compact_logo.size().width(), 18)
+        self.assertEqual(self.widget.expand_btn.height(), 22)
+        self.assertLess(self.widget.frame.height(), 40)
+        self.assertTrue(self.widget.frame.property("compactMode"))
+        self.assertIn("border: 2px solid #4A5266", self.widget.frame.styleSheet())
         self.assertIn("QFrame#rootFrame", self.widget.frame.styleSheet())
         self.assertIn("border-radius: 6px", self.widget.frame.styleSheet())
 
@@ -433,6 +561,93 @@ class WidgetTests(unittest.TestCase):
         self.widget.provider_ui_map["gemini"]["show_five_hour"] = False
         self.widget._refresh_compact_values()
         self.assertEqual(compact_value.text(), "49%")
+
+    def test_expanded_bar_stacks_cli_rows_and_ring_arranges_tiles_side_by_side(self):
+        self.usage.windows = [
+            UsageWindow("5시간", 41, "8/12 09:49", 59),
+            UsageWindow("주간", 12, "8/18 09:49", 88),
+        ]
+        self.widget.update_data([self.usage])
+        self.app.processEvents()
+
+        first, second = self.widget.provider_ui_map["codex"]["window_rows"]
+        self.assertLess(first.geometry().top(), second.geometry().top())
+        self.assertEqual(first.geometry().left(), second.geometry().left())
+
+        self.widget._toggle_usage_view()
+        self.app.processEvents()
+        first, second = self.widget.provider_ui_map["codex"]["window_rows"]
+        self.assertEqual(first.geometry().top(), second.geometry().top())
+        self.assertLess(first.geometry().left(), second.geometry().left())
+
+    def test_compact_bar_uses_white_normally_and_warning_colors_at_thresholds(self):
+        self.widget.update_data([self.usage])
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        compact_value = self.widget.compact_ui_map["codex"]["value"]
+        self.assertIn("color: #F8FAFC", compact_value.styleSheet())
+
+        high_usage = ModelUsage("codex", "Codex", "Codex", 92, 100, "%")
+        self.widget.update_data([high_usage])
+        self.assertEqual(compact_value.text(), "92%")
+        self.assertIn("color: #F38BA8", compact_value.styleSheet())
+
+    def test_dock_above_taskbar_uses_the_bottom_of_available_geometry(self):
+        self.widget.config_data["settings"]["dock_above_taskbar"] = True
+        available = QRect(100, 80, 900, 600)
+        self.widget.resize(300, 90)
+        with patch.object(self.widget, "_available_geometry", return_value=available):
+            self.widget._dock_above_taskbar_if_enabled()
+
+        self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
+
+    def test_docked_widget_can_be_moved_away_from_the_bottom_edge(self):
+        from PySide6.QtCore import QPointF
+        from PySide6.QtGui import QMouseEvent
+
+        self.widget.config_data["settings"]["dock_above_taskbar"] = True
+        available = QRect(0, 0, 1000, 700)
+        with patch.object(self.widget, "_available_geometry", return_value=available):
+            self.widget._dock_above_taskbar_if_enabled()
+            self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
+
+            # Drag the widget up near the top of the screen and release it.
+            self.widget.move(300, 10)
+            release = QMouseEvent(
+                QEvent.Type.MouseButtonRelease,
+                QPointF(0, 0),
+                QPointF(300, 10),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            self.widget.mouseReleaseEvent(release)
+            self.assertFalse(self.widget._docked_to_bottom)
+            self.assertLess(self.widget.frameGeometry().top(), 100)
+
+            # A later usage refresh must not yank it back down.
+            self.usage.windows = [
+                UsageWindow("5시간", 41, "8/12 09:49", 59),
+                UsageWindow("주간", 12, "8/18 09:49", 88),
+            ]
+            self.widget.update_data([self.usage])
+            self.app.processEvents()
+            self.assertLess(self.widget.frameGeometry().top(), 100)
+
+    def test_docked_widget_keeps_bottom_edge_when_usage_rows_grow(self):
+        self.widget.config_data["settings"]["dock_above_taskbar"] = True
+        available = QRect(0, 0, 1000, 700)
+        with patch.object(self.widget, "_available_geometry", return_value=available):
+            self.widget._dock_above_taskbar_if_enabled()
+            self.usage.windows = [
+                UsageWindow("5시간", 41, "8/12 09:49", 59),
+                UsageWindow("주간", 12, "8/18 09:49", 88),
+            ]
+            self.widget.update_data([self.usage])
+            self.app.processEvents()
+
+        self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
 
     def test_legacy_size_setting_uses_responsive_minimum_and_compact_fits_content(self):
         widget = SynapCapWidget(
@@ -627,6 +842,22 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(self.widget.frameGeometry().bottomRight(), compact_bottom_right)
         self.assertLessEqual(self.widget.frameGeometry().bottom(), available.bottom())
 
+    def test_expanding_from_compact_settles_before_the_next_event_cycle(self):
+        available = self.widget.screen().availableGeometry()
+        self.widget.config_data["settings"]["dock_above_taskbar"] = True
+        self.widget._docked_to_bottom = True
+        self.widget.move(
+            available.right() - self.widget.width() - 40,
+            available.bottom() - self.widget.height() + 1,
+        )
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        self.widget.exit_compact_mode()
+
+        self.assertFalse(self.widget._fit_timer.isActive())
+        self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
+
     def test_drag_release_snaps_widget_to_nearby_screen_edges(self):
         available = self.widget.screen().availableGeometry()
         self.widget.move(available.left() + 40, available.top() + 36)
@@ -675,7 +906,8 @@ class WidgetTests(unittest.TestCase):
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
-        self.assertIn("5시간 · 리셋 시각 미상", labels)
+        self.assertIn("5h", labels)
+        self.assertIn("리셋 시각 미상", labels)
 
     def test_visual_rebuild_reuses_latest_usage(self):
         self.widget.update_data([self.usage])
@@ -698,9 +930,11 @@ class WidgetTests(unittest.TestCase):
         )
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
-        self.assertIn("font-size: 16px", usage_label.styleSheet())
-        self.assertIn("font-weight: 400", usage_label.styleSheet())
+        value_label = next(
+            label for label in row.findChildren(QLabel) if label.text().endswith("%")
+        )
+        self.assertEqual(value_label.font().pointSize(), 16)
+        self.assertEqual(value_label.font().weight(), 400)
 
     def test_large_independent_fonts_resize_rows_bars_and_compact_width(self):
         config = {
@@ -723,17 +957,21 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        usage_label = next(label for label in row.findChildren(QLabel) if label.text() == "49%")
-        progress = row.findChild(QProgressBar)
-        self.assertIn("font-size: 18px", usage_label.styleSheet())
-        self.assertGreaterEqual(progress.height(), 13)
-        self.assertGreaterEqual(self.widget.width(), 360)
+        usage_bar = row.findChild(UsageBar)
+        self.assertIsNotNone(usage_bar)
+        assert usage_bar is not None
+        self.assertGreaterEqual(usage_bar.height(), 18)
+        value_label = next(
+            label for label in row.findChildren(QLabel) if label.text().endswith("%")
+        )
+        self.assertEqual(value_label.font().pointSize(), 18)
+        self.assertGreaterEqual(self.widget.width(), 300)
 
         self.widget.enter_compact_mode()
         self.app.processEvents()
         compact_value = self.widget.compact_ui_map["codex"]["value"]
-        self.assertIn("font-size: 16px", compact_value.styleSheet())
-        self.assertIn("font-weight: 400", compact_value.styleSheet())
+        self.assertEqual(compact_value.font().pointSize(), 16)
+        self.assertEqual(compact_value.font().weight(), 400)
         self.assertGreaterEqual(compact_value.width(), compact_value.sizeHint().width())
         self.assertGreaterEqual(self.widget.frame.height(), compact_value.sizeHint().height() + 16)
 

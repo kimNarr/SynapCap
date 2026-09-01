@@ -7,9 +7,9 @@ from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
-    QProgressBar,
     QPushButton,
     QSizePolicy,
     QToolTip,
@@ -30,6 +30,7 @@ from .icon import (
     create_refresh_icon,
     create_settings_icon,
     create_usage_view_icon,
+    create_wordmark_pixmap,
 )
 
 # A frameless widget has no visible resize border, so a slightly wider magnetic
@@ -37,15 +38,48 @@ from .icon import (
 EDGE_SNAP_DISTANCE = 48
 ResizeAnchor = tuple[QPoint, bool, bool]
 
-EXPANDED_BASE_METRICS = {
-    "width": 300,
-    "title_size": 13,
-    "name_size": 12,
-    "val_size": 11,
-    "pbar_height": 8,
-    "badge_size": 30,
-    "card_padding": 10,
+WIDGET_SCALE_PRESETS = {
+    "small": {
+        "width": 320,
+        "title_size": 13,
+        "name_size": 12,
+        "val_size": 11,
+        "pbar_height": 8,
+        "badge_size": 30,
+        "card_padding": 10,
+        "card_spacing": 7,
+        "window_spacing": 5,
+        "compact_font_size": 11,
+    },
+    "medium": {
+        "width": 360,
+        "title_size": 15,
+        "name_size": 14,
+        "val_size": 13,
+        "pbar_height": 10,
+        "badge_size": 32,
+        "card_padding": 12,
+        "card_spacing": 8,
+        "window_spacing": 6,
+        "compact_font_size": 13,
+    },
+    "large": {
+        "width": 420,
+        "title_size": 17,
+        "name_size": 16,
+        "val_size": 15,
+        "pbar_height": 12,
+        "badge_size": 36,
+        "card_padding": 14,
+        "card_spacing": 10,
+        "window_spacing": 7,
+        "compact_font_size": 15,
+    },
 }
+
+# The compact bar is intentionally neutral. Provider icons keep their own
+# identity colours while the numbers stay readable on every dark desktop theme.
+COMPACT_VALUE_COLOR = "#F8FAFC"
 
 
 class UsageRing(QWidget):
@@ -76,7 +110,7 @@ class UsageRing(QWidget):
             self.ring_size - 7,
         )
 
-        background_pen = QPen(QColor("#313244"), 4.0)
+        background_pen = QPen(QColor("#2B303D"), 4.0)
         background_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(background_pen)
         painter.drawArc(ring_rect, 90 * 16, -360 * 16)
@@ -95,6 +129,47 @@ class UsageRing(QWidget):
             Qt.AlignmentFlag.AlignCenter,
             self.value_text,
         )
+
+        painter.end()
+
+
+class UsageBar(QWidget):
+    """Paint a stable usage track with a visible fill at every non-zero value."""
+
+    def __init__(self, used: float, color: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setObjectName("usageBar")
+        self.usage_used = max(0.0, min(100.0, float(used)))
+        self.fill_color = QColor(color)
+        self.fill_width = 0.0
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
+
+    def paintEvent(self, event) -> None:
+        del event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        track = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
+        radius = min(4.0, max(1.0, track.height() / 2))
+        painter.setPen(QPen(QColor("#3A4152"), 1.0))
+        painter.setBrush(QColor("#1C2130"))
+        painter.drawRoundedRect(track, radius, radius)
+
+        inner_width = max(0.0, track.width() - 2.0)
+        inner_height = max(0.0, track.height() - 2.0)
+        self.fill_width = 0.0
+        if self.usage_used > 0 and inner_width > 0 and inner_height > 0:
+            self.fill_width = min(
+                inner_width,
+                max(3.0, inner_width * self.usage_used / 100.0),
+            )
+            fill = QRectF(1.5, 1.5, self.fill_width, inner_height)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(self.fill_color)
+            painter.drawRoundedRect(fill, max(1.5, radius - 1), max(1.5, radius - 1))
 
         painter.end()
 
@@ -158,6 +233,9 @@ class SynapCapWidget(QWidget):
         self._shutdown_in_progress = False
         self.is_compact = False
         self.compact_ui_map = {}
+        # Whether the widget is currently parked above the taskbar. Only then
+        # does the dock_above_taskbar setting re-pin it on layout changes.
+        self._docked_to_bottom = True
         self._pending_resize_anchor: ResizeAnchor | None = None
         configured_view = self.config_data.get("settings", {}).get("usage_view", "bar")
         self.usage_view = configured_view if configured_view in {"bar", "ring"} else "bar"
@@ -206,17 +284,21 @@ class SynapCapWidget(QWidget):
                 background: transparent;
             }
             QFrame#rootFrame {
-                background-color: #202033;
-                border: 2px solid #585B70;
+                background-color: #050608;
+                border: 2px solid #4A5266;
                 border-radius: 6px;
             }
+            QFrame#rootFrame[compactMode="true"] {
+                background-color: #020304;
+                border-color: #596176;
+            }
             QWidget#compactBar {
-                background-color: #242438;
+                background-color: #020304;
                 border-radius: 4px;
             }
             QFrame#providersFrame {
-                background-color: #181825;
-                border: 1px solid #313244;
+                background-color: #090A0D;
+                border: 1px solid #272C38;
                 border-radius: 6px;
             }
             QLabel {
@@ -237,19 +319,13 @@ class SynapCapWidget(QWidget):
         header_layout.setSpacing(3)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # App Icon 'S' Logo
-        icon_label = QLabel()
-        icon_label.setPixmap(create_app_pixmap(20))
-        header_layout.addWidget(icon_label)
-
-        # Title Label
-        self.title_label = QLabel("SynapCap")
-        self.title_label.setStyleSheet(
-            "color: #CDD6F4; font-weight: bold; "
-            f"font-size: {preset['title_size']}px; "
-            "font-family: 'Segoe UI', sans-serif;"
-        )
-        header_layout.addWidget(self.title_label)
+        # Use the supplied horizontal brand mark in the expanded widget. The
+        # compact bar keeps its symbol-only mark to preserve its narrow width.
+        self.wordmark_label = QLabel()
+        self.wordmark_label.setFixedSize(96, 30)
+        self.wordmark_label.setPixmap(create_wordmark_pixmap(96, 30))
+        self.wordmark_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(self.wordmark_label)
 
         self.version_btn = QPushButton(f"v{APP_VERSION}")
         self.version_btn.setFixedHeight(20)
@@ -271,7 +347,7 @@ class SynapCapWidget(QWidget):
                 border-radius: 4px;
             }
             QPushButton:hover {
-                background-color: #313244;
+                background-color: #171B23;
             }
         """
 
@@ -345,7 +421,7 @@ class SynapCapWidget(QWidget):
                 background: transparent;
                 border-radius: 5px;
             }
-            QPushButton:hover { background-color: #313244; }
+            QPushButton:hover { background-color: #171B23; }
         """
         self.expand_btn = QPushButton()
         self.expand_btn.setFixedSize(24, 24)
@@ -388,7 +464,16 @@ class SynapCapWidget(QWidget):
 
     @staticmethod
     def _expanded_preset(settings: dict) -> dict:
-        preset = dict(EXPANDED_BASE_METRICS)
+        scale = settings.get("widget_scale")
+        if scale in WIDGET_SCALE_PRESETS:
+            return dict(WIDGET_SCALE_PRESETS[scale])
+
+        # Direct API callers and pre-v5 in-memory configurations may still use
+        # the former independent font values. Keep that compatibility path out
+        # of the visible settings UI while loading persisted configs into the
+        # new preset model.
+        preset = dict(WIDGET_SCALE_PRESETS["small"])
+        preset["width"] = 300
         font_size = max(10, min(18, int(settings.get("expanded_font_size", 13))))
         preset.update(
             {
@@ -414,7 +499,18 @@ class SynapCapWidget(QWidget):
             default=0,
         )
         provider_header_width = longest_name + preset["badge_size"] + 132
-        return min(480, max(300, preset["width"], provider_header_width))
+        if self.usage_view == "ring":
+            content_width = (
+                2 * max(116, preset["val_size"] * 9)
+                + 2 * preset["card_padding"]
+                + 42
+            )
+        else:
+            # The CLI-style bar view is intentionally a single column.  It
+            # should remain compact even when users choose a large font, but
+            # needs room for the marker, reset text and the trailing % column.
+            content_width = max(268, preset["val_size"] * 16 + 52)
+        return min(480, max(300, preset["width"], provider_header_width, content_width))
 
     def _set_fixed_window_width(self, width: int) -> None:
         """Keep the visible root frame in lockstep with the frameless window."""
@@ -424,23 +520,58 @@ class SynapCapWidget(QWidget):
 
     def _compact_metrics(self) -> dict:
         settings = self.config_data.get("settings", {})
-        font_size = max(9, min(16, int(settings.get("compact_font_size", 12))))
+        scale = settings.get("widget_scale")
+        if scale in WIDGET_SCALE_PRESETS:
+            font_size = WIDGET_SCALE_PRESETS[scale]["compact_font_size"]
+            font_weight = 700
+        else:
+            font_size = max(9, min(16, int(settings.get("compact_font_size", 12))))
+            font_weight = 700 if settings.get("compact_font_bold", True) else 400
         return {
             "font_size": font_size,
-            "font_weight": 800 if settings.get("compact_font_bold", True) else 400,
-            "icon_size": max(22, font_size + 10),
-            "logo_size": max(20, font_size + 8),
-            "button_size": max(24, font_size + 14),
-            "glyph_size": max(14, font_size + 2),
-            "item_spacing": max(5, round(font_size * 0.5)),
-            "bar_spacing": max(8, round(font_size * 0.7)),
-            "vertical_margin": max(2, round((font_size - 8) * 0.5)),
+            "font_weight": font_weight,
+            # Keep the bar deliberately slimmer than the expanded widget. The
+            # text scale remains user-configurable; surrounding geometry grows
+            # from it so a larger font cannot be clipped.
+            "icon_size": max(18, font_size + 7),
+            "logo_size": max(18, font_size + 6),
+            "button_size": max(20, font_size + 10),
+            "glyph_size": max(12, font_size + 1),
+            "item_spacing": max(3, round(font_size * 0.34)),
+            "bar_spacing": max(5, round(font_size * 0.45)),
+            "vertical_margin": max(1, round((font_size - 9) * 0.34)),
         }
+
+    @staticmethod
+    def _set_label_font(label: QLabel, font_size: int, font_weight: int = 400) -> None:
+        """Apply dynamic typography through QFont, not deferred QSS state.
+
+        Qt can retain an old stylesheet font after a widget is rebuilt.  Using
+        QFont makes the bold option update immediately on Windows and macOS.
+        """
+        font = QFont("Segoe UI", max(1, int(font_size)))
+        if font_weight >= 680:
+            weight = QFont.Weight.Bold
+        elif font_weight >= 550:
+            weight = QFont.Weight.DemiBold
+        else:
+            weight = QFont.Weight.Normal
+        font.setWeight(weight)
+        label.setFont(font)
+
+    def _apply_compact_value_style(
+        self,
+        label: QLabel,
+        color: str,
+        metrics: dict,
+    ) -> None:
+        label.setStyleSheet(f"color: {color};")
+        self._set_label_font(label, metrics["font_size"], metrics["font_weight"])
 
     def _apply_compact_metrics(self) -> None:
         metrics = self._compact_metrics()
         vertical = metrics["vertical_margin"]
-        self.compact_layout.setContentsMargins(4, vertical, 2, vertical)
+        self.compact_layout.setContentsMargins(3, vertical, 1, vertical)
         self.compact_layout.setSpacing(metrics["bar_spacing"])
         self.compact_items_layout.setSpacing(metrics["bar_spacing"])
         logo_size = metrics["logo_size"]
@@ -497,8 +628,15 @@ class SynapCapWidget(QWidget):
             # expanded preset remains the source of truth across the round trip.
             self._set_fixed_window_width(self._expanded_width)
         if self._pending_resize_anchor is not None:
-            self._move_to_resize_anchor(self._pending_resize_anchor)
-            self._pending_resize_anchor = None
+            if self._dock_bottom_active():
+                # A bottom-parked widget owns its Y position; the compact/expand
+                # corner anchor would only fight the dock, so skip it and let
+                # _dock_above_taskbar_if_enabled place the widget.
+                self._pending_resize_anchor = None
+            else:
+                self._move_to_resize_anchor(self._pending_resize_anchor)
+                self._pending_resize_anchor = None
+        self._dock_above_taskbar_if_enabled()
 
     def _available_geometry(self, point: QPoint | None = None):
         screen = QApplication.screenAt(point) if point is not None else self.screen()
@@ -571,6 +709,40 @@ class SynapCapWidget(QWidget):
             max(available.top(), min(y, max_y)),
         )
 
+    def _dock_enabled(self) -> bool:
+        return bool(
+            self.config_data.get("settings", {}).get("dock_above_taskbar", False)
+        )
+
+    def _dock_bottom_active(self) -> bool:
+        """Dock the bottom edge only while the widget is actually sitting there.
+
+        The setting keeps a bottom-parked widget above the taskbar as its height
+        changes, but it must not trap the widget: dragging it up clears the
+        parked flag so it can live anywhere on screen.
+        """
+        return self._dock_enabled() and self._docked_to_bottom
+
+    def _is_near_bottom(self) -> bool:
+        geometry = self.frameGeometry()
+        available = self._available_geometry(geometry.center())
+        return available.bottom() - geometry.bottom() <= EDGE_SNAP_DISTANCE + 8
+
+    def _dock_above_taskbar_if_enabled(self) -> None:
+        """Align the widget to the bottom of the usable desktop area.
+
+        QScreen.availableGeometry() excludes the Windows taskbar and macOS
+        Dock, keeping this widget above either platform's system UI.
+        """
+        if not self._dock_bottom_active():
+            return
+        geometry = self.frameGeometry()
+        available = self._available_geometry(geometry.center())
+        max_x = max(available.left(), available.right() - geometry.width() + 1)
+        x = max(available.left(), min(geometry.left(), max_x))
+        y = available.bottom() - geometry.height() + 1
+        self.move(x, max(available.top(), y))
+
     def _build_compact_items(self) -> None:
         metrics = self._compact_metrics()
         self.compact_ui_map.clear()
@@ -601,10 +773,10 @@ class SynapCapWidget(QWidget):
             value_label = QLabel("—")
             value_label.setMinimumWidth(max(27, metrics["font_size"] * 3))
             value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            value_label.setStyleSheet(
-                f"color: #CDD6F4; font-size: {metrics['font_size']}px; "
-                f"font-weight: {metrics['font_weight']}; "
-                "font-family: 'Segoe UI', -apple-system, sans-serif;"
+            self._apply_compact_value_style(
+                value_label,
+                COMPACT_VALUE_COLOR,
+                metrics,
             )
             item_layout.addWidget(value_label)
 
@@ -633,10 +805,11 @@ class SynapCapWidget(QWidget):
     def _apply_layout_visibility(self) -> None:
         """Apply one coherent layout state before measuring or resizing."""
         if self.is_compact:
+            self._set_compact_frame_style(True)
             self.header_widget.hide()
             self.cards_frame.hide()
             self.compact_bar.show()
-            compact_margin = max(8, self._compact_metrics()["vertical_margin"] + 6)
+            compact_margin = max(4, self._compact_metrics()["vertical_margin"] + 3)
             self.frame_layout.setContentsMargins(
                 compact_margin,
                 compact_margin,
@@ -646,20 +819,42 @@ class SynapCapWidget(QWidget):
             self.frame_layout.setSpacing(0)
             return
 
+        self._set_compact_frame_style(False)
         self.compact_bar.hide()
         self.header_widget.show()
         self.cards_frame.show()
         self.frame_layout.setContentsMargins(12, 14, 12, 12)
         self.frame_layout.setSpacing(10)
 
+    def _set_compact_frame_style(self, compact: bool) -> None:
+        """Refresh the dynamic QSS selector used by the slim compact shell."""
+        if self.frame.property("compactMode") == compact:
+            return
+        self.frame.setProperty("compactMode", compact)
+        style = self.frame.style()
+        style.unpolish(self.frame)
+        style.polish(self.frame)
+
     def exit_compact_mode(self) -> None:
         if not self.is_compact:
             return
         resize_anchor = self._capture_resize_anchor()
-        self.is_compact = False
-        self._apply_layout_visibility()
-        self._set_fixed_window_width(self._expanded_width)
-        self._schedule_fit_to_content(resize_anchor)
+        # Expanding can make the window several times taller. If that resize
+        # is first painted at the compact position, a bottom-parked widget
+        # visibly drops over the taskbar before the deferred anchor correction
+        # pulls it back. Settle layout and position in one paint cycle.
+        updates_enabled = self.updatesEnabled()
+        self.setUpdatesEnabled(False)
+        try:
+            self.is_compact = False
+            self._apply_layout_visibility()
+            self._set_fixed_window_width(self._expanded_width)
+            self._pending_resize_anchor = resize_anchor
+            self._fit_timer.stop()
+            self._fit_to_content()
+        finally:
+            self.setUpdatesEnabled(updates_enabled)
+        self.update()
 
     def _apply_compact_width(self) -> None:
         self.compact_items_layout.invalidate()
@@ -704,10 +899,7 @@ class SynapCapWidget(QWidget):
             value_label.show()
             if usage.error:
                 value_label.setText("!")
-                value_label.setStyleSheet(
-                    f"color: #F38BA8; font-size: {metrics['font_size']}px; "
-                    f"font-weight: {metrics['font_weight']};"
-                )
+                self._apply_compact_value_style(value_label, "#F38BA8", metrics)
                 self._fit_compact_value_label(value_label, metrics["font_size"])
                 compact_ui["item"].setToolTip(usage.error)
                 continue
@@ -715,22 +907,22 @@ class SynapCapWidget(QWidget):
             provider_ui = self.provider_ui_map.get(provider_id, {})
             windows = self._visible_usage_windows(provider_ui, usage.windows or [])
             used = max((window.used for window in windows), default=usage.used)
-            color = self._usage_color(used)
+            value_color = self._compact_usage_color(used)
             if len(windows) > 1:
                 value_label.setText(
                     "/".join(f"{window.used:.0f}%" for window in windows)
                 )
-                value_label.setStyleSheet(
-                    f"color: {color}; font-size: {metrics['font_size']}px; "
-                    f"font-weight: {metrics['font_weight']}; "
-                    "font-family: 'Segoe UI', -apple-system, sans-serif;"
+                self._apply_compact_value_style(
+                    value_label,
+                    value_color,
+                    metrics,
                 )
             else:
                 value_label.setText(f"{used:.0f}%")
-                value_label.setStyleSheet(
-                    f"color: {color}; font-size: {metrics['font_size']}px; "
-                    f"font-weight: {metrics['font_weight']}; "
-                    "font-family: 'Segoe UI', -apple-system, sans-serif;"
+                self._apply_compact_value_style(
+                    value_label,
+                    value_color,
+                    metrics,
                 )
             self._fit_compact_value_label(value_label, metrics["font_size"])
             tooltip_lines = [
@@ -764,7 +956,7 @@ class SynapCapWidget(QWidget):
         else:
             foreground = "#7F849C"
             background = "#252538"
-            border = "#313244"
+            border = "#303746"
         self.version_btn.setStyleSheet(
             f"color: {foreground}; background-color: {background}; "
             f"border: 1px solid {border}; border-radius: 5px; "
@@ -806,15 +998,11 @@ class SynapCapWidget(QWidget):
 
         settings = self.config_data.get("settings", {})
         preset = self._expanded_preset(settings)
-        expanded_weight = 700 if settings.get("expanded_font_bold", True) else 400
-
-        # Update title font size dynamically
-        if hasattr(self, "title_label"):
-            self.title_label.setStyleSheet(
-                "color: #CDD6F4; font-weight: bold; "
-                f"font-size: {preset['title_size']}px; "
-                "font-family: 'Segoe UI', sans-serif;"
-            )
+        expanded_weight = (
+            700
+            if settings.get("widget_scale") in WIDGET_SCALE_PRESETS
+            else (700 if settings.get("expanded_font_bold", True) else 400)
+        )
 
         # Clear existing card widgets in layout
         while self.cards_layout.count():
@@ -848,11 +1036,8 @@ class SynapCapWidget(QWidget):
 
             # Provider Name
             name_label = QLabel(provider.name)
-            name_label.setStyleSheet(
-                f"color: #CDD6F4; font-weight: {expanded_weight}; "
-                f"font-size: {preset['name_size']}px; "
-                "font-family: 'Segoe UI', sans-serif;"
-            )
+            name_label.setStyleSheet("color: #CDD6F4;")
+            self._set_label_font(name_label, preset["name_size"], expanded_weight)
             title_row.addWidget(name_label)
 
             title_row.addStretch()
@@ -874,9 +1059,10 @@ class SynapCapWidget(QWidget):
 
             c_layout.addLayout(title_row)
 
-            windows_layout = QVBoxLayout()
+            windows_layout = QGridLayout()
             windows_layout.setContentsMargins(0, 0, 0, 0)
-            windows_layout.setSpacing(preset["window_spacing"])
+            windows_layout.setHorizontalSpacing(max(6, preset["window_spacing"] + 2))
+            windows_layout.setVerticalSpacing(preset["window_spacing"])
             c_layout.addLayout(windows_layout)
 
             self.cards_layout.addWidget(card_widget)
@@ -899,7 +1085,7 @@ class SynapCapWidget(QWidget):
             if index < len(self.providers) - 1:
                 separator = QFrame()
                 separator.setFixedHeight(1)
-                separator.setStyleSheet("background-color: #313244; border: none;")
+                separator.setStyleSheet("background-color: #20242D; border: none;")
                 self.cards_layout.addWidget(separator)
 
         self._schedule_fit_to_content()
@@ -926,8 +1112,15 @@ class SynapCapWidget(QWidget):
     ):
         resize_anchor = self._capture_resize_anchor() if self.is_compact else None
         preserved_usage = list(self.latest_usage) if preserve_usage else []
+        dock_was_enabled = self._dock_enabled()
         self.config_data = config_data
         self.providers = providers
+        if self._dock_enabled() and (
+            not dock_was_enabled or self._is_near_bottom()
+        ):
+            # Turning the setting on (or saving it on while already parked)
+            # re-parks the widget above the taskbar.
+            self._docked_to_bottom = True
         if not preserve_usage:
             self.latest_usage = []
 
@@ -976,20 +1169,6 @@ class SynapCapWidget(QWidget):
             compact_ui["spinner"].stop()
             compact_ui["value"].show()
         self.refresh_btn.setEnabled(True)
-
-    @staticmethod
-    def _progress_style(color: str) -> str:
-        return f"""
-            QProgressBar {{
-                background-color: #313244;
-                border: none;
-                border-radius: 4px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {color};
-                border-radius: 4px;
-            }}
-        """
 
     def _clear_usage_rows(self, ui: dict):
         layout = ui["windows_layout"]
@@ -1059,6 +1238,13 @@ class SynapCapWidget(QWidget):
         if used >= 60:
             return "#F9E2AF"
         return "#89B4FA"
+
+    @classmethod
+    def _compact_usage_color(cls, used: float) -> str:
+        """Keep normal compact text white, then expose warning thresholds."""
+        if used < 60:
+            return COMPACT_VALUE_COLOR
+        return cls._usage_color(used)
 
     @staticmethod
     def _visible_usage_windows(ui: dict, windows: list[UsageWindow]) -> list[UsageWindow]:
@@ -1153,6 +1339,45 @@ class SynapCapWidget(QWidget):
         return relative, tooltip
 
     @staticmethod
+    def _usage_window_marker(label: str) -> str:
+        """Return a compact, recognisable marker for a usage window."""
+        normalized = label.lower().replace(" ", "")
+        if (
+            "5시간" in normalized
+            or "5hour" in normalized
+            or "현재세션" in normalized
+            or "currentsession" in normalized
+        ):
+            return "5h"
+        if "주간" in normalized or "week" in normalized:
+            return "7d"
+        return "•"
+
+    @staticmethod
+    def _condensed_reset(relative: str) -> str:
+        """Use compact English time units for every usage-view countdown."""
+        text = relative.strip()
+        if not text or text in {"곧", "초기화 확인 중", "리셋 시각 미상"}:
+            return text or "리셋 시각 미상"
+
+        match = re.fullmatch(
+            r"(?:(\d+)일)?(?:\s*(\d+)시간)?(?:\s*(\d+)분)?\s*후",
+            text,
+        )
+        if not match:
+            return text.removesuffix(" 후").strip() or "곧"
+
+        days, hours, minutes = match.groups()
+        parts: list[str] = []
+        if days:
+            parts.append(f"{days}d")
+        if hours:
+            parts.append(f"{hours}h")
+        if minutes:
+            parts.append(f"{minutes}m")
+        return " ".join(parts) or "곧"
+
+    @staticmethod
     def _data_freshness_text(
         fetched_at: datetime,
         refresh_interval_sec: int,
@@ -1202,13 +1427,18 @@ class SynapCapWidget(QWidget):
         source_tooltip: str = "",
     ):
         self._clear_usage_rows(ui)
-        usage_value_bold = self.config_data.get("settings", {}).get(
-            "expanded_font_bold", True
+        usage_value_bold = (
+            True
+            if self.config_data.get("settings", {}).get("widget_scale")
+            in WIDGET_SCALE_PRESETS
+            else self.config_data.get("settings", {}).get("expanded_font_bold", True)
         )
         usage_value_weight = 700 if usage_value_bold else 400
 
-        for window in windows:
+        for index, window in enumerate(windows):
             row_widget = QWidget()
+            row_widget.setObjectName("usageMetric")
+            tile_padding = max(5, round(preset["val_size"] * 0.42))
             remaining = (
                 window.remaining if window.remaining is not None else max(0.0, 100.0 - window.used)
             )
@@ -1219,31 +1449,41 @@ class SynapCapWidget(QWidget):
             color = self._usage_color(window.used)
 
             if self.usage_view == "ring":
+                row_widget.setStyleSheet(
+                    "QWidget#usageMetric { background-color: #0D0E12; border-radius: 5px; }"
+                )
                 row_layout = QHBoxLayout(row_widget)
-                row_layout.setContentsMargins(0, 0, 0, 0)
-                row_layout.setSpacing(8)
+                row_layout.setContentsMargins(
+                    tile_padding,
+                    tile_padding,
+                    tile_padding,
+                    tile_padding,
+                )
+                row_layout.setSpacing(max(6, round(preset["val_size"] * 0.5)))
 
                 details_layout = QVBoxLayout()
                 details_layout.setContentsMargins(0, 0, 0, 0)
                 details_layout.setSpacing(1)
 
                 window_label = QLabel(window.label)
-                window_label.setStyleSheet(
-                    f"color: #CDD6F4; font-size: {preset['val_size']}px; "
-                    f"font-weight: {usage_value_weight};"
+                window_label.setStyleSheet("color: #CDD6F4;")
+                self._set_label_font(
+                    window_label,
+                    preset["val_size"],
+                    usage_value_weight,
                 )
                 details_layout.addWidget(window_label)
 
-                if not reset_display:
-                    reset_caption = "리셋 시각 미상"
-                elif "리셋" in reset_display:
-                    reset_caption = reset_display
-                else:
-                    reset_caption = f"{reset_display} 리셋"
+                reset_caption = self._condensed_reset(
+                    reset_display or "리셋 시각 미상"
+                )
                 reset_label = QLabel(reset_caption)
+                reset_label.setWordWrap(False)
                 self._enable_instant_tooltip(reset_label, reset_tooltip)
-                reset_label.setStyleSheet(
-                    f"color: #6C7086; font-size: {max(8, preset['val_size'] - 1)}px;"
+                reset_label.setStyleSheet("color: #8087A0;")
+                self._set_label_font(
+                    reset_label,
+                    max(9, preset["val_size"] - 1),
                 )
                 details_layout.addWidget(reset_label)
                 row_layout.addLayout(details_layout)
@@ -1258,42 +1498,94 @@ class SynapCapWidget(QWidget):
                 self._enable_instant_tooltip(ring, usage_tooltip)
                 row_layout.addWidget(ring)
             else:
-                row_layout = QVBoxLayout(row_widget)
-                row_layout.setContentsMargins(0, 0, 0, 0)
-                row_layout.setSpacing(2)
-
-                info_layout = QHBoxLayout()
-                info_layout.setContentsMargins(0, 0, 0, 0)
-                info_layout.setSpacing(6)
-
-                reset_suffix = f" · {reset_display}" if reset_display else " · 리셋 시각 미상"
-                window_label = QLabel(f"{window.label}{reset_suffix}")
-                self._enable_instant_tooltip(window_label, reset_tooltip)
-                window_label.setStyleSheet(
-                    f"color: #A6ADC8; font-size: {preset['val_size']}px; "
-                    f"font-weight: {usage_value_weight};"
+                # The bar view follows the compact information density of a
+                # CLI status line: a small window badge, reset countdown, and
+                # one progress bar whose centered text is the only percentage.
+                row_widget.setStyleSheet(
+                    "QWidget#usageMetric { background-color: transparent; border-radius: 4px; }"
                 )
-                info_layout.addWidget(window_label)
-                info_layout.addStretch()
-
-                value_label = QLabel(f"{window.used:.0f}%")
-                value_label.setStyleSheet(
-                    f"color: {color}; font-size: {preset['val_size']}px; "
-                    f"font-weight: {usage_value_weight};"
+                row_layout = QHBoxLayout(row_widget)
+                row_layout.setContentsMargins(
+                    tile_padding,
+                    max(2, tile_padding // 2),
+                    tile_padding,
+                    max(2, tile_padding // 2),
                 )
-                info_layout.addWidget(value_label)
-                row_layout.addLayout(info_layout)
+                row_layout.setSpacing(max(7, round(preset["val_size"] * 0.55)))
 
-                pbar = QProgressBar()
-                pbar.setFixedHeight(preset["pbar_height"])
-                pbar.setRange(0, 100)
-                pbar.setValue(round(window.used))
-                pbar.setTextVisible(False)
-                self._enable_instant_tooltip(pbar, usage_tooltip)
-                pbar.setStyleSheet(self._progress_style(color))
-                row_layout.addWidget(pbar)
+                marker_label = QLabel(self._usage_window_marker(window.label))
+                marker_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                marker_size = max(20, preset["val_size"] + 8)
+                marker_label.setFixedSize(marker_size + 6, marker_size)
+                marker_label.setStyleSheet(
+                    "color: #8FB6E8; background-color: #141A28; "
+                    "border: none; border-radius: 5px;"
+                )
+                # A quiet label, not data — keep it at regular weight so the
+                # provider name and any high usage % stay the only bold marks.
+                self._set_label_font(
+                    marker_label,
+                    max(9, preset["val_size"] - 2),
+                    400,
+                )
+                self._enable_instant_tooltip(marker_label, window.label)
+                row_layout.addWidget(marker_label)
 
-            ui["windows_layout"].addWidget(row_widget)
+                reset_label = QLabel(
+                    self._condensed_reset(reset_display or "리셋 시각 미상")
+                )
+                reset_label.setObjectName("resetCountdown")
+                reset_label.setWordWrap(False)
+                self._enable_instant_tooltip(reset_label, reset_tooltip)
+                reset_label.setStyleSheet("color: #8087A0;")
+                self._set_label_font(
+                    reset_label,
+                    max(9, preset["val_size"] - 2),
+                )
+                reset_label.setFixedWidth(
+                    max(
+                        48,
+                        QFontMetrics(reset_label.font()).horizontalAdvance("00d 00h") + 4,
+                    )
+                )
+                row_layout.addWidget(reset_label)
+
+                usage_bar = UsageBar(window.used, color)
+                usage_bar.setFixedHeight(max(14, preset["pbar_height"] + 5))
+                self._enable_instant_tooltip(usage_bar, usage_tooltip)
+                row_layout.addWidget(usage_bar, 1)
+
+                # The percentage sits outside the bar in a fixed-width column so
+                # it keeps full contrast at any fill level and every row's number
+                # lines up on the same right edge.
+                is_warning = window.used >= 60
+                is_critical = window.used >= 80
+                value_label = QLabel(
+                    f"▲ {window.used:.0f}%" if is_critical else f"{window.used:.0f}%"
+                )
+                value_label.setObjectName("usageValue")
+                value_label.setAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                value_label.setFixedWidth(max(48, preset["val_size"] * 4 + 10))
+                value_label.setStyleSheet(f"color: {color};")
+                # Weight hierarchy: provider name (bold) > normal % (demibold) is
+                # calm; a warning/critical % jumps back to bold so weight itself
+                # signals "getting high", on top of colour and the ▲ mark.
+                self._set_label_font(
+                    value_label,
+                    preset["val_size"],
+                    700
+                    if is_warning
+                    else (600 if usage_value_weight >= 680 else usage_value_weight),
+                )
+                self._enable_instant_tooltip(value_label, usage_tooltip)
+                row_layout.addWidget(value_label)
+
+            if self.usage_view == "ring":
+                ui["windows_layout"].addWidget(row_widget, index // 2, index % 2)
+            else:
+                ui["windows_layout"].addWidget(row_widget, index, 0, 1, 2)
             ui["window_rows"].append(row_widget)
 
     def update_data(
@@ -1389,7 +1681,20 @@ class SynapCapWidget(QWidget):
         if root_layout is not None:
             root_layout.activate()
         self._refresh_compact_values()
-        self.resize(self.width(), self.frame.sizeHint().height())
+        self._resize_to_height(self.frame.sizeHint().height())
+
+    def _resize_to_height(self, height: int) -> None:
+        """Grow/shrink the window, keeping the bottom pinned when docked.
+
+        A plain resize() keeps the top-left corner fixed, so when new usage rows
+        make the widget taller it grows downward — behind the taskbar for a
+        bottom-docked widget. New rows are laid out asynchronously, so re-pin the
+        bottom now and again once Qt has applied the real height.
+        """
+        self.resize(self.width(), height)
+        if not self.is_compact and self._dock_bottom_active():
+            self._dock_above_taskbar_if_enabled()
+            self._schedule_fit_to_content()
 
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
@@ -1441,6 +1746,11 @@ class SynapCapWidget(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._snap_to_screen_edges()
+            if self._dock_enabled():
+                # Dropping it near the taskbar re-parks it there; dropping it
+                # anywhere else lets it stay put.
+                self._docked_to_bottom = self._is_near_bottom()
+            self._dock_above_taskbar_if_enabled()
             if self.is_compact:
                 self._update_expand_direction(self._capture_resize_anchor())
             event.accept()

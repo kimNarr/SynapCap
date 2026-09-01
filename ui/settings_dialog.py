@@ -2,7 +2,7 @@ import copy
 import sys
 import uuid
 
-from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPolygon
 from PySide6.QtWidgets import (
     QApplication,
@@ -40,6 +40,7 @@ from .icon import (
     create_plus_icon,
     create_provider_icon,
     create_trash_icon,
+    create_wordmark_pixmap,
 )
 
 
@@ -170,13 +171,14 @@ class SettingsTitleBar(QWidget):
         layout.setContentsMargins(12, 0, 6, 0)
         layout.setSpacing(8)
 
-        icon_label = QLabel()
-        icon_label.setPixmap(create_app_icon(18).pixmap(18, 18))
-        icon_label.setFixedSize(18, 18)
-        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        layout.addWidget(icon_label)
+        wordmark_label = QLabel()
+        wordmark_label.setPixmap(create_wordmark_pixmap(78, 24))
+        wordmark_label.setFixedSize(78, 24)
+        wordmark_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        wordmark_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        layout.addWidget(wordmark_label)
 
-        title_label = QLabel(f"SynapCap v{APP_VERSION} 설정")
+        title_label = QLabel(f"v{APP_VERSION} 설정")
         title_label.setObjectName("settingsTitleLabel")
         title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(title_label)
@@ -212,12 +214,20 @@ class SettingsTitleBar(QWidget):
 
 class SettingsDialog(QDialog):
     config_saved = Signal(dict)
+    preview_requested = Signal(dict)
+    preview_reverted = Signal()
     feedback_requested = Signal(str)
 
     def __init__(self, current_config: dict, parent=None):
         super().__init__(parent)
         self.config_data = copy.deepcopy(current_config)
+        self._preview_active = False
         self.provider_widgets = []
+        self._preview_label_timer = QTimer(self)
+        self._preview_label_timer.setSingleShot(True)
+        self._preview_label_timer.timeout.connect(
+            lambda: self.preview_btn.setText("적용")
+        )
         self.init_ui()
 
     def init_ui(self):
@@ -240,15 +250,15 @@ class SettingsDialog(QDialog):
                 font-family: 'Segoe UI', -apple-system, sans-serif;
             }
             QFrame#settingsFrame {
-                background-color: #1E1E2E;
-                border: 2px solid #45475A;
+                background-color: #050608;
+                border: 2px solid #353C4B;
                 border-radius: 6px;
             }
             QWidget#settingsTitleBar {
-                background-color: #181825;
+                background-color: #020304;
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
-                border-bottom: 1px solid #313244;
+                border-bottom: 1px solid #272C38;
             }
             QLabel#settingsTitleLabel {
                 color: #CDD6F4;
@@ -275,8 +285,8 @@ class SettingsDialog(QDialog):
                 font-weight: 500;
             }
             QGroupBox {
-                background-color: #181825;
-                border: 1px solid #313244;
+                background-color: #090A0D;
+                border: 1px solid #272C38;
                 border-radius: 6px;
                 margin-top: 14px;
                 padding-top: 16px;
@@ -287,39 +297,45 @@ class SettingsDialog(QDialog):
                 subcontrol-origin: margin;
                 left: 12px;
                 padding: 0 6px;
-                background-color: #181825;
+                background-color: #090A0D;
                 border-radius: 4px;
             }
+            QGroupBox#providerCard {
+                margin-top: 0px;
+                padding-top: 0px;
+                background-color: #090A0D;
+                border-color: #303746;
+            }
             QLineEdit, QSpinBox {
-                background-color: #11111B;
+                background-color: #020304;
                 color: #CDD6F4;
-                border: 1px solid #313244;
+                border: 1px solid #272C38;
                 border-radius: 5px;
                 padding: 7px 12px;
                 font-size: 13px;
-                selection-background-color: #45475A;
+                selection-background-color: #3C4156;
             }
             QLineEdit:hover, QSpinBox:hover {
-                border: 1px solid #45475A;
-                background-color: #181825;
+                border: 1px solid #3C4156;
+                background-color: #090A0D;
             }
             QLineEdit:focus, QSpinBox:focus {
                 border: 2px solid #89B4FA;
-                background-color: #1E1E2E;
+                background-color: #050608;
                 color: #FFFFFF;
             }
             QComboBox {
-                background-color: #11111B;
+                background-color: #020304;
                 color: #CDD6F4;
-                border: 1px solid #313244;
+                border: 1px solid #272C38;
                 border-radius: 5px;
                 padding: 7px 32px 7px 12px;
                 font-size: 13px;
-                selection-background-color: #45475A;
+                selection-background-color: #3C4156;
             }
             QComboBox:hover {
-                border: 1px solid #45475A;
-                background-color: #181825;
+                border: 1px solid #3C4156;
+                background-color: #090A0D;
             }
             QComboBox:focus {
                 border: 2px solid #89B4FA;
@@ -328,20 +344,20 @@ class SettingsDialog(QDialog):
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 30px;
-                background-color: #313244;
-                border-left: 1px solid #45475A;
+                background-color: #232637;
+                border-left: 1px solid #3C4156;
                 border-top-right-radius: 5px;
                 border-bottom-right-radius: 5px;
             }
             QComboBox::drop-down:hover {
-                background-color: #45475A;
+                background-color: #3C4156;
             }
             QComboBox QAbstractItemView {
-                background-color: #181825;
+                background-color: #090A0D;
                 color: #CDD6F4;
-                border: 1px solid #45475A;
+                border: 1px solid #3C4156;
                 border-radius: 5px;
-                selection-background-color: #45475A;
+                selection-background-color: #3C4156;
                 selection-color: #FFFFFF;
                 outline: 0;
                 padding: 4px;
@@ -353,24 +369,24 @@ class SettingsDialog(QDialog):
                 subcontrol-origin: border;
                 subcontrol-position: top right;
                 width: 28px;
-                background-color: #313244;
-                border-left: 1px solid #45475A;
-                border-bottom: 1px solid #45475A;
+                background-color: #232637;
+                border-left: 1px solid #3C4156;
+                border-bottom: 1px solid #3C4156;
                 border-top-right-radius: 5px;
             }
             QSpinBox::up-button:hover {
-                background-color: #45475A;
+                background-color: #3C4156;
             }
             QSpinBox::down-button {
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
                 width: 28px;
-                background-color: #313244;
-                border-left: 1px solid #45475A;
+                background-color: #232637;
+                border-left: 1px solid #3C4156;
                 border-bottom-right-radius: 5px;
             }
             QSpinBox::down-button:hover {
-                background-color: #45475A;
+                background-color: #3C4156;
             }
             QCheckBox {
                 color: #CDD6F4;
@@ -380,20 +396,20 @@ class SettingsDialog(QDialog):
                 width: 16px;
                 height: 16px;
                 border-radius: 4px;
-                border: 1px solid #45475A;
-                background-color: #11111B;
+                border: 1px solid #3C4156;
+                background-color: #020304;
             }
             QCheckBox::indicator:checked {
                 background-color: #89B4FA;
                 border: 1px solid #89B4FA;
             }
             QTabWidget::pane {
-                border: 1px solid #313244;
+                border: 1px solid #272C38;
                 border-radius: 6px;
-                background-color: #1E1E2E;
+                background-color: #050608;
             }
             QTabBar::tab {
-                background: #11111B;
+                background: #020304;
                 color: #A6ADC8;
                 padding: 9px 20px;
                 border-top-left-radius: 6px;
@@ -402,46 +418,51 @@ class SettingsDialog(QDialog):
                 font-weight: 600;
             }
             QTabBar::tab:selected {
-                background: #313244;
+                background: #232637;
                 color: #89B4FA;
                 font-weight: bold;
             }
             QPushButton {
-                background-color: #313244;
+                background-color: #232637;
                 color: #CDD6F4;
-                border: 1px solid #45475A;
+                border: 1px solid #3C4156;
                 border-radius: 5px;
                 padding: 7px 14px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #45475A;
+                background-color: #3C4156;
                 color: #FFFFFF;
                 border: 1px solid #89B4FA;
             }
             QPushButton#addBtn {
-                background-color: #313244;
+                background-color: #232637;
                 color: #89B4FA;
                 border: 1px solid #89B4FA;
                 padding: 7px 16px;
             }
             QPushButton#addBtn:hover {
-                background-color: #45475A;
+                background-color: #3C4156;
                 color: #89B4FA;
                 border: 1px solid #B4BEFE;
             }
+            QPushButton#addBtn:disabled {
+                background-color: #12151C;
+                color: #697187;
+                border-color: #303746;
+            }
             QPushButton#iconOnlyBtn {
-                background-color: #313244;
-                border: 1px solid #45475A;
+                background-color: #232637;
+                border: 1px solid #3C4156;
                 border-radius: 6px;
                 padding: 0px;
             }
             QPushButton#iconOnlyBtn:hover {
-                background-color: #45475A;
+                background-color: #3C4156;
                 border: 1px solid #89B4FA;
             }
             QPushButton#deleteIconBtn {
-                background-color: #313244;
+                background-color: #232637;
                 border: 1px solid #F38BA8;
                 border-radius: 6px;
                 padding: 0px;
@@ -458,6 +479,15 @@ class SettingsDialog(QDialog):
             }
             QPushButton#saveBtn:hover {
                 background-color: #B4BEFE;
+            }
+            QPushButton#previewBtn {
+                background-color: #1B2030;
+                color: #AFCBFF;
+                border-color: #5B80C7;
+            }
+            QPushButton#previewBtn:hover {
+                background-color: #252D43;
+                border-color: #89B4FA;
             }
         """)
 
@@ -503,6 +533,12 @@ class SettingsDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
+        self.preview_btn = QPushButton("적용")
+        self.preview_btn.setObjectName("previewBtn")
+        self.preview_btn.setToolTip("저장하지 않고 현재 화면에 적용합니다")
+        self.preview_btn.clicked.connect(self.on_preview)
+        btn_layout.addWidget(self.preview_btn)
+
         cancel_btn = QPushButton("취소")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
@@ -535,33 +571,31 @@ class SettingsDialog(QDialog):
         self.always_top_check.setChecked(settings.get("always_on_top", True))
         form.addRow("화면 고정:", self.always_top_check)
 
+        self.dock_above_taskbar_check = StyledCheckBox(
+            "하단 작업 표시줄 바로 위에 위젯 고정"
+        )
+        self.dock_above_taskbar_check.setChecked(
+            settings.get("dock_above_taskbar", False)
+        )
+        form.addRow("작업 표시줄:", self.dock_above_taskbar_check)
+
         self.update_check = StyledCheckBox("자동으로 새 버전 확인")
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
 
-        self.expanded_font_spin = VisibleSpinBox()
-        self.expanded_font_spin.setRange(10, 18)
-        self.expanded_font_spin.setSuffix(" px")
-        self.expanded_font_spin.setValue(settings.get("expanded_font_size", 13))
-        form.addRow("펼침 글꼴 크기:", self.expanded_font_spin)
-
-        self.expanded_font_bold_check = StyledCheckBox("펼침 상태 글꼴을 굵게 표시")
-        self.expanded_font_bold_check.setChecked(
-            settings.get("expanded_font_bold", True)
+        self.widget_scale_combo = NoWheelComboBox()
+        self.widget_scale_combo.addItem("작게 · 320 px", "small")
+        self.widget_scale_combo.addItem("기본 · 360 px", "medium")
+        self.widget_scale_combo.addItem("크게 · 420 px", "large")
+        selected_scale = settings.get("widget_scale", "medium")
+        selected_index = self.widget_scale_combo.findData(selected_scale)
+        self.widget_scale_combo.setCurrentIndex(
+            selected_index if selected_index >= 0 else 1
         )
-        form.addRow("펼침 글꼴 굵기:", self.expanded_font_bold_check)
-
-        self.compact_font_spin = VisibleSpinBox()
-        self.compact_font_spin.setRange(9, 16)
-        self.compact_font_spin.setSuffix(" px")
-        self.compact_font_spin.setValue(settings.get("compact_font_size", 12))
-        form.addRow("막대 글꼴 크기:", self.compact_font_spin)
-
-        self.compact_font_bold_check = StyledCheckBox("막대 상태 글꼴을 굵게 표시")
-        self.compact_font_bold_check.setChecked(
-            settings.get("compact_font_bold", True)
+        self.widget_scale_combo.setToolTip(
+            "창 너비, 글자, 아이콘, 행 간격과 진행 막대 크기를 함께 조절합니다."
         )
-        form.addRow("막대 글꼴 굵기:", self.compact_font_bold_check)
+        form.addRow("위젯 크기:", self.widget_scale_combo)
 
         self.usage_alert_check = StyledCheckBox("설정한 사용량 이상에서 알림")
         self.usage_alert_check.setChecked(
@@ -623,8 +657,8 @@ class SettingsDialog(QDialog):
             card = QFrame()
             card.setObjectName("feedbackCard")
             card.setStyleSheet(
-                "QFrame#feedbackCard { background-color: #181825; "
-                "border: 1px solid #313244; border-radius: 6px; }"
+                "QFrame#feedbackCard { background-color: #0F1017; "
+                "border: 1px solid #292D3C; border-radius: 6px; }"
             )
             card_layout = QHBoxLayout(card)
             card_layout.setContentsMargins(16, 14, 14, 14)
@@ -674,16 +708,19 @@ class SettingsDialog(QDialog):
 
         # Top Control Bar (Add Provider)
         top_bar = QHBoxLayout()
-        top_label = QLabel("<b>AI 프로바이더 목록</b>")
+        top_label = QLabel("<b>AI 프로바이더</b>")
         top_label.setStyleSheet("font-size: 13px; color: #CDD6F4;")
         top_bar.addWidget(top_label)
+        self.provider_count_label = QLabel()
+        self.provider_count_label.setStyleSheet("color: #7F849C; font-size: 11px;")
+        top_bar.addWidget(self.provider_count_label)
         top_bar.addStretch()
 
-        add_btn = QPushButton("Add")
-        add_btn.setObjectName("addBtn")
-        add_btn.setIcon(create_plus_icon(14, "#89B4FA"))
-        add_btn.clicked.connect(self.on_add_provider)
-        top_bar.addWidget(add_btn)
+        self.add_btn = QPushButton("Add")
+        self.add_btn.setObjectName("addBtn")
+        self.add_btn.setIcon(create_plus_icon(14, "#89B4FA"))
+        self.add_btn.clicked.connect(self.on_add_provider)
+        top_bar.addWidget(self.add_btn)
 
         main_layout.addLayout(top_bar)
 
@@ -700,15 +737,15 @@ class SettingsDialog(QDialog):
                 width: 9px;
                 margin: 2px 0;
                 border: none;
-                background: #181825;
+                background: #0F1017;
             }
             QScrollBar::handle:vertical {
                 min-height: 32px;
                 border-radius: 4px;
-                background: #45475A;
+                background: #3C4156;
             }
             QScrollBar::handle:vertical:hover {
-                background: #585B70;
+                background: #4A5168;
             }
             QScrollBar::add-line:vertical,
             QScrollBar::sub-line:vertical {
@@ -731,19 +768,37 @@ class SettingsDialog(QDialog):
         for p in providers:
             self._add_provider_widget_item(p)
 
+        self._update_add_provider_state()
+
         self.providers_scroll.setWidget(self.container)
         main_layout.addWidget(self.providers_scroll)
 
     def _add_provider_widget_item(self, p_data: dict):
         group = QGroupBox()
-        group_title = p_data.get("name", "Provider")
-        group.setTitle(f"  {group_title}  ")
+        group.setObjectName("providerCard")
+        group.setTitle("")
 
         g_main_layout = QVBoxLayout(group)
-        g_main_layout.setContentsMargins(12, 12, 12, 12)
+        g_main_layout.setContentsMargins(12, 10, 12, 12)
+        g_main_layout.setSpacing(10)
 
-        # Header bar inside group (Icon-only buttons with tooltips)
+        # Compact header: provider identity and controls share one row, so the
+        # card has no empty fieldset title area above its actual settings.
         header_bar = QHBoxLayout()
+        header_bar.setContentsMargins(0, 0, 0, 0)
+        header_bar.setSpacing(8)
+        provider_icon = QLabel()
+        provider_icon.setFixedSize(22, 22)
+        provider_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_bar.addWidget(provider_icon)
+
+        header_title = QLabel(p_data.get("name", "Provider"))
+        header_title.setStyleSheet("color: #CDD6F4; font-size: 13px; font-weight: 700;")
+        header_bar.addWidget(header_title)
+
+        enabled_check = StyledCheckBox("사용")
+        enabled_check.setChecked(p_data.get("enabled", True))
+        header_bar.addWidget(enabled_check)
         header_bar.addStretch()
 
         up_btn = QPushButton("")
@@ -793,11 +848,6 @@ class SettingsDialog(QDialog):
         type_combo.setCurrentIndex(idx_to_set)
 
         g_layout.addRow("프로바이더 종류:", type_combo)
-
-        # Enabled Checkbox
-        enabled_check = StyledCheckBox("이 프로바이더 사용")
-        enabled_check.setChecked(p_data.get("enabled", True))
-        g_layout.addRow("상태:", enabled_check)
 
         # Name Edit
         name_edit = QLineEdit(p_data.get("name", ""))
@@ -860,6 +910,8 @@ class SettingsDialog(QDialog):
         item_info = {
             "id": p_data.get("id", str(uuid.uuid4())[:8]),
             "group": group,
+            "header_icon": provider_icon,
+            "header_title": header_title,
             "type_combo": type_combo,
             "enabled_check": enabled_check,
             "name_edit": name_edit,
@@ -896,12 +948,47 @@ class SettingsDialog(QDialog):
                     self.provider_widgets.remove(info)
                 self.container_layout.removeWidget(target_group)
                 target_group.deleteLater()
+                self._update_add_provider_state()
 
         up_btn.clicked.connect(move_up)
         dn_btn.clicked.connect(move_down)
         del_btn.clicked.connect(delete_item)
 
+        def update_header_identity(_value=None):
+            selected_type = type_combo.currentData() or "codex"
+            provider_icon.setPixmap(create_provider_icon(selected_type, 22).pixmap(22, 22))
+            self._update_add_provider_state()
+
+        name_edit.textChanged.connect(header_title.setText)
+        type_combo.currentIndexChanged.connect(update_header_identity)
+        update_header_identity()
+
         self.provider_widgets.append(item_info)
+
+    def _available_provider_types(self) -> list[tuple[str, str]]:
+        used_types = {
+            item["type_combo"].currentData()
+            for item in self.provider_widgets
+        }
+        return [
+            option for option in PROVIDER_TYPE_OPTIONS if option[1] not in used_types
+        ]
+
+    def _update_add_provider_state(self) -> None:
+        if not hasattr(self, "add_btn"):
+            return
+        available = self._available_provider_types()
+        has_capacity = len(self.provider_widgets) < len(PROVIDER_TYPE_OPTIONS)
+        enabled = bool(available) and has_capacity
+        self.add_btn.setEnabled(enabled)
+        self.provider_count_label.setText(
+            f"{len(self.provider_widgets)} / {len(PROVIDER_TYPE_OPTIONS)}"
+        )
+        if enabled:
+            labels = ", ".join(label for label, _value in available)
+            self.add_btn.setToolTip(f"추가 가능한 프로바이더: {labels}")
+        else:
+            self.add_btn.setToolTip("Codex, Gemini, Claude는 각각 하나만 추가할 수 있습니다.")
 
     def _reorder_container_layout(self):
         for item in self.provider_widgets:
@@ -910,39 +997,72 @@ class SettingsDialog(QDialog):
             self.container_layout.addWidget(item["group"])
 
     def on_add_provider(self):
-        new_id = f"provider_{str(uuid.uuid4())[:6]}"
+        available = self._available_provider_types()
+        if not available or len(self.provider_widgets) >= len(PROVIDER_TYPE_OPTIONS):
+            self._update_add_provider_state()
+            return
+        _label, provider_type = available[0]
+        default_names = {
+            "codex": "GPT",
+            "antigravity": "Gemini",
+            "claude": "Claude",
+        }
+        new_id = f"{provider_type}_{str(uuid.uuid4())[:6]}"
         default_data = {
             "id": new_id,
-            "name": "Codex",
-            "type": "codex",
+            "name": default_names[provider_type],
+            "type": provider_type,
             "enabled": True,
+            "show_five_hour": True,
+            "show_weekly": True,
             "limit": 100.0,
             "unit": "%",
         }
         self._add_provider_widget_item(default_data)
+        self._update_add_provider_state()
 
-    def on_save(self):
-        # Update Settings
-        self.config_data["settings"]["refresh_interval_sec"] = self.interval_spin.value()
-        self.config_data["settings"]["always_on_top"] = self.always_top_check.isChecked()
-        self.config_data["settings"]["check_updates"] = self.update_check.isChecked()
-        self.config_data["settings"]["expanded_font_size"] = self.expanded_font_spin.value()
-        self.config_data["settings"]["expanded_font_bold"] = (
-            self.expanded_font_bold_check.isChecked()
+    def _apply_general_settings(self, config_data: dict) -> None:
+        """Copy visual and runtime controls into a config without persisting it."""
+        settings = config_data.setdefault("settings", {})
+        settings["refresh_interval_sec"] = self.interval_spin.value()
+        settings["always_on_top"] = self.always_top_check.isChecked()
+        settings["dock_above_taskbar"] = (
+            self.dock_above_taskbar_check.isChecked()
         )
-        self.config_data["settings"]["compact_font_size"] = self.compact_font_spin.value()
-        self.config_data["settings"]["compact_font_bold"] = (
-            self.compact_font_bold_check.isChecked()
-        )
-        self.config_data["settings"]["usage_alerts_enabled"] = (
+        settings["check_updates"] = self.update_check.isChecked()
+        settings["widget_scale"] = self.widget_scale_combo.currentData() or "medium"
+        settings["usage_alerts_enabled"] = (
             self.usage_alert_check.isChecked()
         )
-        self.config_data["settings"]["usage_alert_threshold"] = (
+        settings["usage_alert_threshold"] = (
             self.usage_alert_threshold_spin.value()
         )
-        self.config_data["settings"].pop("usage_value_bold", None)
-        self.config_data["settings"].pop("widget_width", None)
-        self.config_data["settings"].pop("widget_size", None)
+        for legacy_key in (
+            "usage_value_bold",
+            "widget_width",
+            "widget_size",
+            "expanded_font_size",
+            "expanded_font_bold",
+            "compact_font_size",
+            "compact_font_bold",
+        ):
+            settings.pop(legacy_key, None)
+
+    def on_preview(self):
+        preview_config = copy.deepcopy(self.config_data)
+        self._apply_general_settings(preview_config)
+        self._preview_active = True
+        self.preview_requested.emit(preview_config)
+        self.preview_btn.setText("적용됨 ✓")
+        self._preview_label_timer.start(1400)
+
+    def reject(self):
+        if self._preview_active:
+            self.preview_reverted.emit()
+        super().reject()
+
+    def on_save(self):
+        self._apply_general_settings(self.config_data)
 
         updated_providers = []
         for pw in self.provider_widgets:

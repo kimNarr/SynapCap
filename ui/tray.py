@@ -37,9 +37,9 @@ class SynapCapTray(QObject):
         menu = QMenu()
         menu.setStyleSheet("""
             QMenu {
-                background-color: #1E1E2E;
+                background-color: #050608;
                 color: #CDD6F4;
-                border: 1px solid #313244;
+                border: 1px solid #303746;
                 border-radius: 6px;
                 padding: 4px;
             }
@@ -48,12 +48,12 @@ class SynapCapTray(QObject):
                 border-radius: 4px;
             }
             QMenu::item:selected {
-                background-color: #313244;
+                background-color: #171B23;
                 color: #89B4FA;
             }
             QMenu::separator {
                 height: 1px;
-                background-color: #313244;
+                background-color: #272C38;
                 margin: 4px 0px;
             }
         """)

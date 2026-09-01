@@ -48,15 +48,15 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(settings["always_on_top"])
             self.assertTrue(settings["check_updates"])
             self.assertEqual(settings["usage_view"], "bar")
-            self.assertEqual(settings["expanded_font_size"], 13)
-            self.assertTrue(settings["expanded_font_bold"])
-            self.assertEqual(settings["compact_font_size"], 12)
-            self.assertTrue(settings["compact_font_bold"])
+            self.assertEqual(settings["widget_scale"], "medium")
+            self.assertNotIn("expanded_font_size", settings)
+            self.assertNotIn("compact_font_size", settings)
+            self.assertFalse(settings["dock_above_taskbar"])
             self.assertFalse(settings["usage_alerts_enabled"])
             self.assertEqual(settings["usage_alert_threshold"], 90)
             self.assertEqual(settings["last_seen_version"], "legacy")
 
-    def test_legacy_usage_bold_is_migrated_to_expanded_font(self):
+    def test_legacy_usage_bold_is_removed_for_the_scale_presets(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
@@ -66,10 +66,11 @@ class ConfigTests(unittest.TestCase):
 
             settings = load_config(str(path))["settings"]
 
-            self.assertFalse(settings["expanded_font_bold"])
             self.assertNotIn("usage_value_bold", settings)
+            self.assertNotIn("expanded_font_bold", settings)
+            self.assertEqual(settings["widget_scale"], "medium")
 
-    def test_font_sizes_are_normalized_to_safe_ranges(self):
+    def test_legacy_font_size_is_migrated_to_the_nearest_scale(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
@@ -86,8 +87,9 @@ class ConfigTests(unittest.TestCase):
 
             settings = load_config(str(path))["settings"]
 
-            self.assertEqual(settings["expanded_font_size"], 18)
-            self.assertEqual(settings["compact_font_size"], 9)
+            self.assertEqual(settings["widget_scale"], "large")
+            self.assertNotIn("expanded_font_size", settings)
+            self.assertNotIn("compact_font_size", settings)
 
     def test_usage_alert_settings_are_normalized(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -111,7 +113,7 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(settings["usage_alert_threshold"], 100)
             self.assertEqual(settings["last_seen_version"], "")
 
-    def test_legacy_manual_width_is_removed(self):
+    def test_legacy_manual_size_is_migrated_to_widget_scale(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
@@ -130,6 +132,7 @@ class ConfigTests(unittest.TestCase):
 
             self.assertNotIn("widget_width", settings)
             self.assertNotIn("widget_size", settings)
+            self.assertEqual(settings["widget_scale"], "large")
 
     def test_provider_window_visibility_is_normalized(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -185,7 +188,7 @@ class ConfigTests(unittest.TestCase):
 
             loaded = load_config(str(path))
 
-            self.assertEqual(loaded["schema_version"], 3)
+            self.assertEqual(loaded["schema_version"], 5)
             self.assertFalse(loaded["providers"][0]["show_five_hour"])
             self.assertTrue(loaded["providers"][0]["show_weekly"])
 

@@ -1,13 +1,11 @@
 {
-  "schema_version": 3,
+  "schema_version": 5,
   "settings": {
     "refresh_interval_sec": 30,
     "always_on_top": true,
+    "dock_above_taskbar": false,
     "usage_view": "bar",
-    "expanded_font_size": 13,
-    "expanded_font_bold": true,
-    "compact_font_size": 12,
-    "compact_font_bold": true,
+    "widget_scale": "medium",
     "usage_alerts_enabled": false,
     "usage_alert_threshold": 90,
     "check_updates": true,

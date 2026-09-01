@@ -7,7 +7,7 @@ from typing import Any
 
 from version import APP_NAME
 
-CONFIG_SCHEMA_VERSION = 3
+CONFIG_SCHEMA_VERSION = 5
 
 
 def _default_config_path() -> Path:
@@ -40,11 +40,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "settings": {
         "refresh_interval_sec": 30,
         "always_on_top": True,
+        "dock_above_taskbar": False,
         "usage_view": "bar",
-        "expanded_font_size": 13,
-        "expanded_font_bold": True,
-        "compact_font_size": 12,
-        "compact_font_bold": True,
+        "widget_scale": "medium",
         "usage_alerts_enabled": False,
         "usage_alert_threshold": 90,
         "check_updates": True,
@@ -130,27 +128,45 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
             # Brand-new configurations return above with an empty value.
             if "last_seen_version" not in loaded_settings:
                 settings["last_seen_version"] = "legacy"
-            # Legacy manual size controls conflicted with responsive restoration.
-            # Width is now derived from font metrics and visible content.
-            settings.pop("widget_width", None)
-            settings.pop("widget_size", None)
+            # v0.1.18 consolidates independent font controls into one visual
+            # scale. Preserve a user's intent by deriving the nearest preset.
+            scale = loaded_settings.get("widget_scale")
+            if scale not in {"small", "medium", "large"}:
+                legacy_size = loaded_settings.get("widget_size")
+                if isinstance(legacy_size, str) and legacy_size.lower() in {
+                    "small",
+                    "medium",
+                    "large",
+                }:
+                    scale = legacy_size.lower()
+                else:
+                    legacy_font_size = loaded_settings.get("expanded_font_size", 13)
+                    if isinstance(legacy_font_size, bool) or not isinstance(
+                        legacy_font_size,
+                        (int, float),
+                    ):
+                        legacy_font_size = 13
+                    if legacy_font_size <= 11:
+                        scale = "small"
+                    elif legacy_font_size >= 16:
+                        scale = "large"
+                    else:
+                        scale = "medium"
+            settings["widget_scale"] = scale
+            for legacy_key in (
+                "widget_width",
+                "widget_size",
+                "expanded_font_size",
+                "expanded_font_bold",
+                "compact_font_size",
+                "compact_font_bold",
+            ):
+                settings.pop(legacy_key, None)
             if settings.get("usage_view") not in {"bar", "ring"}:
                 settings["usage_view"] = "bar"
-            legacy_bold = loaded_settings.get("usage_value_bold")
-            if "expanded_font_bold" not in loaded_settings and isinstance(legacy_bold, bool):
-                settings["expanded_font_bold"] = legacy_bold
+            if not isinstance(settings.get("dock_above_taskbar"), bool):
+                settings["dock_above_taskbar"] = False
             settings.pop("usage_value_bold", None)
-            for key, minimum, maximum, fallback in (
-                ("expanded_font_size", 10, 18, 13),
-                ("compact_font_size", 9, 16, 12),
-            ):
-                value = settings.get(key)
-                if isinstance(value, bool) or not isinstance(value, (int, float)):
-                    value = fallback
-                settings[key] = max(minimum, min(maximum, int(value)))
-            for key in ("expanded_font_bold", "compact_font_bold"):
-                if not isinstance(settings.get(key), bool):
-                    settings[key] = True
             if not isinstance(settings.get("usage_alerts_enabled"), bool):
                 settings["usage_alerts_enabled"] = False
             alert_threshold = settings.get("usage_alert_threshold", 90)

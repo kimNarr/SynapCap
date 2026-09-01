@@ -79,7 +79,7 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
     dialog.setEscapeButton(QMessageBox.StandardButton.No)
     dialog.setStyleSheet("""
         QMessageBox {
-            background-color: #1E1E2E;
+            background-color: #050608;
         }
         QMessageBox QLabel {
             color: #CDD6F4;
@@ -91,14 +91,14 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
         QMessageBox QPushButton {
             min-width: 60px;
             padding: 5px 10px;
-            border: 1px solid #45475A;
+            border: 1px solid #353C4B;
             border-radius: 5px;
-            background-color: #313244;
+            background-color: #151820;
             color: #CDD6F4;
         }
         QMessageBox QPushButton:hover {
             border-color: #89B4FA;
-            background-color: #45475A;
+            background-color: #20242D;
         }
         QMessageBox QPushButton:default {
             border-color: #89B4FA;
@@ -269,6 +269,14 @@ def main():
             lambda url: QDesktopServices.openUrl(QUrl(url))
         )
 
+        def apply_preview(preview_config: dict):
+            # Preview is deliberately visual-only. Provider edits still require
+            # Save so no accidental CLI query or config write can occur.
+            widget.rebuild_ui(preview_config, providers, preserve_usage=True)
+
+        def revert_preview():
+            widget.rebuild_ui(config_data, providers, preserve_usage=True)
+
         def handle_config_saved(new_config: dict):
             nonlocal config_data, providers
             previous_config = config_data
@@ -314,6 +322,8 @@ def main():
             tray.always_top_action.setChecked(new_always_top)
 
         dialog.config_saved.connect(handle_config_saved)
+        dialog.preview_requested.connect(apply_preview)
+        dialog.preview_reverted.connect(revert_preview)
         dialog.exec()
 
     def open_provider_diagnostics(provider_id: str):
