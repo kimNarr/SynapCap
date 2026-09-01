@@ -7,7 +7,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from PySide6.QtWidgets import QApplication
 
-from ui.icon import create_app_pixmap
+from ui.icon import create_app_icon_pixmap
 
 
 def main() -> None:
@@ -22,7 +22,7 @@ def main() -> None:
     )
     for filename, size in outputs:
         destination = assets_dir / filename
-        if not create_app_pixmap(size).save(str(destination)):
+        if not create_app_icon_pixmap(size).save(str(destination)):
             raise RuntimeError(f"아이콘 생성 실패: {destination}")
 
     app.quit()

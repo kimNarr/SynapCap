@@ -14,26 +14,36 @@
 | `logo-mono.svg` | 단색 (트레이) | `currentColor`, track `stroke-opacity 0.32` — 부모에 `color` 지정 |
 | `logo-icon.svg` | 앱 아이콘 빌드 소스 | 근접흑 라운드 타일 + 마스터 마크(78% 인셋) |
 
-> `assets/synapcap-logo-source.png`, `assets/synapcap-wordmark.png`(기존 3D 로고)는 교체 대상.
-
 ## 색 토큰
 
 로고 accent는 `#5B8DEF`. 앱 UI accent(`#89B4FA`)와 통일 여부는 미결(→ `docs/DESIGN.md`).
 통일 시 `logo.svg`의 `#5B8DEF`를 앱 accent로 맞추면 됨.
 
-## 아이콘 파이프라인 (배포 시)
+## 앱 코드 연동 — 완료
 
-1. `logo-icon.svg` → `synapcap.ico`(16·24·32·48·64·128·256), `synapcap.icns`(16~1024), `synapcap.png`(512).
-   - 도구: `cairosvg` / `rsvg-convert` / Inkscape CLI + `png2icns`·ImageMagick. `scripts/build_icons.py`로 묶으면 좋음.
-2. `packaging/`, `SynapCap.spec`의 아이콘 경로 확인.
-3. 홈페이지(`docs/assets`), README 이미지 교체.
+`ui/icon.py`가 `_render_svg` + `QSvgRenderer`로 런타임 래스터라이즈:
 
-## 앱 코드 연동
+| 함수 | 소스 | 쓰임 |
+| --- | --- | --- |
+| `create_app_pixmap(size)` | `logo.svg` | 컴팩트 바의 작은 로고(투명) |
+| `create_app_icon_pixmap(size)` · `create_app_icon` | `logo-icon.svg` | 창·트레이·설치 아이콘 — 타일이 밝은/어두운 시스템 크롬 모두에서 대비 확보 |
+| `create_wordmark_pixmap(w, h)` | `wordmark.svg` | 위젯 헤더·설정 타이틀바 (둘 다 어두운 바탕) |
 
-- `ui/icon.py` `create_app_pixmap` / `create_app_icon` — 지금은 `synapcap-logo-source.png`를
-  크롭·스케일. `logo.svg`/`logo-mono.svg`를 `QSvgRenderer`로 래스터라이즈하도록 교체.
-  트레이는 `logo-mono.svg` + 테마색.
-- 16px 트레이는 스트로크가 얇으므로, 필요하면 16px 전용으로 굵기를 키운 변형을 추가.
+`assets/logo.svg` · `logo-icon.svg` · `wordmark.svg` 3개를 PyInstaller 번들에 포함
+(`SynapCap.spec`, `build_windows.ps1`, `build_macos.sh`). SVG 없을 때 대비한 코드 드로잉 fallback 유지.
+
+### `synapcap.ico` / `.icns` / `.png` (gitignore)
+
+빌드 시 `scripts/generate_icons.py`가 `create_app_icon_pixmap`으로 생성 → PyInstaller `--icon`,
+Inno Setup이 사용. 두 빌드 스크립트가 PyInstaller 전에 이 스크립트를 실행하므로 로고 교체가
+자동 반영됨.
+
+## 남은 것
+
+- **홈페이지·README**: `docs/assets/logo.png`, `docs/assets/synapcap-wordmark.png`,
+  `docs/index.html`의 위젯 미리보기 목업 — 아직 기존 3D 로고. SVG → PNG 래스터라이즈 후 교체 필요.
+- 라이트 테마 도입 시 `create_wordmark_pixmap`이 `wordmark-light.svg`를 고르도록 분기.
+- 로고/앱 accent 통일 결정.
 
 ## 워드마크
 
@@ -46,8 +56,3 @@ SIL OFL이라 재배포 문제 없음. viewBox `0 0 223.8 52`, 자간 -1%.
 | `wordmark-light.svg` | Synap `#1B1D26` · Cap `#3B6FD4` |
 | `wordmark-mono.svg` | 전체 `currentColor` |
 | `wordmark-lockup.svg` | 마크 + 워드마크 가로 조합 (README·홈페이지 헤더) |
-
-- 앱 타이틀바는 Segoe UI로 라이브 렌더 중(`create_wordmark_pixmap`) — 자산은 Noto라 미세하게 다르나
-  타이틀바 크기에선 구분 불가. 완전 일치를 원하면 앱에서도 `wordmark.svg`를 래스터라이즈.
-- Segoe UI 아웃라인 버전이 필요하면 재생성 가능(단, Segoe UI는 Windows 번들 폰트라 아웃라인
-  재배포는 EULA 회색지대 — OSS 배포엔 Noto 권장).

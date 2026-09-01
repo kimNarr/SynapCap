@@ -86,13 +86,9 @@ def create_provider_icon(provider_type: str, size: int = 24) -> QIcon:
     return QIcon(create_provider_pixmap(provider_type, size))
 
 
-def create_app_icon(size: int = 32) -> QIcon:
-    pixmap = create_app_pixmap(size)
-    return QIcon(pixmap)
-
-
-@lru_cache(maxsize=1)
-def _app_logo_source() -> QPixmap:
+@lru_cache(maxsize=8)
+def _asset_bytes(name: str) -> bytes:
+    """Read an SVG/asset from the PyInstaller bundle or the repo, network-free."""
     roots: list[Path] = []
     bundle_root = getattr(sys, "_MEIPASS", None)
     if bundle_root:
@@ -100,105 +96,91 @@ def _app_logo_source() -> QPixmap:
     roots.append(Path(__file__).resolve().parents[1])
 
     for root in roots:
-        source = QPixmap(str(root / "assets" / "synapcap-logo-source.png"))
-        if not source.isNull():
-            return source
-    return QPixmap()
+        try:
+            return (root / "assets" / name).read_bytes()
+        except OSError:
+            continue
+    return b""
 
 
-@lru_cache(maxsize=1)
-def _wordmark_source() -> QPixmap:
-    roots: list[Path] = []
-    bundle_root = getattr(sys, "_MEIPASS", None)
-    if bundle_root:
-        roots.append(Path(bundle_root))
-    roots.append(Path(__file__).resolve().parents[1])
+def _render_svg(data: bytes, width: int, height: int) -> QPixmap | None:
+    """Rasterise an SVG into a transparent pixmap, preserving its aspect ratio."""
+    if not data or QSvgRenderer is None:
+        return None
+    renderer = QSvgRenderer(QByteArray(data))
+    if not renderer.isValid():
+        return None
 
-    for root in roots:
-        source = QPixmap(str(root / "assets" / "synapcap-wordmark.png"))
-        if not source.isNull():
-            return source
-    return QPixmap()
-
-
-def create_app_pixmap(size: int = 32) -> QPixmap:
-    pixmap = QPixmap(size, size)
+    pixmap = QPixmap(max(1, width), max(1, height))
     pixmap.fill(QColor(0, 0, 0, 0))
 
-    source = _app_logo_source()
-    if not source.isNull():
-        # The supplied artwork has intentionally transparent export margins.
-        # Crop only those margins so small tray icons stay optically centered.
-        cropped = source.copy(50, 15, 1199, 1199)
-        target_size = max(1, round(size * 0.96))
-        scaled = cropped.scaled(
-            target_size,
-            target_size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+    view_box = renderer.viewBoxF()
+    if view_box.width() > 0 and view_box.height() > 0:
+        scale = min(width / view_box.width(), height / view_box.height())
+        drawn_w = view_box.width() * scale
+        drawn_h = view_box.height() * scale
+        target = QRectF(
+            (width - drawn_w) / 2.0,
+            (height - drawn_h) / 2.0,
+            drawn_w,
+            drawn_h,
         )
-        painter = QPainter(pixmap)
-        painter.drawPixmap(
-            (size - scaled.width()) // 2,
-            (size - scaled.height()) // 2,
-            scaled,
-        )
-        painter.end()
-        return pixmap
+    else:
+        target = QRectF(0, 0, width, height)
 
-    # Keep a code-rendered fallback for incomplete source checkouts.
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-    # Fallback brand mark on the same near-black app surface.
-    painter.setBrush(QColor("#050608"))
-    painter.setPen(QColor("#89B4FA"))
-    painter.drawEllipse(1, 1, size - 2, size - 2)
-
-    # 'S' Text Logo (Catppuccin Blue #89B4FA)
-    painter.setPen(QColor("#89B4FA"))
-    font_size = int(size * 0.45)
-    font = QFont("Segoe UI", font_size, QFont.Weight.Bold)
-    painter.setFont(font)
-    # Font metrics make the glyph look slightly low even with AlignCenter.
-    # Shift only the visual glyph upward while keeping the circle centered.
-    text_offset = max(1.0, size * 0.03)
-    painter.drawText(
-        QRectF(0, -text_offset, size, size),
-        Qt.AlignmentFlag.AlignCenter,
-        "S",
-    )
-
+    renderer.render(painter, target)
     painter.end()
     return pixmap
 
 
-@lru_cache(maxsize=12)
-def create_wordmark_pixmap(width: int = 96, height: int = 30) -> QPixmap:
-    """Return the supplied horizontal wordmark, scaled for title bars."""
-    pixmap = QPixmap(width, height)
+@lru_cache(maxsize=16)
+def create_app_pixmap(size: int = 32) -> QPixmap:
+    """The transparent gauge mark, for in-app use (compact bar, etc.)."""
+    rendered = _render_svg(_asset_bytes("logo.svg"), size, size)
+    if rendered is not None:
+        return rendered
+
+    # Code-drawn fallback for checkouts without the SVG assets.
+    pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
-
-    source = _wordmark_source()
-    if source.isNull():
-        return pixmap
-
-    # The exported wordmark has transparent padding on every edge. Removing
-    # it keeps the visible mark centered in the compact title-bar space.
-    cropped = source.copy(89, 38, 1982, 686)
-    scaled = cropped.scaled(
-        width,
-        height,
-        Qt.AspectRatioMode.KeepAspectRatio,
-        Qt.TransformationMode.SmoothTransformation,
-    )
     painter = QPainter(pixmap)
-    painter.drawPixmap(
-        (width - scaled.width()) // 2,
-        (height - scaled.height()) // 2,
-        scaled,
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QColor("#5B8DEF"))
+    font = QFont("Segoe UI", max(1, int(size * 0.5)), QFont.Weight.Bold)
+    painter.setFont(font)
+    painter.drawText(
+        QRectF(0, -max(1.0, size * 0.03), size, size),
+        Qt.AlignmentFlag.AlignCenter,
+        "S",
     )
     painter.end()
+    return pixmap
+
+
+@lru_cache(maxsize=16)
+def create_app_icon_pixmap(size: int = 32) -> QPixmap:
+    """The mark on its near-black tile — for window / tray / installer icons,
+    where it must read on both light and dark system chrome."""
+    rendered = _render_svg(_asset_bytes("logo-icon.svg"), size, size)
+    if rendered is not None:
+        return rendered
+    return create_app_pixmap(size)
+
+
+def create_app_icon(size: int = 32) -> QIcon:
+    return QIcon(create_app_icon_pixmap(size))
+
+
+@lru_cache(maxsize=12)
+def create_wordmark_pixmap(width: int = 96, height: int = 30) -> QPixmap:
+    """The SynapCap wordmark, scaled for title bars."""
+    rendered = _render_svg(_asset_bytes("wordmark.svg"), width, height)
+    if rendered is not None:
+        return rendered
+    pixmap = QPixmap(width, height)
+    pixmap.fill(QColor(0, 0, 0, 0))
     return pixmap
 
 

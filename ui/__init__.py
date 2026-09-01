@@ -1,5 +1,6 @@
 from .icon import (
     create_app_icon,
+    create_app_icon_pixmap,
     create_app_pixmap,
     create_arrow_down_icon,
     create_arrow_up_icon,
@@ -24,6 +25,7 @@ __all__ = [
     "SynapCapTray",
     "SynapCapWidget",
     "create_app_icon",
+    "create_app_icon_pixmap",
     "create_app_pixmap",
     "create_arrow_down_icon",
     "create_arrow_up_icon",

@@ -56,9 +56,9 @@
 **미결정**: 로고 accent(`#5B8DEF`)와 앱 UI accent(`#89B4FA`)의 통일 여부.
 통일 시 `logo.svg`의 `#5B8DEF`를 앱 accent에 맞춘다.
 
-**남은 것**: `logo-icon.svg` → `synapcap.ico`/`.icns`/`.png` 빌드,
-`ui/icon.py`(`create_app_pixmap`/`create_app_icon`, 현재 `synapcap-logo-source.png` 크롭)를
-SVG 래스터라이즈로 교체, packaging·docs 경로 교체.
+**연동 완료**: `ui/icon.py`가 `logo.svg`/`logo-icon.svg`/`wordmark.svg`를 런타임 래스터라이즈,
+`scripts/generate_icons.py`가 빌드 시 `synapcap.ico`/`.icns`/`.png` 생성. 기존 3D PNG 자산 제거.
+**남은 것**: 홈페이지·README(`docs/assets/`) 로고 교체, 로고/앱 accent 통일 결정.
 
 ### 색 (Catppuccin Mocha 기반, 배경은 더 어둡게)
 
