@@ -48,6 +48,7 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(settings["always_on_top"])
             self.assertTrue(settings["check_updates"])
             self.assertEqual(settings["usage_view"], "bar")
+            self.assertEqual(settings["ring_layout"], "vertical")
             self.assertEqual(settings["widget_scale"], "medium")
             self.assertNotIn("expanded_font_size", settings)
             self.assertNotIn("compact_font_size", settings)
@@ -55,6 +56,31 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(settings["usage_alerts_enabled"])
             self.assertEqual(settings["usage_alert_threshold"], 90)
             self.assertEqual(settings["last_seen_version"], "legacy")
+            self.assertEqual(settings["theme"], "auto")
+
+    def test_invalid_theme_falls_back_to_dark(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps({"settings": {"theme": "sepia"}}),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertEqual(settings["theme"], "dark")
+
+    def test_invalid_ring_layout_falls_back_to_vertical(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps({"settings": {"ring_layout": "diagonal"}}),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertEqual(settings["ring_layout"], "vertical")
 
     def test_legacy_usage_bold_is_removed_for_the_scale_presets(self):
         with tempfile.TemporaryDirectory() as temp_dir:

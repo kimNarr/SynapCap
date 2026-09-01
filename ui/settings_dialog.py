@@ -409,6 +409,11 @@ class HoverIconButton(QPushButton):
         self._hover_icon = hover_icon
         self.setIcon(self._normal_icon)
 
+    def set_icons(self, normal_icon: QIcon, hover_icon: QIcon) -> None:
+        self._normal_icon = normal_icon
+        self._hover_icon = hover_icon
+        self.setIcon(self._normal_icon)
+
     def enterEvent(self, event) -> None:
         self.setIcon(self._hover_icon)
         super().enterEvent(event)
@@ -452,12 +457,12 @@ class SettingsTitleBar(QWidget):
         layout.setContentsMargins(12, 0, 6, 0)
         layout.setSpacing(8)
 
-        wordmark_label = QLabel()
-        wordmark_label.setPixmap(create_wordmark_pixmap(78, 24))
-        wordmark_label.setFixedSize(78, 24)
-        wordmark_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        wordmark_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        layout.addWidget(wordmark_label)
+        self.wordmark_label = QLabel()
+        self.wordmark_label.setPixmap(create_wordmark_pixmap(78, 24))
+        self.wordmark_label.setFixedSize(78, 24)
+        self.wordmark_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.wordmark_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        layout.addWidget(self.wordmark_label)
 
         title_label = QLabel(f"v{APP_VERSION} 설정")
         title_label.setObjectName("settingsTitleLabel")
@@ -471,6 +476,10 @@ class SettingsTitleBar(QWidget):
         self.close_button.setToolTip("닫기")
         self.close_button.clicked.connect(dialog.reject)
         layout.addWidget(self.close_button)
+
+    def restyle(self) -> None:
+        self.wordmark_label.setPixmap(create_wordmark_pixmap(78, 24))
+        self.update()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -510,6 +519,39 @@ class SettingsDialog(QDialog):
             lambda: self.preview_btn.setText("적용")
         )
         self.init_ui()
+
+    @staticmethod
+    def _set_themed_style(widget: QWidget, template: str) -> None:
+        widget.setProperty("synapcapThemeStyle", template)
+        widget.setStyleSheet(template % palette())
+
+    def restyle(self) -> None:
+        """Reapply palette-backed QSS and icons without losing form edits."""
+        self.setStyleSheet(_DIALOG_QSS % palette())
+        if hasattr(self, "providers_scroll"):
+            self.providers_scroll.setStyleSheet(_PROVIDERS_SCROLL_QSS % palette())
+        self.title_bar.restyle()
+        for widget in self.findChildren(QWidget):
+            template = widget.property("synapcapThemeStyle")
+            if isinstance(template, str) and template:
+                widget.setStyleSheet(template % palette())
+            widget.update()
+        self.add_btn.setIcon(create_plus_icon(14, t("accent")))
+        for item in self.provider_widgets:
+            item["up_button"].setIcon(create_arrow_up_icon(14, t("ink")))
+            item["down_button"].setIcon(create_arrow_down_icon(14, t("ink")))
+            item["delete_button"].set_icons(
+                create_trash_icon(14, t("danger")),
+                create_trash_icon(14, t("on_accent")),
+            )
+            combo = item["type_combo"]
+            for index in range(combo.count()):
+                provider_type = combo.itemData(index)
+                combo.setItemIcon(index, create_provider_icon(provider_type, 18))
+            selected_type = combo.currentData() or "codex"
+            item["header_icon"].setPixmap(
+                create_provider_icon(selected_type, 22).pixmap(22, 22)
+            )
 
     def init_ui(self):
         # Fusion avoids native Cocoa controls overriding the Windows-oriented
@@ -618,6 +660,21 @@ class SettingsDialog(QDialog):
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
 
+        self.theme_combo = NoWheelComboBox()
+        self.theme_combo.addItem("시스템 설정 따름", "auto")
+        self.theme_combo.addItem("라이트", "light")
+        self.theme_combo.addItem("다크", "dark")
+        selected_theme = settings.get("theme", "auto")
+        theme_index = self.theme_combo.findData(selected_theme)
+        self.theme_combo.setCurrentIndex(max(theme_index, 0))
+        self.theme_combo.setToolTip(
+            "시스템 설정 따름 — OS의 라이트/다크 설정을 자동으로 따라갑니다."
+        )
+        self.theme_combo.currentIndexChanged.connect(
+            lambda _index: self.on_preview()
+        )
+        form.addRow("테마:", self.theme_combo)
+
         self.widget_scale_combo = NoWheelComboBox()
         self.widget_scale_combo.addItem("작게 · 320 px", "small")
         self.widget_scale_combo.addItem("기본 · 360 px", "medium")
@@ -645,6 +702,22 @@ class SettingsDialog(QDialog):
         )
         form.addRow("그래프 모양:", self.graph_combo)
 
+        self.ring_layout_combo = NoWheelComboBox()
+        self.ring_layout_combo.addItem("세로 · 좁은 화면", "vertical")
+        self.ring_layout_combo.addItem("가로 · 모델 나란히", "horizontal")
+        selected_ring_layout = settings.get("ring_layout", "vertical")
+        ring_layout_index = self.ring_layout_combo.findData(selected_ring_layout)
+        self.ring_layout_combo.setCurrentIndex(max(ring_layout_index, 0))
+        self.ring_layout_combo.setToolTip(
+            "링 그래프에서 모델 카드를 세로 또는 가로로 배치합니다. "
+            "화면 폭이 부족하면 가로 배치도 자동으로 세로로 표시됩니다."
+        )
+        self.graph_combo.currentIndexChanged.connect(
+            self._update_ring_layout_control
+        )
+        self._update_ring_layout_control()
+        form.addRow("링 배치:", self.ring_layout_combo)
+
         self.usage_alert_check = StyledCheckBox("설정한 사용량 이상에서 알림")
         self.usage_alert_check.setChecked(
             settings.get("usage_alerts_enabled", False)
@@ -665,14 +738,20 @@ class SettingsDialog(QDialog):
         )
         form.addRow("알림 기준:", self.usage_alert_threshold_spin)
 
+    def _update_ring_layout_control(self, _index: int | None = None) -> None:
+        self.ring_layout_combo.setEnabled(
+            self.graph_combo.currentData() == "ring"
+        )
+
     def init_feedback_tab(self):
         layout = QVBoxLayout(self.feedback_tab)
         layout.setContentsMargins(22, 24, 22, 22)
         layout.setSpacing(12)
 
         title = QLabel("SynapCap에 의견 보내기")
-        title.setStyleSheet(
-            f"color: {t('ink')}; font-size: 17px; font-weight: 750;"
+        self._set_themed_style(
+            title,
+            "color: %(ink)s; font-size: 17px; font-weight: 750;",
         )
         layout.addWidget(title)
 
@@ -681,7 +760,10 @@ class SettingsDialog(QDialog):
             "내용을 확인한 뒤 직접 등록해 주세요."
         )
         description.setWordWrap(True)
-        description.setStyleSheet(f"color: {t('ink_mid')}; line-height: 1.5;")
+        self._set_themed_style(
+            description,
+            "color: %(ink_mid)s; line-height: 1.5;",
+        )
         layout.addWidget(description)
 
         self.feedback_buttons = {}
@@ -706,9 +788,10 @@ class SettingsDialog(QDialog):
         for button_text, detail_text, feedback_type in feedback_options:
             card = QFrame()
             card.setObjectName("feedbackCard")
-            card.setStyleSheet(
-                f"QFrame#feedbackCard {{ background-color: {t('panel_sunken')}; "
-                f"border: 1px solid {t('line_soft')}; border-radius: 6px; }}"
+            self._set_themed_style(
+                card,
+                "QFrame#feedbackCard { background-color: %(panel_sunken)s; "
+                "border: 1px solid %(line_soft)s; border-radius: 6px; }",
             )
             card_layout = QHBoxLayout(card)
             card_layout.setContentsMargins(16, 14, 14, 14)
@@ -717,12 +800,16 @@ class SettingsDialog(QDialog):
             copy_layout = QVBoxLayout()
             copy_layout.setSpacing(4)
             option_title = QLabel(button_text)
-            option_title.setStyleSheet(
-                f"color: {t('ink')}; font-size: 13px; font-weight: 700;"
+            self._set_themed_style(
+                option_title,
+                "color: %(ink)s; font-size: 13px; font-weight: 700;",
             )
             option_detail = QLabel(detail_text)
             option_detail.setWordWrap(True)
-            option_detail.setStyleSheet(f"color: {t('ink_faint')}; font-size: 11px;")
+            self._set_themed_style(
+                option_detail,
+                "color: %(ink_faint)s; font-size: 11px;",
+            )
             copy_layout.addWidget(option_title)
             copy_layout.addWidget(option_detail)
             card_layout.addLayout(copy_layout, 1)
@@ -743,10 +830,11 @@ class SettingsDialog(QDialog):
             "올리지 마세요. 스크린샷에도 개인정보가 없는지 확인해 주세요."
         )
         privacy_note.setWordWrap(True)
-        privacy_note.setStyleSheet(
-            f"color: {t('warn_soft')}; background-color: {t('privacy_note_bg')}; "
-            f"border: 1px solid {t('privacy_note_edge')}; border-radius: 6px; "
-            "padding: 10px; font-size: 11px;"
+        self._set_themed_style(
+            privacy_note,
+            "color: %(warn_soft)s; background-color: %(privacy_note_bg)s; "
+            "border: 1px solid %(privacy_note_edge)s; border-radius: 6px; "
+            "padding: 10px; font-size: 11px;",
         )
         layout.addWidget(privacy_note)
         layout.addStretch()
@@ -759,11 +847,12 @@ class SettingsDialog(QDialog):
         # Top Control Bar (Add Provider)
         top_bar = QHBoxLayout()
         top_label = QLabel("<b>AI 프로바이더</b>")
-        top_label.setStyleSheet(f"font-size: 13px; color: {t('ink')};")
+        self._set_themed_style(top_label, "font-size: 13px; color: %(ink)s;")
         top_bar.addWidget(top_label)
         self.provider_count_label = QLabel()
-        self.provider_count_label.setStyleSheet(
-            f"color: {t('ink_faint')}; font-size: 11px;"
+        self._set_themed_style(
+            self.provider_count_label,
+            "color: %(ink_faint)s; font-size: 11px;",
         )
         top_bar.addWidget(self.provider_count_label)
         top_bar.addStretch()
@@ -817,8 +906,9 @@ class SettingsDialog(QDialog):
         header_bar.addWidget(provider_icon)
 
         header_title = QLabel(p_data.get("name", "Provider"))
-        header_title.setStyleSheet(
-            f"color: {t('ink')}; font-size: 13px; font-weight: 700;"
+        self._set_themed_style(
+            header_title,
+            "color: %(ink)s; font-size: 13px; font-weight: 700;",
         )
         header_bar.addWidget(header_title)
 
@@ -881,7 +971,10 @@ class SettingsDialog(QDialog):
 
         connection_label = QLabel()
         connection_label.setWordWrap(True)
-        connection_label.setStyleSheet(f"color: {t('good')}; font-size: 11px;")
+        self._set_themed_style(
+            connection_label,
+            "color: %(good)s; font-size: 11px;",
+        )
         g_layout.addRow("연결 방식:", connection_label)
 
         window_options = QWidget()
@@ -943,6 +1036,8 @@ class SettingsDialog(QDialog):
             "name_edit": name_edit,
             "form_layout": g_layout,
             "connection_label": connection_label,
+            "up_button": up_btn,
+            "down_button": dn_btn,
             "five_hour_check": five_hour_check,
             "weekly_check": weekly_check,
             "delete_button": del_btn,
@@ -1056,8 +1151,12 @@ class SettingsDialog(QDialog):
             self.dock_above_taskbar_check.isChecked()
         )
         settings["check_updates"] = self.update_check.isChecked()
+        settings["theme"] = self.theme_combo.currentData() or "dark"
         settings["widget_scale"] = self.widget_scale_combo.currentData() or "medium"
         settings["usage_view"] = self.graph_combo.currentData() or "bar"
+        settings["ring_layout"] = (
+            self.ring_layout_combo.currentData() or "vertical"
+        )
         settings["usage_alerts_enabled"] = (
             self.usage_alert_check.isChecked()
         )

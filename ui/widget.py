@@ -60,7 +60,7 @@ WIDGET_SCALE_PRESETS = {
         "card_spacing": 5,
         "window_spacing": 6,
         "card_gap": 5,
-        "compact_font_size": 11,
+        "compact_font_size": 10,
     },
     "medium": {
         "width": 360,
@@ -73,7 +73,7 @@ WIDGET_SCALE_PRESETS = {
         "card_spacing": 6,
         "window_spacing": 8,
         "card_gap": 7,
-        "compact_font_size": 13,
+        "compact_font_size": 12,
     },
     "large": {
         "width": 420,
@@ -86,7 +86,7 @@ WIDGET_SCALE_PRESETS = {
         "card_spacing": 7,
         "window_spacing": 10,
         "card_gap": 9,
-        "compact_font_size": 15,
+        "compact_font_size": 14,
     },
 }
 
@@ -176,7 +176,7 @@ class UsageRing(QWidget):
         if show_value:
             self.ring_size = max(50, font_size + 38)
         else:
-            self.ring_size = max(26, font_size + 12)
+            self.ring_size = max(22, font_size + 8)
         self.setFixedSize(self.ring_size, self.ring_size)
 
     def paintEvent(self, event):
@@ -528,7 +528,7 @@ class SynapCapWidget(QWidget):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Preferred,
         )
-        self.cards_layout = QVBoxLayout()
+        self.cards_layout = QGridLayout()
         self.cards_layout.setContentsMargins(0, 0, 0, 0)
         self.cards_layout.setSpacing(0)
         self.cards_frame.setLayout(self.cards_layout)
@@ -540,6 +540,45 @@ class SynapCapWidget(QWidget):
         outer_layout.addWidget(self.frame)
 
         self._schedule_fit_to_content()
+
+    def _apply_theme_chrome(self) -> None:
+        """Refresh palette-bound frame styles and persistent header artwork."""
+        self.frame.setStyleSheet(_ROOT_FRAME_QSS % palette())
+        button_style = _ICON_BTN_QSS % palette()
+        for button in (
+            self.view_btn,
+            self.refresh_btn,
+            self.settings_btn,
+            self.minimize_btn,
+            self.close_btn,
+        ):
+            button.setStyleSheet(button_style)
+        compact_button_style = _COMPACT_BTN_QSS % palette()
+        self.expand_btn.setStyleSheet(compact_button_style)
+        self.compact_close_btn.setStyleSheet(compact_button_style)
+
+        self.wordmark_label.setPixmap(create_wordmark_pixmap(96, 30))
+        self.refresh_btn.setIcon(create_refresh_icon(14, t("accent")))
+        self.settings_btn.setIcon(create_settings_icon(14, t("ink_mid")))
+        self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
+        self.close_btn.setIcon(create_close_icon(14, t("danger_soft")))
+        self._update_view_button()
+        self._set_version_badge_style(bool(self._update_url))
+        self._apply_compact_metrics()
+
+    def apply_theme(self) -> None:
+        """Live-apply the active palette without changing visual state."""
+        compact_before = self.is_compact
+        view_before = self.usage_view
+        self._apply_theme_chrome()
+        self.rebuild_ui(self.config_data, self.providers, preserve_usage=True)
+        self.usage_view = view_before
+        if compact_before != self.is_compact:
+            self.is_compact = compact_before
+            self._apply_layout_visibility()
+        for child in self.findChildren(QWidget):
+            child.update()
+        self.update()
 
     @staticmethod
     def _expanded_preset(settings: dict) -> dict:
@@ -571,6 +610,9 @@ class SynapCapWidget(QWidget):
         return preset
 
     def _responsive_expanded_width(self, preset: dict) -> int:
+        if self._use_horizontal_ring_layout(preset):
+            return self._horizontal_ring_width(preset)
+
         name_font = QFont("Segoe UI", preset["name_size"])
         name_font.setWeight(QFont.Weight.Bold)
         metrics = QFontMetrics(name_font)
@@ -584,6 +626,24 @@ class SynapCapWidget(QWidget):
         content_width = max(268, preset["val_size"] * 16 + 52)
         return min(480, max(300, preset["width"], provider_header_width, content_width))
 
+    def _horizontal_ring_width(self, preset: dict) -> int:
+        provider_count = max(1, len(self.providers))
+        card_width = max(190, preset["val_size"] * 9 + 90)
+        separators = max(0, provider_count - 1)
+        inter_card_space = separators * (preset["card_gap"] * 2 + 1)
+        return card_width * provider_count + inter_card_space + 24
+
+    def _use_horizontal_ring_layout(self, preset: dict) -> bool:
+        settings = self.config_data.get("settings", {})
+        if (
+            self.usage_view != "ring"
+            or settings.get("ring_layout", "vertical") != "horizontal"
+        ):
+            return False
+        required_width = self._horizontal_ring_width(preset)
+        available_width = self._available_geometry().width()
+        return required_width <= min(780, max(0, available_width - 24))
+
     def _set_fixed_window_width(self, width: int) -> None:
         """Keep the visible root frame in lockstep with the frameless window."""
         self.setFixedWidth(width)
@@ -595,7 +655,7 @@ class SynapCapWidget(QWidget):
         scale = settings.get("widget_scale")
         if scale in WIDGET_SCALE_PRESETS:
             font_size = WIDGET_SCALE_PRESETS[scale]["compact_font_size"]
-            font_weight = 700
+            font_weight = 600
         else:
             font_size = max(9, min(16, int(settings.get("compact_font_size", 12))))
             font_weight = 700 if settings.get("compact_font_bold", True) else 400
@@ -605,12 +665,15 @@ class SynapCapWidget(QWidget):
             # Keep the bar deliberately slimmer than the expanded widget. The
             # text scale remains user-configurable; surrounding geometry grows
             # from it so a larger font cannot be clipped.
-            "icon_size": max(18, font_size + 7),
-            "logo_size": max(18, font_size + 6),
-            "button_size": max(20, font_size + 10),
-            "glyph_size": max(12, font_size + 1),
-            "item_spacing": max(3, round(font_size * 0.34)),
-            "bar_spacing": max(5, round(font_size * 0.45)),
+            "icon_size": max(17, font_size + 6),
+            "logo_size": max(17, font_size + 5),
+            "button_size": max(20, font_size + 9),
+            "glyph_size": max(11, font_size),
+            # Keep each icon/value pair compact, but leave enough air between
+            # provider groups that consecutive percentages do not read as one.
+            "item_spacing": max(4, round(font_size * 0.34)),
+            "logo_spacing": max(9, round(font_size * 0.75)),
+            "provider_spacing": max(8, round(font_size * 0.66)),
             "vertical_margin": max(1, round((font_size - 9) * 0.34)),
         }
 
@@ -644,8 +707,8 @@ class SynapCapWidget(QWidget):
         metrics = self._compact_metrics()
         vertical = metrics["vertical_margin"]
         self.compact_layout.setContentsMargins(3, vertical, 1, vertical)
-        self.compact_layout.setSpacing(metrics["bar_spacing"])
-        self.compact_items_layout.setSpacing(metrics["bar_spacing"])
+        self.compact_layout.setSpacing(metrics["logo_spacing"])
+        self.compact_items_layout.setSpacing(metrics["provider_spacing"])
         logo_size = metrics["logo_size"]
         self.compact_logo.setFixedSize(logo_size, logo_size)
         self.compact_logo.setPixmap(create_app_pixmap(logo_size))
@@ -936,17 +999,28 @@ class SynapCapWidget(QWidget):
         margins = self.frame_layout.contentsMargins()
         content_width = self.compact_bar.sizeHint().width()
         responsive_width = max(
-            150, content_width + margins.left() + margins.right() + 2
+            150, content_width + margins.left() + margins.right() + 10
         )
         self._set_fixed_window_width(responsive_width)
 
     @staticmethod
     def _fit_compact_value_label(value_label: QLabel, font_size: int) -> None:
-        """Drop loading-era constraints and reserve the rendered text width."""
+        """Reserve the real glyph width, including rich-text safety padding."""
         value_label.setMinimumWidth(0)
         value_label.ensurePolished()
         value_label.adjustSize()
-        value_label.setMinimumWidth(max(font_size * 3, value_label.sizeHint().width()))
+        plain_text = str(
+            value_label.property("compactPlainText") or value_label.text()
+        )
+        text_width = QFontMetrics(value_label.font()).horizontalAdvance(plain_text)
+        safety_padding = max(6, round(font_size * 0.5))
+        value_label.setMinimumWidth(
+            max(
+                font_size * 3,
+                value_label.sizeHint().width() + safety_padding,
+                text_width + safety_padding,
+            )
+        )
         parent = value_label.parentWidget()
         if parent is not None:
             parent.adjustSize()
@@ -971,6 +1045,7 @@ class SynapCapWidget(QWidget):
             value_label.show()
             if usage.error:
                 value_label.setText("!")
+                value_label.setProperty("compactPlainText", "!")
                 self._apply_compact_value_style(value_label, t("usage_crit"), metrics)
                 self._fit_compact_value_label(value_label, metrics["font_size"])
                 compact_ui["item"].setToolTip(usage.error)
@@ -980,6 +1055,12 @@ class SynapCapWidget(QWidget):
             windows = self._visible_usage_windows(provider_ui, usage.windows or [])
             used = max((window.used for window in windows), default=usage.used)
             window_colors = [self._compact_usage_color(w.used) for w in windows]
+            plain_value = (
+                "/".join(f"{window.used:.0f}%" for window in windows)
+                if len(windows) > 1
+                else f"{used:.0f}%"
+            )
+            value_label.setProperty("compactPlainText", plain_value)
             if len(windows) > 1 and len(set(window_colors)) > 1:
                 # Colour each window on its own so "90%/20%" doesn't paint the
                 # calm 20% red just because the 5h window is hot.
@@ -994,12 +1075,10 @@ class SynapCapWidget(QWidget):
                     )
                 )
             elif len(windows) > 1:
-                value_label.setText(
-                    "/".join(f"{window.used:.0f}%" for window in windows)
-                )
+                value_label.setText(plain_value)
                 self._apply_compact_value_style(value_label, window_colors[0], metrics)
             else:
-                value_label.setText(f"{used:.0f}%")
+                value_label.setText(plain_value)
                 self._apply_compact_value_style(
                     value_label, self._compact_usage_color(used), metrics
                 )
@@ -1073,8 +1152,9 @@ class SynapCapWidget(QWidget):
         self.config_data.setdefault("settings", {})["usage_view"] = self.usage_view
         self._update_view_button()
         self.view_mode_changed.emit(self.usage_view)
-        if self.latest_usage:
-            self.update_data(self.latest_usage, force=True)
+        # Ring orientation can change the provider-card topology and window
+        # width, so rebuild the visual layer while preserving fetched usage.
+        self.rebuild_ui(self.config_data, self.providers, preserve_usage=True)
         self._schedule_fit_to_content(resize_anchor)
 
     def _build_provider_cards(self):
@@ -1087,6 +1167,8 @@ class SynapCapWidget(QWidget):
             if settings.get("widget_scale") in WIDGET_SCALE_PRESETS
             else (700 if settings.get("expanded_font_bold", True) else 400)
         )
+        horizontal_ring = self._use_horizontal_ring_layout(preset)
+        self._horizontal_ring_active = horizontal_ring
 
         # Clear existing card widgets in layout
         while self.cards_layout.count():
@@ -1098,9 +1180,16 @@ class SynapCapWidget(QWidget):
                 widget.setParent(None)
                 widget.deleteLater()
 
-        # Cards read as units: the gap between them is clearly larger than any
-        # gap inside one. The 1px separator sits centred in that gap.
-        self.cards_layout.setSpacing(preset["card_gap"])
+        # Reset grid geometry from the previous orientation before repopulating.
+        for index in range(8):
+            self.cards_layout.setColumnStretch(index, 0)
+            self.cards_layout.setRowStretch(index, 0)
+        if horizontal_ring:
+            self.cards_layout.setHorizontalSpacing(preset["card_gap"])
+            self.cards_layout.setVerticalSpacing(0)
+        else:
+            self.cards_layout.setHorizontalSpacing(0)
+            self.cards_layout.setVerticalSpacing(preset["card_gap"])
 
         for index, provider in enumerate(self.providers):
             card_widget = QWidget()
@@ -1154,7 +1243,14 @@ class SynapCapWidget(QWidget):
             windows_layout.setVerticalSpacing(preset["window_spacing"])
             c_layout.addLayout(windows_layout)
 
-            self.cards_layout.addWidget(card_widget)
+            if horizontal_ring:
+                card_column = index * 2
+                self.cards_layout.addWidget(card_widget, 0, card_column)
+                self.cards_layout.setColumnStretch(card_column, 1)
+            else:
+                card_row = index * 2
+                self.cards_layout.addWidget(card_widget, card_row, 0)
+                self.cards_layout.setColumnStretch(0, 1)
 
             # Save UI elements for dynamic updates
             self.provider_ui_map[provider.provider_id] = {
@@ -1165,6 +1261,7 @@ class SynapCapWidget(QWidget):
                 "windows_layout": windows_layout,
                 "window_rows": [],
                 "provider_type": provider_type,
+                "card": card_widget,
                 "show_five_hour": provider.config.get("show_five_hour", True),
                 "show_weekly": provider.config.get("show_weekly", True),
                 "limit": provider.limit,
@@ -1178,11 +1275,19 @@ class SynapCapWidget(QWidget):
 
             if index < len(self.providers) - 1:
                 separator = QFrame()
-                separator.setFixedHeight(1)
                 separator.setStyleSheet(
                     f"background-color: {t('separator')}; border: none;"
                 )
-                self.cards_layout.addWidget(separator)
+                if horizontal_ring:
+                    separator.setFixedWidth(1)
+                    separator.setSizePolicy(
+                        QSizePolicy.Policy.Fixed,
+                        QSizePolicy.Policy.Expanding,
+                    )
+                    self.cards_layout.addWidget(separator, 0, index * 2 + 1)
+                else:
+                    separator.setFixedHeight(1)
+                    self.cards_layout.addWidget(separator, index * 2 + 1, 0)
 
         self._schedule_fit_to_content()
 
@@ -1439,6 +1544,21 @@ class SynapCapWidget(QWidget):
         return 2
 
     @staticmethod
+    def _usage_window_marker(label: str) -> str:
+        """Use short, unambiguous period badges in every expanded graph view."""
+        normalized = label.lower().replace(" ", "")
+        if (
+            "5시간" in normalized
+            or "5hour" in normalized
+            or "현재세션" in normalized
+            or "currentsession" in normalized
+        ):
+            return "5h"
+        if "주간" in normalized or "week" in normalized:
+            return "7d"
+        return "•"
+
+    @staticmethod
     def _reset_presentation(
         reset_text: str,
         now: datetime | None = None,
@@ -1607,26 +1727,52 @@ class SynapCapWidget(QWidget):
             is_warning = window.used >= 60
             is_critical = window.used >= 80
 
-            # Every graph type shares the same tile: an invariant meta row
-            # (window name + reset) and a swappable graph row.  Only the graph
-            # widget changes, so the layout never shifts between views.
+            # Keep every usage window to one line. The graph swaps in place
+            # between views, avoiding the former extra meta row that made the
+            # bar, segment, and ring views much taller than number view.
             tile = QWidget()
             tile.setObjectName("usageMetric")
             tile.setStyleSheet("QWidget#usageMetric { background: transparent; }")
-            tile_layout = QVBoxLayout(tile)
-            pad = max(4, round(vs * 0.34))
-            tile_layout.setContentsMargins(pad, pad, pad, pad)
-            tile_layout.setSpacing(max(3, round(vs * 0.3)))
+            tile_layout = QHBoxLayout(tile)
+            pad = max(3, round(vs * 0.25))
+            tile_layout.setContentsMargins(pad, 2, pad, 2)
+            tile_layout.setSpacing(max(6, round(vs * 0.45)))
+            window_label = QLabel(self._usage_window_marker(window.label))
+            window_label.setObjectName("windowBadge")
+            window_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            # Period is metadata, just like the CLI source. Use the same
+            # restrained outline treatment so the coloured usage value stays
+            # the visual headline.
+            window_label.setStyleSheet(
+                f"color: {t('cli_badge_fg')}; background-color: transparent; "
+                f"border: 1px solid {t('cli_badge_edge')}; border-radius: 4px; "
+                "padding: 1px 5px;"
+            )
+            self._set_label_font(window_label, max(8, vs - 2), 600)
+            window_label.setFixedWidth(
+                max(30, QFontMetrics(window_label.font()).horizontalAdvance("7d") + 10)
+            )
+            self._enable_instant_tooltip(window_label, window.label)
+            tile_layout.addWidget(window_label)
 
-            meta = QHBoxLayout()
-            meta.setContentsMargins(0, 0, 0, 0)
-            meta.setSpacing(8)
-            window_label = QLabel(window.label)
-            window_label.setObjectName("windowLabel")
-            window_label.setStyleSheet(f"color: {t('ink_bright')};")
-            self._set_label_font(window_label, max(9, vs - 1), 600)
-            meta.addWidget(window_label)
-            meta.addStretch()
+            graph_widget: QWidget | None = None
+            if graph == "segment":
+                graph_widget = SegmentBar(window.used, color)
+                graph_widget.setFixedHeight(max(9, round(vs * 0.68)))
+                tile_layout.addWidget(graph_widget, 1)
+            elif graph == "ring":
+                graph_widget = UsageRing(
+                    window.used, color, usage_value_bold, vs, show_value=False
+                )
+                tile_layout.addWidget(graph_widget)
+                tile_layout.addStretch()
+            elif graph == "bar":
+                graph_widget = UsageBar(window.used, color)
+                graph_widget.setFixedHeight(max(12, preset["pbar_height"] + 3))
+                tile_layout.addWidget(graph_widget, 1)
+            else:  # number
+                tile_layout.addStretch()
+
             reset_label = QLabel(self._condensed_reset(reset_display))
             reset_label.setObjectName("resetCountdown")
             reset_label.setWordWrap(False)
@@ -1635,7 +1781,7 @@ class SynapCapWidget(QWidget):
             )
             reset_label.setStyleSheet(f"color: {t('ink_dim')};")
             self._set_label_font(reset_label, max(9, vs - 2))
-            meta.addWidget(reset_label)
+            tile_layout.addWidget(reset_label)
 
             value_label = QLabel(
                 f"▲ {window.used:.0f}%" if is_critical else f"{window.used:.0f}%"
@@ -1645,45 +1791,15 @@ class SynapCapWidget(QWidget):
             value_weight = 700 if is_warning else normal_weight
             self._enable_instant_tooltip(value_label, usage_tooltip)
 
-            if graph == "number":
-                # No graph to align, so the % joins the meta row and the tile
-                # stays a single compact line.
-                self._set_label_font(value_label, vs + 1, value_weight)
-                value_label.setAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-                value_label.setFixedWidth(max(48, vs * 4 + 10))
-                meta.addSpacing(4)
-                meta.addWidget(value_label)
-                tile_layout.addLayout(meta)
-            else:
-                tile_layout.addLayout(meta)
-                row = QHBoxLayout()
-                row.setContentsMargins(0, 0, 0, 0)
-                row.setSpacing(max(7, round(vs * 0.6)))
-                if graph == "segment":
-                    graph_widget = SegmentBar(window.used, color)
-                    graph_widget.setFixedHeight(max(10, round(vs * 0.72)))
-                    row.addWidget(graph_widget, 1)
-                elif graph == "ring":
-                    graph_widget = UsageRing(
-                        window.used, color, usage_value_bold, vs, show_value=False
-                    )
-                    row.addWidget(graph_widget)
-                    row.addStretch()
-                else:  # bar
-                    graph_widget = UsageBar(window.used, color)
-                    graph_widget.setFixedHeight(max(14, preset["pbar_height"] + 5))
-                    row.addWidget(graph_widget, 1)
+            if graph_widget is not None:
                 self._enable_instant_tooltip(graph_widget, usage_tooltip)
 
-                self._set_label_font(value_label, vs, value_weight)
-                value_label.setAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-                value_label.setFixedWidth(max(48, vs * 4 + 10))
-                row.addWidget(value_label)
-                tile_layout.addLayout(row)
+            self._set_label_font(value_label, vs + (1 if graph == "number" else 0), value_weight)
+            value_label.setAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
+            value_label.setFixedWidth(max(48, vs * 4 + 10))
+            tile_layout.addWidget(value_label)
 
             ui["windows_layout"].addWidget(tile, index, 0, 1, 2)
             ui["window_rows"].append(tile)

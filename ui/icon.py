@@ -134,10 +134,23 @@ def _render_svg(data: bytes, width: int, height: int) -> QPixmap | None:
     return pixmap
 
 
+def _themed_brand_asset(name: str) -> bytes:
+    """Recolour in-app logo art while leaving the packaged app tile fixed."""
+    data = _asset_bytes(name)
+    replacements = {
+        b"#5B8DEF": t("logo_mark").encode("ascii"),
+        b"#EAEEF7": t("logo_text").encode("ascii"),
+        b"#363B4D": t("logo_track").encode("ascii"),
+    }
+    for source, replacement in replacements.items():
+        data = data.replace(source, replacement)
+    return data
+
+
 @lru_cache(maxsize=16)
 def create_app_pixmap(size: int = 32) -> QPixmap:
     """The transparent gauge mark, for in-app use (compact bar, etc.)."""
-    rendered = _render_svg(_asset_bytes("logo.svg"), size, size)
+    rendered = _render_svg(_themed_brand_asset("logo.svg"), size, size)
     if rendered is not None:
         return rendered
 
@@ -175,7 +188,7 @@ def create_app_icon(size: int = 32) -> QIcon:
 @lru_cache(maxsize=12)
 def create_wordmark_pixmap(width: int = 96, height: int = 30) -> QPixmap:
     """The SynapCap wordmark, scaled for title bars."""
-    rendered = _render_svg(_asset_bytes("wordmark.svg"), width, height)
+    rendered = _render_svg(_themed_brand_asset("wordmark.svg"), width, height)
     if rendered is not None:
         return rendered
     pixmap = QPixmap(width, height)
@@ -509,3 +522,4 @@ def create_minimize_icon(size: int = 16, color: str | None = None) -> QIcon:
 on_change(create_provider_pixmap.cache_clear)
 on_change(create_app_pixmap.cache_clear)
 on_change(create_app_icon_pixmap.cache_clear)
+on_change(create_wordmark_pixmap.cache_clear)

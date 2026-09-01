@@ -118,6 +118,28 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertNotIn("expanded_font_size", settings)
         self.assertNotIn("compact_font_size", settings)
 
+    def test_theme_selector_round_trips_and_previews_immediately(self):
+        self.assertEqual(self.dialog.theme_combo.currentData(), "auto")
+        previewed = []
+        self.dialog.preview_requested.connect(previewed.append)
+
+        self.dialog.theme_combo.setCurrentIndex(
+            self.dialog.theme_combo.findData("light")
+        )
+
+        self.assertEqual(previewed[-1]["settings"]["theme"], "light")
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+        self.assertEqual(saved[0]["settings"]["theme"], "light")
+
+    def test_restyle_preserves_unsaved_form_values(self):
+        self.dialog.interval_spin.setValue(45)
+        self.dialog.restyle()
+
+        self.assertEqual(self.dialog.interval_spin.value(), 45)
+        self.assertFalse(self.dialog.title_bar.wordmark_label.pixmap().isNull())
+
     def test_graph_shape_selector_round_trips_usage_view(self):
         self.assertEqual(
             self.dialog.graph_combo.currentData(),
@@ -130,6 +152,22 @@ class SettingsDialogTests(unittest.TestCase):
         self.dialog.config_saved.connect(saved.append)
         self.dialog.on_save()
         self.assertEqual(saved[0]["settings"]["usage_view"], "segment")
+
+    def test_ring_layout_selector_is_scoped_to_ring_view_and_saved(self):
+        self.assertFalse(self.dialog.ring_layout_combo.isEnabled())
+        self.dialog.graph_combo.setCurrentIndex(
+            self.dialog.graph_combo.findData("ring")
+        )
+        self.assertTrue(self.dialog.ring_layout_combo.isEnabled())
+        self.dialog.ring_layout_combo.setCurrentIndex(
+            self.dialog.ring_layout_combo.findData("horizontal")
+        )
+
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+
+        self.assertEqual(saved[0]["settings"]["ring_layout"], "horizontal")
 
     def test_preview_applies_visual_settings_without_persisting_them(self):
         self.dialog.widget_scale_combo.setCurrentIndex(

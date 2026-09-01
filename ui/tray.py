@@ -100,6 +100,13 @@ class SynapCapTray(QObject):
 
         self.tray_icon.setContextMenu(menu)
 
+    def apply_theme(self) -> None:
+        menu = self.tray_icon.contextMenu()
+        if menu is not None:
+            menu.setStyleSheet(_MENU_QSS % palette())
+            menu.update()
+        self.tray_icon.setIcon(create_app_icon(32))
+
     def _on_activated(self, reason):
         if reason in (
             QSystemTrayIcon.ActivationReason.Trigger,

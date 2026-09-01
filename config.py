@@ -42,12 +42,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "always_on_top": True,
         "dock_above_taskbar": False,
         "usage_view": "bar",
+        "ring_layout": "vertical",
         "widget_scale": "medium",
         "usage_alerts_enabled": False,
         "usage_alert_threshold": 90,
         "check_updates": True,
         "last_seen_version": "",
-        "theme": "dark"
+        "theme": "auto"
     },
     "providers": [
         {
@@ -164,6 +165,10 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 settings.pop(legacy_key, None)
             if settings.get("usage_view") not in {"bar", "segment", "ring", "number"}:
                 settings["usage_view"] = "bar"
+            if settings.get("ring_layout") not in {"vertical", "horizontal"}:
+                settings["ring_layout"] = "vertical"
+            if settings.get("theme") not in {"dark", "light", "auto"}:
+                settings["theme"] = "dark"
             if not isinstance(settings.get("dock_above_taskbar"), bool):
                 settings["dock_above_taskbar"] = False
             settings.pop("usage_value_bold", None)
