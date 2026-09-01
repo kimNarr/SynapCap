@@ -5,18 +5,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseScriptTests(unittest.TestCase):
-    def test_logo_source_is_packaged_for_both_desktop_builds(self):
+    def test_brand_assets_are_packaged_for_both_desktop_builds(self):
         windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(
             encoding="utf-8"
         )
         macos_script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
 
         self.assertTrue((ROOT / "assets" / "synapcap-logo-source.png").is_file())
+        self.assertTrue((ROOT / "assets" / "synapcap-wordmark.png").is_file())
         self.assertIn(
             '--add-data "assets\\synapcap-logo-source.png;assets"', windows_script
         )
         self.assertIn(
             '--add-data "assets/synapcap-logo-source.png:assets"', macos_script
+        )
+        self.assertIn(
+            '--add-data "assets\\synapcap-wordmark.png;assets"', windows_script
+        )
+        self.assertIn(
+            '--add-data "assets/synapcap-wordmark.png:assets"', macos_script
         )
 
     def test_windows_shortcuts_use_a_versioned_icon_path(self):

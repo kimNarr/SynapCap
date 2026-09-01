@@ -24,8 +24,8 @@ _PROVIDER_BRANDS = {
     },
     "antigravity": {
         "path": "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81",
-        "foreground": "#A6E3A1",
-        "background": "#26372F",
+        "foreground": "#4285F4",
+        "background": "#FFFFFF",
         "fallback": "G",
     },
     "claude": {
@@ -48,7 +48,7 @@ def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
         brand = {
             "path": "",
             "foreground": "#CDD6F4",
-            "background": "#313244",
+            "background": "#202531",
             "fallback": "AI",
         }
 
@@ -106,6 +106,21 @@ def _app_logo_source() -> QPixmap:
     return QPixmap()
 
 
+@lru_cache(maxsize=1)
+def _wordmark_source() -> QPixmap:
+    roots: list[Path] = []
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        roots.append(Path(bundle_root))
+    roots.append(Path(__file__).resolve().parents[1])
+
+    for root in roots:
+        source = QPixmap(str(root / "assets" / "synapcap-wordmark.png"))
+        if not source.isNull():
+            return source
+    return QPixmap()
+
+
 def create_app_pixmap(size: int = 32) -> QPixmap:
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
@@ -135,8 +150,8 @@ def create_app_pixmap(size: int = 32) -> QPixmap:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-    # Background Circle (Catppuccin Base #1E1E2E)
-    painter.setBrush(QColor("#1E1E2E"))
+    # Fallback brand mark on the same near-black app surface.
+    painter.setBrush(QColor("#050608"))
     painter.setPen(QColor("#89B4FA"))
     painter.drawEllipse(1, 1, size - 2, size - 2)
 
@@ -154,6 +169,35 @@ def create_app_pixmap(size: int = 32) -> QPixmap:
         "S",
     )
 
+    painter.end()
+    return pixmap
+
+
+@lru_cache(maxsize=12)
+def create_wordmark_pixmap(width: int = 96, height: int = 30) -> QPixmap:
+    """Return the supplied horizontal wordmark, scaled for title bars."""
+    pixmap = QPixmap(width, height)
+    pixmap.fill(QColor(0, 0, 0, 0))
+
+    source = _wordmark_source()
+    if source.isNull():
+        return pixmap
+
+    # The exported wordmark has transparent padding on every edge. Removing
+    # it keeps the visible mark centered in the compact title-bar space.
+    cropped = source.copy(89, 38, 1982, 686)
+    scaled = cropped.scaled(
+        width,
+        height,
+        Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
+    )
+    painter = QPainter(pixmap)
+    painter.drawPixmap(
+        (width - scaled.width()) // 2,
+        (height - scaled.height()) // 2,
+        scaled,
+    )
     painter.end()
     return pixmap
 
