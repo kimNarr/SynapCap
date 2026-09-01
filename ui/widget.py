@@ -47,8 +47,9 @@ WIDGET_SCALE_PRESETS = {
         "pbar_height": 8,
         "badge_size": 30,
         "card_padding": 10,
-        "card_spacing": 7,
-        "window_spacing": 5,
+        "card_spacing": 5,
+        "window_spacing": 6,
+        "card_gap": 5,
         "compact_font_size": 11,
     },
     "medium": {
@@ -59,8 +60,9 @@ WIDGET_SCALE_PRESETS = {
         "pbar_height": 10,
         "badge_size": 32,
         "card_padding": 12,
-        "card_spacing": 8,
-        "window_spacing": 6,
+        "card_spacing": 6,
+        "window_spacing": 8,
+        "card_gap": 7,
         "compact_font_size": 13,
     },
     "large": {
@@ -71,8 +73,9 @@ WIDGET_SCALE_PRESETS = {
         "pbar_height": 12,
         "badge_size": 36,
         "card_padding": 14,
-        "card_spacing": 10,
-        "window_spacing": 7,
+        "card_spacing": 7,
+        "window_spacing": 10,
+        "card_gap": 9,
         "compact_font_size": 15,
     },
 }
@@ -491,8 +494,9 @@ class SynapCapWidget(QWidget):
                 "pbar_height": max(8, round(font_size * 0.72)),
                 "badge_size": max(preset["badge_size"], font_size + 18),
                 "card_padding": max(preset["card_padding"], round(font_size * 0.8)),
-                "card_spacing": max(7, round(font_size * 0.58)),
-                "window_spacing": max(5, round(font_size * 0.42)),
+                "card_spacing": max(5, round(font_size * 0.42)),
+                "window_spacing": max(6, round(font_size * 0.58)),
+                "card_gap": max(4, round(font_size * 0.4)),
             }
         )
         preset["width"] = max(preset["width"], 300 + max(0, font_size - 13) * 12)
@@ -1022,11 +1026,16 @@ class SynapCapWidget(QWidget):
                 widget.setParent(None)
                 widget.deleteLater()
 
+        # Cards read as units: the gap between them is clearly larger than any
+        # gap inside one. The 1px separator sits centred in that gap.
+        self.cards_layout.setSpacing(preset["card_gap"])
+
         for index, provider in enumerate(self.providers):
             card_widget = QWidget()
             c_layout = QVBoxLayout(card_widget)
             card_padding = preset["card_padding"]
-            c_layout.setContentsMargins(card_padding, card_padding, card_padding, card_padding)
+            card_pad_v = max(8, round(card_padding * 0.72))
+            c_layout.setContentsMargins(card_padding, card_pad_v, card_padding, card_pad_v)
             c_layout.setSpacing(preset["card_spacing"])
 
             # Title Row (LED Status Dot + Provider Name + Usage & Status Text)
