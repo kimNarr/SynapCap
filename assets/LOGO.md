@@ -38,10 +38,15 @@
 Inno Setup이 사용. 두 빌드 스크립트가 PyInstaller 전에 이 스크립트를 실행하므로 로고 교체가
 자동 반영됨.
 
+## 홈페이지 · README
+
+`docs/assets/`에 `logo.svg`·`logo-icon.svg`·`wordmark.svg` 사본, `logo.png`는
+`logo-icon.svg`의 256px 래스터(README·favicon fallback). `docs/index.html`은 favicon(SVG),
+헤더·푸터 워드마크, CTA·미리보기 로고를 새 자산으로 교체. `docs/assets/synapcap-wordmark.png` 제거.
+
 ## 남은 것
 
-- **홈페이지·README**: `docs/assets/logo.png`, `docs/assets/synapcap-wordmark.png`,
-  `docs/index.html`의 위젯 미리보기 목업 — 아직 기존 3D 로고. SVG → PNG 래스터라이즈 후 교체 필요.
+- 홈페이지 위젯 미리보기 목업이 아직 구버전 UI(막대 전용·구 리셋 표기) — 앱 재설계와 함께 갱신.
 - 라이트 테마 도입 시 `create_wordmark_pixmap`이 `wordmark-light.svg`를 고르도록 분기.
 - 로고/앱 accent 통일 결정.
 

@@ -57,8 +57,9 @@
 통일 시 `logo.svg`의 `#5B8DEF`를 앱 accent에 맞춘다.
 
 **연동 완료**: `ui/icon.py`가 `logo.svg`/`logo-icon.svg`/`wordmark.svg`를 런타임 래스터라이즈,
-`scripts/generate_icons.py`가 빌드 시 `synapcap.ico`/`.icns`/`.png` 생성. 기존 3D PNG 자산 제거.
-**남은 것**: 홈페이지·README(`docs/assets/`) 로고 교체, 로고/앱 accent 통일 결정.
+`scripts/generate_icons.py`가 빌드 시 `synapcap.ico`/`.icns`/`.png` 생성. 홈페이지(`docs/`)와
+README도 새 SVG/PNG로 교체. 기존 3D 래스터 자산 제거.
+**남은 것**: 홈페이지 위젯 미리보기 목업을 현재 앱 디자인에 맞추기(별도), 로고/앱 accent 통일 결정.
 
 ### 색 (Catppuccin Mocha 기반, 배경은 더 어둡게)
 
