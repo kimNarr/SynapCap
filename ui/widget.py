@@ -1251,10 +1251,10 @@ class SynapCapWidget(QWidget):
     @staticmethod
     def _usage_color(used: float) -> str:
         if used >= 80:
-            return "#F38BA8"
+            return "#F38BA8"  # red — over limit soon
         if used >= 60:
-            return "#F9E2AF"
-        return "#89B4FA"
+            return "#FAB387"  # peach — pale yellow washed out on the dark ground
+        return "#89B4FA"  # blue — comfortable
 
     @classmethod
     def _compact_usage_color(cls, used: float) -> str:

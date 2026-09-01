@@ -160,6 +160,11 @@ class WidgetTests(unittest.TestCase):
         usage_bar.grab()
         self.assertEqual(usage_bar.fill_width, 0)
 
+    def test_usage_scale_uses_blue_peach_red(self):
+        self.assertEqual(self.widget._usage_color(10), "#89B4FA")
+        self.assertEqual(self.widget._usage_color(65), "#FAB387")
+        self.assertEqual(self.widget._usage_color(88), "#F38BA8")
+
     def test_warning_and_critical_values_have_non_color_signals(self):
         self.widget.config_data["settings"]["expanded_font_bold"] = False
         self.usage.windows = [UsageWindow("5시간", 65, "8/12 09:49", 35)]
@@ -172,6 +177,7 @@ class WidgetTests(unittest.TestCase):
         assert value_label is not None
         self.assertEqual(value_label.text(), "65%")
         self.assertEqual(value_label.font().weight(), 700)
+        self.assertIn("#FAB387", value_label.styleSheet())
 
         self.usage.windows = [UsageWindow("5시간", 85, "8/12 09:49", 15)]
         self.widget.update_data([self.usage], force=True)
