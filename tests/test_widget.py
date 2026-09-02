@@ -551,6 +551,22 @@ class WidgetTests(unittest.TestCase):
         widget.close()
         widget.deleteLater()
 
+    def test_pinned_windows_widget_re_raises_after_taskbar_deactivation(self):
+        provider = CodexProvider({"id": "codex", "name": "Codex"})
+        with patch("ui.widget.sys.platform", "win32"):
+            widget = SynapCapWidget(
+                {"settings": {"always_on_top": True}},
+                [provider],
+            )
+            with patch.object(widget, "raise_") as raise_window:
+                widget.show()
+                widget.event(QEvent(QEvent.Type.WindowDeactivate))
+                self.app.processEvents()
+
+        raise_window.assert_called_once_with()
+        widget.close()
+        widget.deleteLater()
+
     def test_compact_bar_shows_latest_provider_usage(self):
         self.widget.update_data([self.usage])
         self.widget.enter_compact_mode()

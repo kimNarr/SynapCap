@@ -2215,6 +2215,21 @@ class SynapCapWidget(QWidget):
         """Grow or shrink the window while preserving its current position."""
         self.resize(self.width(), height)
 
+    def event(self, event):
+        """Keep a pinned Windows tool window above the app selected from the taskbar."""
+        result = super().event(event)
+        if (
+            event.type() == QEvent.Type.WindowDeactivate
+            and sys.platform.startswith("win")
+            and self.isVisible()
+            and bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        ):
+            # Defer until Windows has activated the taskbar target. ``raise_``
+            # does not activate this tool window, so keyboard focus remains in
+            # the app the user chose.
+            QTimer.singleShot(0, self.raise_)
+        return result
+
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
         currently_enabled = bool(flags & Qt.WindowType.WindowStaysOnTopHint)
