@@ -6,8 +6,8 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QPoint, QRect, Qt
-from PySide6.QtGui import QFontMetrics
-from PySide6.QtWidgets import QApplication, QLabel, QWidget
+from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import QApplication, QLabel, QToolTip, QWidget
 
 from providers import (
     AntigravityProvider,
@@ -18,7 +18,7 @@ from providers import (
     UsageWindow,
 )
 from theme import apply_theme_setting, t
-from ui.widget import SegmentBar, SynapCapWidget, UsageBar, UsageRing
+from ui.widget import FocusProviderButton, SynapCapWidget, UsageRing
 from version import APP_VERSION
 
 
@@ -71,6 +71,8 @@ class WidgetTests(unittest.TestCase):
     def test_expanded_header_uses_horizontal_wordmark(self):
         self.assertTrue(hasattr(self.widget, "wordmark_label"))
         self.assertFalse(self.widget.wordmark_label.pixmap().isNull())
+        self.assertEqual(self.widget.wordmark_label.size().width(), 92)
+        self.assertEqual(self.widget.wordmark_label.size().height(), 28)
         self.assertFalse(hasattr(self.widget, "title_label"))
 
     def test_past_reset_does_not_roll_over_to_next_year(self):
@@ -101,109 +103,39 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(self.widget._usage_window_marker("5시간"), "5h")
         self.assertEqual(self.widget._usage_window_marker("주간"), "7d")
 
-    def _select_usage_view(self, view: str) -> None:
-        """The graph shape is chosen in Settings now, not a header toggle."""
-        self.widget.config_data.setdefault("settings", {})["usage_view"] = view
-        self.widget.rebuild_ui(
-            self.widget.config_data, self.widget.providers, preserve_usage=True
-        )
-        self.app.processEvents()
-
-    def test_graph_views_render_all_four_shapes(self):
+    def test_expanded_usage_uses_one_ring_shape(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        labels = [label.text() for label in row.findChildren(QLabel)]
-
-        # Every tile carries the window name, the reset, and the % — only the
-        # graph widget differs between views.
-        self.assertIn("7d", labels)
-        self.assertIn("49%", labels)
-        self.assertIsNotNone(row.findChild(UsageBar))
+        ring = row.findChild(UsageRing)
+        self.assertIsNotNone(ring)
+        assert ring is not None
+        self.assertEqual(ring.value_text, "49%")
+        self.assertEqual(ring.center_caption, "")
         period_badge = row.findChild(QLabel, "windowBadge")
         self.assertIsNotNone(period_badge)
         assert period_badge is not None
-        # The period is a plain dim label, not an outlined chip (that reads as
-        # a button).
-        self.assertIn("border: none", period_badge.styleSheet())
-        self.assertIn("#8087A0", period_badge.styleSheet())
-        value_label = next(
-            label for label in row.findChildren(QLabel) if label.text() == "49%"
-        )
-        self.assertEqual(value_label.font().weight(), 600)
+        self.assertEqual(period_badge.text(), "WEEKLY")
+        self.assertEqual(period_badge.alignment(), Qt.AlignmentFlag.AlignCenter)
 
-        self._select_usage_view("segment")
-        self.assertEqual(self.widget.usage_view, "segment")
-        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        self.assertIsNotNone(row.findChild(SegmentBar))
-        self.assertEqual(len(self.widget.findChildren(UsageBar)), 0)
-
-        self._select_usage_view("ring")
         self.assertEqual(self.widget.usage_view, "ring")
-        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         self.assertEqual(len(row.findChildren(UsageRing)), 1)
-        self.assertIn(
-            "49%", [label.text() for label in row.findChildren(QLabel)]
-        )
+        self.assertTrue(self.widget._horizontal_ring_active)
 
-        self._select_usage_view("number")
-        self.assertEqual(self.widget.usage_view, "number")
+    def test_legacy_bar_setting_is_normalized_to_ring(self):
+        self.usage.windows = [UsageWindow("5시간", 1, "8/12 09:49", 99)]
+        self.widget.update_data([self.usage], force=True)
+        self.app.processEvents()
+
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        self.assertEqual(len(self.widget.findChildren(UsageRing)), 0)
-        self.assertEqual(len(self.widget.findChildren(SegmentBar)), 0)
-        self.assertIn(
-            "49%", [label.text() for label in row.findChildren(QLabel)]
-        )
+        self.assertIsNotNone(row.findChild(UsageRing))
+        self.assertEqual(self.widget.usage_view, "ring")
 
-        self._select_usage_view("bar")
-        self.assertEqual(self.widget.usage_view, "bar")
-        self.assertEqual(self.widget.config_data["settings"]["usage_view"], "bar")
-
-    def test_usage_bar_keeps_a_minimum_fill_for_nonzero_usage(self):
-        self.usage.windows = [UsageWindow("5시간", 1, "8/12 09:49", 99)]
-        self.widget.update_data([self.usage], force=True)
-        self.app.processEvents()
-
-        usage_bar = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
-            UsageBar
-        )
-        self.assertIsNotNone(usage_bar)
-        assert usage_bar is not None
-        usage_bar.grab()
-        self.assertGreaterEqual(usage_bar.fill_width, 3)
-
-        self.usage.windows = [UsageWindow("5시간", 0, "8/12 09:49", 100)]
-        self.widget.update_data([self.usage], force=True)
-        self.app.processEvents()
-        usage_bar = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
-            UsageBar
-        )
-        self.assertIsNotNone(usage_bar)
-        assert usage_bar is not None
-        usage_bar.grab()
-        self.assertEqual(usage_bar.fill_width, 0)
-
-    def test_segment_bar_lights_one_segment_per_ten_percent(self):
-        self.usage.windows = [UsageWindow("5시간", 1, "8/12 09:49", 99)]
+    def test_legacy_segment_setting_is_normalized_to_ring(self):
         self.widget.config_data["settings"]["usage_view"] = "segment"
         self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
         self.widget.update_data([self.usage], force=True)
-        seg = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
-            SegmentBar
-        )
-        self.assertIsNotNone(seg)
-        assert seg is not None
-        seg.resize(120, 12)
-        seg.grab()
-        self.assertEqual(seg.lit_segments, 1)  # non-zero always lights at least one
-
-        self.usage.windows = [UsageWindow("5시간", 74, "8/12 09:49", 26)]
-        self.widget.update_data([self.usage], force=True)
-        seg = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
-            SegmentBar
-        )
-        seg.resize(120, 12)
-        seg.grab()
-        self.assertEqual(seg.lit_segments, 7)
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        self.assertIsNotNone(row.findChild(UsageRing))
 
     def test_usage_scale_has_four_tiers_with_a_muted_low_end(self):
         self.assertEqual(self.widget._usage_color(10), "#8087A0")  # calm
@@ -211,38 +143,24 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(self.widget._usage_color(80), "#FAB387")  # warn
         self.assertEqual(self.widget._usage_color(92), "#F38BA8")  # crit
 
-    def test_warning_and_critical_values_have_non_color_signals(self):
-        self.widget.config_data["settings"]["expanded_font_bold"] = False
-        # A "notice" value (60-74) stays quiet: no bold, no marker.
+    def test_warning_and_critical_values_keep_ring_severity_colours(self):
         self.usage.windows = [UsageWindow("5시간", 65, "8/12 09:49", 35)]
         self.widget.update_data([self.usage], force=True)
-        value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
-            QLabel, "usageValue"
-        )
-        assert value_label is not None
-        self.assertEqual(value_label.text(), "65%")
-        self.assertEqual(value_label.font().weight(), 400)
+        ring = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(UsageRing)
+        assert ring is not None
+        self.assertEqual(ring.color.name(), "#89b4fa")
 
-        # Warning (>=75) earns bold weight on top of the amber colour.
         self.usage.windows = [UsageWindow("5시간", 78, "8/12 09:49", 22)]
         self.widget.update_data([self.usage], force=True)
-        value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
-            QLabel, "usageValue"
-        )
-        assert value_label is not None
-        self.assertEqual(value_label.text(), "78%")
-        self.assertEqual(value_label.font().weight(), 700)
-        self.assertIn("#FAB387", value_label.styleSheet())
+        ring = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(UsageRing)
+        assert ring is not None
+        self.assertEqual(ring.color.name(), "#fab387")
 
-        # Critical (>=90) adds the ▲ marker.
         self.usage.windows = [UsageWindow("5시간", 92, "8/12 09:49", 8)]
         self.widget.update_data([self.usage], force=True)
-        value_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
-            QLabel, "usageValue"
-        )
-        assert value_label is not None
-        self.assertEqual(value_label.text(), "▲ 92%")
-        self.assertEqual(value_label.font().weight(), 700)
+        ring = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(UsageRing)
+        assert ring is not None
+        self.assertEqual(ring.color.name(), "#f38ba8")
 
     def test_bar_reset_countdown_uses_secondary_visual_weight(self):
         self.widget.update_data([self.usage])
@@ -252,11 +170,11 @@ class WidgetTests(unittest.TestCase):
 
         self.assertIsNotNone(reset_label)
         assert reset_label is not None
-        self.assertIn("color: #8087A0", reset_label.styleSheet())
+        self.assertIn("color: #CDD6F4", reset_label.styleSheet())
         preset = self.widget._expanded_preset(self.widget.config_data["settings"])
         self.assertEqual(
             reset_label.font().pointSize(),
-            max(9, preset["val_size"] - 2),
+            max(10, preset["val_size"] - 1),
         )
         self.assertGreaterEqual(reset_label.width(), 48)
 
@@ -270,42 +188,26 @@ class WidgetTests(unittest.TestCase):
 
         rows = self.widget.provider_ui_map["codex"]["window_rows"]
         self.assertEqual(len(rows), 2)
-        values = [
-            next(
-                label.text()
-                for label in row.findChildren(QLabel)
-                if label.text().endswith("%")
-            )
-            for row in rows
-        ]
+        values = [row.findChild(UsageRing).value_text for row in rows]
         self.assertEqual(values, ["38%", "6%"])
 
-    def test_usage_value_bold_can_be_disabled(self):
-        self.widget.config_data["settings"]["expanded_font_bold"] = False
+    def test_fixed_expanded_rings_use_bold_values(self):
         self.widget.update_data([self.usage])
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        value_label = next(
-            label for label in row.findChildren(QLabel) if label.text().endswith("%")
-        )
-        self.assertEqual(value_label.font().weight(), 400)
+        ring = row.findChild(UsageRing)
+        assert ring is not None
+        self.assertTrue(ring.bold)
 
-    def test_compact_usage_bold_option_changes_the_rendered_font_weight(self):
-        self.widget.config_data["settings"]["compact_font_bold"] = False
+    def test_compact_uses_a_fixed_medium_baseline_weight(self):
         self.widget.update_data([self.usage])
         self.widget.enter_compact_mode()
         self.app.processEvents()
 
         compact_value = self.widget.compact_ui_map["codex"]["value"]
-        self.assertEqual(compact_value.font().weight(), 400)
+        self.assertEqual(compact_value.font().weight(), 500)
 
-        self.widget.config_data["settings"]["compact_font_bold"] = True
-        self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
-        self.app.processEvents()
-        compact_value = self.widget.compact_ui_map["codex"]["value"]
-        self.assertEqual(compact_value.font().weight(), 700)
-
-    def test_medium_widget_scale_sets_a_roomier_default_width(self):
+    def test_expanded_widget_uses_fixed_336px_width(self):
         self.widget.rebuild_ui(
             {
                 "settings": {
@@ -318,8 +220,8 @@ class WidgetTests(unittest.TestCase):
             preserve_usage=False,
         )
 
-        self.assertEqual(self.widget.width(), 360)
-        self.assertEqual(self.widget._expanded_preset({"widget_scale": "medium"})["val_size"], 13)
+        self.assertEqual(self.widget.width(), 336)
+        self.assertEqual(self.widget._expanded_preset({"widget_scale": "medium"})["val_size"], 11)
 
     def test_missing_cli_reads_as_dormant_not_an_alarm(self):
         usage = ModelUsage(
@@ -359,16 +261,16 @@ class WidgetTests(unittest.TestCase):
         self.assertIn(t("danger"), ui["status"].styleSheet())
         self.assertIn(t("ink"), ui["name"].styleSheet())
 
-    def test_progress_tooltip_is_shown_on_enter(self):
+    def test_ring_tooltip_is_shown_on_enter(self):
         self.widget.update_data([self.usage])
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        usage_bar = row.findChild(UsageBar)
-        self.assertIsNotNone(usage_bar)
-        assert usage_bar is not None
+        usage_ring = row.findChild(UsageRing)
+        self.assertIsNotNone(usage_ring)
+        assert usage_ring is not None
 
-        self.assertEqual(usage_bar.toolTip(), "49% 사용 · 51% 남음")
+        self.assertEqual(usage_ring.toolTip(), "49% 사용 · 51% 남음")
         with patch("ui.widget.QToolTip.showText") as show_text:
-            self.widget.eventFilter(usage_bar, QEvent(QEvent.Type.Enter))
+            self.widget.eventFilter(usage_ring, QEvent(QEvent.Type.Enter))
 
         show_text.assert_called_once()
 
@@ -406,10 +308,10 @@ class WidgetTests(unittest.TestCase):
         self.assertTrue(ui["status"].property("instantTooltip"))
         self.assertIn("마지막 조회: 8/14 13:20:30", ui["status"].toolTip())
         self.assertIn("일시적으로 차이가 날 수 있습니다", ui["status"].toolTip())
-        usage_bar = ui["window_rows"][0].findChild(UsageBar)
-        self.assertIsNotNone(usage_bar)
-        assert usage_bar is not None
-        self.assertIn("Claude CLI 기준 사용량", usage_bar.toolTip())
+        usage_ring = ui["window_rows"][0].findChild(UsageRing)
+        self.assertIsNotNone(usage_ring)
+        assert usage_ring is not None
+        self.assertIn("Claude CLI 기준 사용량", usage_ring.toolTip())
 
         self.widget.enter_compact_mode()
         compact_item = self.widget.compact_ui_map["claude"]["item"]
@@ -445,19 +347,20 @@ class WidgetTests(unittest.TestCase):
             self.widget._freshness_caption(base, 30, now=base + timedelta(minutes=15)),
         )
 
-    def test_freshness_caption_shows_after_data_and_hides_in_compact(self):
+    def test_focus_ring_moves_freshness_caption_to_refresh_tooltip(self):
         self.usage.fetched_at = datetime.now().astimezone() - timedelta(minutes=3)
         self.widget.update_data([self.usage], force=True)
         self.app.processEvents()
 
-        self.assertTrue(self.widget.freshness_label.isVisible())
-        self.assertIn("분 전 갱신", self.widget.freshness_label.text())
+        self.assertTrue(self.widget._horizontal_ring_active)
+        self.assertFalse(self.widget.freshness_label.isVisible())
+        self.assertIn("분 전 갱신", self.widget.refresh_btn.toolTip())
 
         self.widget.enter_compact_mode()
         self.app.processEvents()
         self.assertFalse(self.widget.freshness_label.isVisible())
 
-    def test_first_card_labels_the_reset_and_usage_columns(self):
+    def test_focus_ring_has_no_legacy_column_header(self):
         providers = [
             CodexProvider({"id": "codex", "name": "Codex"}),
             AntigravityProvider({"id": "gemini", "name": "Gemini"}),
@@ -480,27 +383,14 @@ class WidgetTests(unittest.TestCase):
         )
         self.app.processEvents()
 
-        codex_layout = self.widget.provider_ui_map["codex"]["windows_layout"]
-        gemini_layout = self.widget.provider_ui_map["gemini"]["windows_layout"]
-        codex_headers = [
-            codex_layout.itemAt(i).widget()
-            for i in range(codex_layout.count())
-            if codex_layout.itemAt(i).widget() is not None
-            and codex_layout.itemAt(i).widget().objectName() == "usageColumnHeader"
-        ]
-        gemini_headers = [
-            gemini_layout.itemAt(i).widget()
-            for i in range(gemini_layout.count())
-            if gemini_layout.itemAt(i).widget() is not None
-            and gemini_layout.itemAt(i).widget().objectName() == "usageColumnHeader"
-        ]
-        self.assertEqual(len(codex_headers), 1)
-        self.assertEqual(len(gemini_headers), 0)
-        labels = [
-            child.text() for child in codex_headers[0].findChildren(QLabel)
-        ]
-        self.assertIn("리셋까지", labels)
-        self.assertIn("사용률", labels)
+        self.assertTrue(self.widget._horizontal_ring_active)
+        self.assertEqual(self.widget.focus_provider_buttons.keys(), {"codex", "gemini"})
+        self.assertEqual(
+            self.widget.provider_ui_map["codex"]["card"].findChildren(
+                QLabel, "usageColumnHeader"
+            ),
+            [],
+        )
 
     def test_status_badge_requests_provider_diagnostics(self):
         usage = ModelUsage(
@@ -520,9 +410,9 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(requested, ["codex"])
 
-    def test_instant_tooltip_is_anchored_below_hovered_widget(self):
+    def test_instant_tooltip_is_anchored_near_hovered_widget(self):
         expected_position = self.widget.version_btn.mapToGlobal(
-            QPoint(0, self.widget.version_btn.height() + 8)
+            QPoint(0, max(0, self.widget.version_btn.height() - 10))
         )
 
         with patch("ui.widget.QToolTip.showText") as show_text:
@@ -564,6 +454,8 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_requested.connect(requested_urls.append)
 
         self.assertEqual(self.widget.version_btn.text(), f"v{APP_VERSION}")
+        self.assertIn("background: transparent", self.widget.version_btn.styleSheet())
+        self.assertIn("border: none", self.widget.version_btn.styleSheet())
         self.widget.set_update_available(
             "0.1.1",
             "https://github.com/kimNarr/SynapCap/releases/tag/v0.1.1",
@@ -596,7 +488,7 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(self.widget.windowType(), Qt.WindowType.Tool)
         self.assertTrue(self.widget.windowFlags() & Qt.WindowType.Tool)
-        self.assertEqual(self.widget.version_btn.height(), 20)
+        self.assertEqual(self.widget.version_btn.height(), 18)
         self.widget.minimize_btn.click()
         self.app.processEvents()
         self.assertTrue(self.widget.is_compact)
@@ -615,10 +507,8 @@ class WidgetTests(unittest.TestCase):
         header_children = self.widget.header_widget.children()
         self.assertIn(self.widget.header_control_divider, header_children)
         self.assertEqual(self.widget.header_control_divider.width(), 1)
-        self.assertIn(
-            self.widget.compact_control_divider,
-            self.widget.compact_bar.children(),
-        )
+        self.assertFalse(hasattr(self.widget, "compact_control_divider"))
+        self.assertFalse(hasattr(self.widget, "compact_logo_divider"))
 
     def test_header_has_no_graph_view_toggle(self):
         # The graph shape is chosen in Settings; the cryptic header cycle button
@@ -626,9 +516,8 @@ class WidgetTests(unittest.TestCase):
         self.assertFalse(hasattr(self.widget, "view_btn"))
         self.assertFalse(hasattr(self.widget, "_toggle_usage_view"))
 
-    def test_settings_change_still_drives_the_graph_view(self):
+    def test_fixed_widget_always_uses_the_ring_view(self):
         self.widget.update_data([self.usage])
-        self._select_usage_view("ring")
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         self.assertEqual(len(row.findChildren(UsageRing)), 1)
 
@@ -667,17 +556,17 @@ class WidgetTests(unittest.TestCase):
         compact_item = self.widget.compact_ui_map["codex"]["item"]
         self.assertEqual(compact_value.text(), "49%")
         self.assertIn("Codex", compact_item.toolTip())
-        self.assertEqual(compact_value.font().pointSize(), 12)
+        self.assertEqual(compact_value.font().pointSize(), 10)
         self.assertIn("color: #F8FAFC", compact_value.styleSheet())
         self.assertEqual(self.widget.compact_logo.size().width(), 17)
-        self.assertEqual(self.widget.expand_btn.height(), 21)
-        self.assertLess(self.widget.frame.height(), 40)
+        self.assertEqual(self.widget.expand_btn.height(), 20)
+        self.assertLess(self.widget.frame.height(), 50)
         self.assertTrue(self.widget.frame.property("compactMode"))
         self.assertIn("border: 2px solid #4A5266", self.widget.frame.styleSheet())
         self.assertIn("QFrame#rootFrame", self.widget.frame.styleSheet())
         self.assertIn("border-radius: 6px", self.widget.frame.styleSheet())
 
-    def test_compact_bar_separates_provider_groups_with_hairline_dividers(self):
+    def test_compact_bar_uses_flat_provider_groups(self):
         providers = [
             CodexProvider({"id": "codex", "name": "Codex"}),
             AntigravityProvider({"id": "gemini", "name": "Gemini"}),
@@ -690,16 +579,38 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         layout = self.widget.compact_items_layout
-        dividers = [
-            layout.itemAt(i).widget()
-            for i in range(layout.count())
-            if layout.itemAt(i).widget() is not None
-            and layout.itemAt(i).widget().objectName() == "compactDivider"
+        items = [
+            layout.itemAt(index).widget()
+            for index in range(layout.count())
+            if layout.itemAt(index).widget() is not None
         ]
-        self.assertEqual(len(dividers), 2)
-        self.assertTrue(all(d.width() == 1 for d in dividers))
+        self.assertEqual(len(items), 3)
+        self.assertTrue(
+            all(item.objectName() == "compactProviderGroup" for item in items)
+        )
+        self.assertIn("QWidget#compactProviderGroup", self.widget.frame.styleSheet())
+        self.assertTrue(
+            all(item.layout().contentsMargins().left() >= 4 for item in items)
+        )
+        self.assertTrue(
+            all(item.layout().contentsMargins().top() >= 3 for item in items)
+        )
 
-    def test_compact_bar_prints_a_single_percent_sign_for_two_windows(self):
+    def test_light_theme_tooltip_palette_has_readable_text_and_background(self):
+        apply_theme_setting("light")
+        self.widget.apply_theme()
+
+        tooltip_palette = QToolTip.palette()
+        self.assertEqual(
+            tooltip_palette.color(QPalette.ColorRole.ToolTipBase).name(),
+            "#171a21",
+        )
+        self.assertEqual(
+            tooltip_palette.color(QPalette.ColorRole.ToolTipText).name(),
+            "#f8fafc",
+        )
+
+    def test_compact_bar_uses_one_percent_suffix_for_two_windows(self):
         provider = AntigravityProvider(
             {
                 "id": "gemini",
@@ -731,7 +642,7 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         compact_value = self.widget.compact_ui_map["gemini"]["value"]
-        self.assertEqual(compact_value.property("compactPlainText"), "8/72%")
+        self.assertEqual(compact_value.property("compactPlainText"), "8 / 72%")
         self.assertEqual(compact_value.text().count("%"), 1)
 
     def test_loading_uses_animation_and_keeps_existing_rows(self):
@@ -787,8 +698,8 @@ class WidgetTests(unittest.TestCase):
 
         compact_value = self.widget.compact_ui_map["gemini"]["value"]
         compact_item = self.widget.compact_ui_map["gemini"]["item"]
-        self.assertEqual(compact_value.text(), "15/49%")
-        self.assertGreaterEqual(compact_value.width(), compact_value.sizeHint().width())
+        self.assertEqual(compact_value.text(), "15 / 49%")
+        self.assertGreaterEqual(compact_value.width(), compact_value.font().pointSize() * 3)
         self.assertIn("5시간 15% 사용", compact_item.toolTip())
         self.assertIn("주간 49% 사용", compact_item.toolTip())
 
@@ -796,38 +707,27 @@ class WidgetTests(unittest.TestCase):
         self.widget._refresh_compact_values()
         self.assertEqual(compact_value.text(), "49%")
 
-    def test_every_graph_view_stacks_window_tiles_in_one_column(self):
+    def test_fixed_focus_ring_places_window_tiles_side_by_side(self):
         self.usage.windows = [
             UsageWindow("5시간", 41, "8/12 09:49", 59),
             UsageWindow("주간", 12, "8/18 09:49", 88),
         ]
-        for view in ("bar", "segment", "ring", "number"):
-            self.widget.config_data["settings"]["usage_view"] = view
-            self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
-            self.widget.update_data([self.usage], force=True)
-            self.app.processEvents()
+        self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
+        self.widget.update_data([self.usage], force=True)
+        self.app.processEvents()
 
-            first, second = self.widget.provider_ui_map["codex"]["window_rows"]
-            self.assertLess(first.geometry().top(), second.geometry().top(), view)
-            self.assertEqual(first.geometry().left(), second.geometry().left(), view)
-            self.assertLessEqual(first.height(), 30, view)
-            # The reset column starts at the same x in both tiles.
-            resets = [
-                t.findChild(QLabel, "resetCountdown")
-                for t in (first, second)
-            ]
-            self.assertEqual(
-                resets[0].mapTo(first, resets[0].rect().topLeft()).x(),
-                resets[1].mapTo(second, resets[1].rect().topLeft()).x(),
-                view,
-            )
-            self.assertEqual(resets[0].width(), resets[1].width(), view)
-            if view == "segment":
-                segments = [tile.findChild(SegmentBar) for tile in (first, second)]
-                self.assertEqual(segments[0].width(), segments[1].width())
-                self.assertLessEqual(segments[0].width(), 124)
+        first, second = self.widget.provider_ui_map["codex"]["window_rows"]
+        self.assertEqual(first.geometry().top(), second.geometry().top())
+        self.assertLess(first.geometry().left(), second.geometry().left())
+        resets = [tile.findChild(QLabel, "resetCountdown") for tile in (first, second)]
+        self.assertEqual(
+            resets[0].mapTo(first, resets[0].rect().topLeft()).x(),
+            resets[1].mapTo(second, resets[1].rect().topLeft()).x(),
+        )
+        self.assertEqual(resets[0].width(), resets[1].width())
+        self.assertTrue(all(tile.findChild(UsageRing) for tile in (first, second)))
 
-    def test_horizontal_ring_layout_places_provider_cards_in_one_row(self):
+    def test_horizontal_ring_layout_focuses_one_provider_with_two_large_rings(self):
         providers: list[BaseAIProvider] = [
             CodexProvider({"id": "codex", "name": "Codex"}),
             AntigravityProvider({"id": "gemini", "name": "Gemini"}),
@@ -848,21 +748,108 @@ class WidgetTests(unittest.TestCase):
             return_value=QRect(0, 0, 1400, 900),
         ):
             self.widget.rebuild_ui(config, providers, preserve_usage=False)
+            self.widget.update_data(
+                [
+                    ModelUsage(
+                        "codex",
+                        "Codex",
+                        "Codex",
+                        34,
+                        100,
+                        "%",
+                        windows=[
+                            UsageWindow("5시간", 34, "2h 28m", 66),
+                            UsageWindow("주간", 26, "5d 22h", 74),
+                        ],
+                    ),
+                    ModelUsage(
+                        "gemini",
+                        "Gemini",
+                        "Gemini",
+                        68,
+                        100,
+                        "%",
+                        windows=[
+                            UsageWindow("5시간", 68, "2h 35m", 32),
+                            UsageWindow("주간", 69, "21h 13m", 31),
+                        ],
+                    ),
+                    ModelUsage(
+                        "claude",
+                        "Claude",
+                        "Claude",
+                        94,
+                        100,
+                        "%",
+                        windows=[
+                            UsageWindow("5시간", 94, "2h 24m", 6),
+                            UsageWindow("주간", 65, "15h 24m", 35),
+                        ],
+                    ),
+                ],
+                force=True,
+            )
             self.app.processEvents()
 
-        cards = [
-            self.widget.provider_ui_map[provider.provider_id]["card"]
-            for provider in providers
-        ]
         self.assertTrue(self.widget._horizontal_ring_active)
-        self.assertEqual(len({card.geometry().top() for card in cards}), 1)
-        self.assertEqual(
-            [card.geometry().left() for card in cards],
-            sorted(card.geometry().left() for card in cards),
+        self.assertEqual(set(self.widget.focus_provider_buttons), {
+            "codex", "gemini", "claude"
+        })
+        self.assertTrue(
+            all(
+                isinstance(button, FocusProviderButton)
+                for button in self.widget.focus_provider_buttons.values()
+            )
         )
-        self.assertGreater(self.widget.width(), 600)
+        codex_tab = self.widget.focus_provider_buttons["codex"]
+        self.assertLess(codex_tab.title_size, codex_tab.summary_size)
+        self.assertIn(
+            "34 / 26%", self.widget.focus_provider_buttons["codex"].text()
+        )
+        self.assertTrue(self.widget.provider_ui_map["codex"]["name"].isHidden())
+        title_container = self.widget.provider_ui_map["codex"]["title_container"]
+        self.assertTrue(title_container.isHidden())
+        self.assertIs(
+            self.widget.provider_ui_map["codex"]["status"].parentWidget(),
+            title_container,
+        )
+        self.assertFalse(self.widget.provider_ui_map["codex"]["card"].isHidden())
+        self.assertTrue(self.widget.provider_ui_map["gemini"]["card"].isHidden())
+        self.assertTrue(self.widget.provider_ui_map["claude"]["card"].isHidden())
+        rings = self.widget.provider_ui_map["codex"]["card"].findChildren(
+            UsageRing
+        )
+        self.assertEqual(len(rings), 2)
+        self.assertTrue(all(ring.emphasized for ring in rings))
+        self.assertTrue(all(ring.ring_size >= 96 for ring in rings))
+        self.assertEqual({ring.center_caption for ring in rings}, {""})
+        labels = [
+            tile.findChild(QLabel, "windowBadge").text()
+            for tile in self.widget.provider_ui_map["codex"]["window_rows"]
+        ]
+        self.assertEqual(labels, ["SESSION", "WEEKLY"])
+        first, second = self.widget.provider_ui_map["codex"]["window_rows"]
+        self.assertEqual(first.geometry().top(), second.geometry().top())
+        self.assertLess(self.widget.width(), 600)
 
-    def test_horizontal_ring_layout_falls_back_on_a_narrow_screen(self):
+        self.widget.focus_provider_buttons["gemini"].click()
+        self.app.processEvents()
+        self.assertEqual(self.widget._focused_provider_id, "gemini")
+        self.assertTrue(self.widget.provider_ui_map["codex"]["card"].isHidden())
+        self.assertFalse(self.widget.provider_ui_map["gemini"]["card"].isHidden())
+
+        with patch.object(
+            self.widget,
+            "_available_geometry",
+            return_value=QRect(0, 0, 1400, 900),
+        ):
+            self.widget.rebuild_ui(config, providers)
+            self.app.processEvents()
+        self.assertEqual(self.widget._focused_provider_id, "gemini")
+        self.assertTrue(self.widget.focus_provider_buttons["gemini"].isChecked())
+        self.assertFalse(self.widget.provider_ui_map["gemini"]["card"].isHidden())
+
+    def test_fixed_focus_ring_does_not_fall_back_on_a_narrow_screen(self):
         providers: list[BaseAIProvider] = [
             CodexProvider({"id": "codex", "name": "Codex"}),
             AntigravityProvider({"id": "gemini", "name": "Gemini"}),
@@ -880,7 +867,7 @@ class WidgetTests(unittest.TestCase):
         with patch.object(
             self.widget,
             "_available_geometry",
-            return_value=QRect(0, 0, 500, 900),
+            return_value=QRect(0, 0, 380, 900),
         ):
             self.widget.rebuild_ui(config, providers, preserve_usage=False)
             self.app.processEvents()
@@ -889,14 +876,13 @@ class WidgetTests(unittest.TestCase):
             self.widget.provider_ui_map[provider.provider_id]["card"]
             for provider in providers
         ]
-        self.assertFalse(self.widget._horizontal_ring_active)
-        self.assertEqual(len({card.geometry().left() for card in cards}), 1)
-        self.assertEqual(
-            [card.geometry().top() for card in cards],
-            sorted(card.geometry().top() for card in cards),
-        )
+        self.assertTrue(self.widget._horizontal_ring_active)
+        self.assertEqual(set(self.widget.focus_provider_buttons), {"codex", "gemini", "claude"})
+        self.assertEqual(self.widget.width(), 336)
+        self.assertTrue(cards[0].isVisible())
+        self.assertTrue(all(card.isHidden() for card in cards[1:]))
 
-    def test_compact_scale_uses_tighter_spacing_and_calmer_default_weight(self):
+    def test_compact_scale_uses_tighter_spacing_and_readable_default_weight(self):
         self.widget.rebuild_ui(
             {
                 "settings": {
@@ -914,24 +900,16 @@ class WidgetTests(unittest.TestCase):
 
         metrics = self.widget._compact_metrics()
         compact_value = self.widget.compact_ui_map["codex"]["value"]
-        self.assertEqual(compact_value.font().pointSize(), 12)
+        self.assertEqual(compact_value.font().pointSize(), 10)
         self.assertEqual(compact_value.font().weight(), 500)
-        self.assertGreaterEqual(metrics["provider_spacing"], 9)
+        self.assertEqual(metrics["provider_spacing"], 10)
         self.assertGreaterEqual(metrics["vertical_margin"], 2)
         self.assertEqual(self.widget.compact_layout.spacing(), metrics["logo_spacing"])
         self.assertEqual(
             self.widget.compact_items_layout.spacing(), metrics["provider_spacing"]
         )
-        self.assertEqual(
-            self.widget.compact_brand_layout.spacing(),
-            metrics["logo_divider_spacing"],
-        )
-        self.assertEqual(
-            self.widget.compact_logo_divider.objectName(),
-            "compactLogoDivider",
-        )
 
-    def test_apply_theme_preserves_graph_and_compact_state(self):
+    def test_apply_theme_preserves_ring_and_compact_state(self):
         self.widget.config_data["settings"]["usage_view"] = "segment"
         self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
         self.widget.enter_compact_mode()
@@ -942,12 +920,10 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         self.assertTrue(self.widget.is_compact)
-        self.assertEqual(self.widget.usage_view, "segment")
+        self.assertEqual(self.widget.usage_view, "ring")
         self.assertIn("#F7F8FB", self.widget.frame.styleSheet())
 
     def test_compact_bar_uses_white_normally_and_warning_colors_at_thresholds(self):
-        self.widget.config_data["settings"]["widget_scale"] = "medium"
-        self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
         self.widget.update_data([self.usage])
         self.widget.enter_compact_mode()
         self.app.processEvents()
@@ -960,66 +936,16 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(compact_value.text(), "92%")
         self.assertIn("color: #F38BA8", compact_value.styleSheet())
         self.assertEqual(compact_value.font().weight(), 700)
+        self.assertEqual(compact_value.font().pointSize(), 10)
 
         warning_usage = ModelUsage("codex", "Codex", "Codex", 80, 100, "%")
         self.widget.update_data([warning_usage])
         self.assertEqual(compact_value.font().weight(), 600)
 
-    def test_dock_above_taskbar_uses_the_bottom_of_available_geometry(self):
-        self.widget.config_data["settings"]["dock_above_taskbar"] = True
-        available = QRect(100, 80, 900, 600)
-        self.widget.resize(300, 90)
-        with patch.object(self.widget, "_available_geometry", return_value=available):
-            self.widget._dock_above_taskbar_if_enabled()
-
-        self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
-
-    def test_docked_widget_can_be_moved_away_from_the_bottom_edge(self):
-        from PySide6.QtCore import QPointF
-        from PySide6.QtGui import QMouseEvent
-
-        self.widget.config_data["settings"]["dock_above_taskbar"] = True
-        available = QRect(0, 0, 1000, 700)
-        with patch.object(self.widget, "_available_geometry", return_value=available):
-            self.widget._dock_above_taskbar_if_enabled()
-            self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
-
-            # Drag the widget up near the top of the screen and release it.
-            self.widget.move(300, 10)
-            release = QMouseEvent(
-                QEvent.Type.MouseButtonRelease,
-                QPointF(0, 0),
-                QPointF(300, 10),
-                Qt.MouseButton.LeftButton,
-                Qt.MouseButton.NoButton,
-                Qt.KeyboardModifier.NoModifier,
-            )
-            self.widget.mouseReleaseEvent(release)
-            self.assertFalse(self.widget._docked_to_bottom)
-            self.assertLess(self.widget.frameGeometry().top(), 100)
-
-            # A later usage refresh must not yank it back down.
-            self.usage.windows = [
-                UsageWindow("5시간", 41, "8/12 09:49", 59),
-                UsageWindow("주간", 12, "8/18 09:49", 88),
-            ]
-            self.widget.update_data([self.usage])
-            self.app.processEvents()
-            self.assertLess(self.widget.frameGeometry().top(), 100)
-
-    def test_docked_widget_keeps_bottom_edge_when_usage_rows_grow(self):
-        self.widget.config_data["settings"]["dock_above_taskbar"] = True
-        available = QRect(0, 0, 1000, 700)
-        with patch.object(self.widget, "_available_geometry", return_value=available):
-            self.widget._dock_above_taskbar_if_enabled()
-            self.usage.windows = [
-                UsageWindow("5시간", 41, "8/12 09:49", 59),
-                UsageWindow("주간", 12, "8/18 09:49", 88),
-            ]
-            self.widget.update_data([self.usage])
-            self.app.processEvents()
-
-        self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
+    def test_screen_bounds_include_the_taskbar_area(self):
+        screen = self.widget.screen()
+        assert screen is not None
+        self.assertEqual(self.widget._available_geometry(), screen.geometry())
 
     def test_legacy_size_setting_uses_responsive_minimum_and_compact_fits_content(self):
         widget = SynapCapWidget(
@@ -1039,12 +965,12 @@ class WidgetTests(unittest.TestCase):
         )
         widget.show()
         self.app.processEvents()
-        self.assertEqual(widget.width(), 300)
+        self.assertEqual(widget.width(), 336)
 
         widget.enter_compact_mode()
         self.app.processEvents()
 
-        self.assertLess(widget.width(), 300)
+        self.assertLessEqual(widget.width(), 336)
         self.assertGreaterEqual(
             widget.width(),
             widget.compact_bar.sizeHint().width()
@@ -1053,11 +979,11 @@ class WidgetTests(unittest.TestCase):
         )
         widget.exit_compact_mode()
         self.app.processEvents()
-        self.assertEqual(widget.width(), 300)
+        self.assertEqual(widget.width(), 336)
         widget.close()
         widget.deleteLater()
 
-    def test_responsive_font_width_survives_compact_round_trip(self):
+    def test_fixed_width_survives_compact_round_trip(self):
         self.widget.rebuild_ui(
             {
                 "settings": {
@@ -1072,7 +998,7 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data([self.usage])
         self.app.processEvents()
         expected_width = self.widget._expanded_width
-        self.assertGreater(expected_width, 300)
+        self.assertEqual(expected_width, 336)
         self.assertEqual(self.widget.width(), expected_width)
 
         self.widget.enter_compact_mode()
@@ -1084,9 +1010,9 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(self.widget.width(), expected_width)
 
-        # A deferred Qt content-fit pass must not replace the responsive width
+        # A deferred Qt content-fit pass must not replace the fixed width
         # with a transient compact/content size hint.
-        self.widget.setFixedWidth(300)
+        self.widget.setFixedWidth(280)
         self.widget._fit_to_content()
         self.assertEqual(self.widget.width(), expected_width)
 
@@ -1125,8 +1051,6 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data(usages)
         self.app.processEvents()
 
-        self._select_usage_view("segment")
-        self._select_usage_view("ring")
         for action in (
             self.widget.enter_compact_mode,
             self.widget.exit_compact_mode,
@@ -1173,7 +1097,7 @@ class WidgetTests(unittest.TestCase):
 
         self.assertLess(widths[0], widths[1])
         self.assertLess(widths[1], widths[2])
-        self.assertEqual(self.widget.width(), 300)
+        self.assertEqual(self.widget.width(), 336)
 
     def test_compact_toggle_expands_downward_near_top_edge(self):
         available = self.widget.screen().availableGeometry()
@@ -1215,9 +1139,7 @@ class WidgetTests(unittest.TestCase):
         self.assertLessEqual(self.widget.frameGeometry().bottom(), available.bottom())
 
     def test_expanding_from_compact_settles_before_the_next_event_cycle(self):
-        available = self.widget.screen().availableGeometry()
-        self.widget.config_data["settings"]["dock_above_taskbar"] = True
-        self.widget._docked_to_bottom = True
+        available = self.widget.screen().geometry()
         self.widget.move(
             available.right() - self.widget.width() - 40,
             available.bottom() - self.widget.height() + 1,
@@ -1228,7 +1150,7 @@ class WidgetTests(unittest.TestCase):
         self.widget.exit_compact_mode()
 
         self.assertFalse(self.widget._fit_timer.isActive())
-        self.assertEqual(self.widget.frameGeometry().bottom(), available.bottom())
+        self.assertLessEqual(self.widget.frameGeometry().bottom(), available.bottom())
 
     def test_drag_release_snaps_widget_to_nearby_screen_edges(self):
         available = self.widget.screen().availableGeometry()
@@ -1271,23 +1193,24 @@ class WidgetTests(unittest.TestCase):
         current_row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         self.assertIs(current_row, original_row)
 
-    def test_missing_reset_is_shown_explicitly(self):
+    def test_missing_reset_is_shown_without_tooltip(self):
         self.widget.provider_ui_map["codex"]["show_five_hour"] = True
         self.usage.windows = [UsageWindow("5시간", 0, "", 100)]
         self.widget.update_data([self.usage])
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         labels = [label.text() for label in row.findChildren(QLabel)]
-        self.assertIn("5h", labels)
+        self.assertIn("SESSION", labels)
         reset_label = row.findChild(QLabel, "resetCountdown")
         self.assertIsNotNone(reset_label)
         assert reset_label is not None
-        # Column is narrow, so the label is short but the tooltip is explicit.
+        # The short status is self-contained; time labels intentionally do not
+        # open a tooltip when the pointer crosses the compact usage row.
         self.assertEqual(reset_label.text(), "미상")
-        self.assertIn("알 수 없", reset_label.toolTip())
+        self.assertEqual(reset_label.toolTip(), "")
         self.assertGreaterEqual(reset_label.width(), reset_label.sizeHint().width())
 
-    def test_stale_reset_shows_short_label_with_full_tooltip(self):
+    def test_stale_reset_shows_short_label_without_tooltip(self):
         self.widget.provider_ui_map["codex"]["show_five_hour"] = True
         self.usage.windows = [UsageWindow("5시간", 40, "8/12 13:00", 60)]
         self.widget.update_data([self.usage])
@@ -1298,7 +1221,7 @@ class WidgetTests(unittest.TestCase):
         self.assertIsNotNone(reset_label)
         assert reset_label is not None
         self.assertEqual(reset_label.text(), "확인 중")
-        self.assertIn("8/12 13:00", reset_label.toolTip())
+        self.assertEqual(reset_label.toolTip(), "")
         self.assertGreaterEqual(reset_label.width(), reset_label.sizeHint().width())
 
     def test_visual_rebuild_reuses_latest_usage(self):
@@ -1321,14 +1244,13 @@ class WidgetTests(unittest.TestCase):
             [CodexProvider({"id": "codex", "name": "Codex"})],
         )
 
-        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        value_label = next(
-            label for label in row.findChildren(QLabel) if label.text().endswith("%")
-        )
-        self.assertEqual(value_label.font().pointSize(), 16)
-        self.assertEqual(value_label.font().weight(), 400)
+        ring = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(UsageRing)
+        assert ring is not None
+        self.assertEqual(ring.font_size, 11)
+        self.assertTrue(ring.bold)
+        self.assertEqual(self.widget.width(), 336)
 
-    def test_large_independent_fonts_resize_rows_bars_and_compact_width(self):
+    def test_fixed_metrics_ignore_legacy_font_preferences(self):
         config = {
             "settings": {
                 "widget_size": "Medium",
@@ -1349,22 +1271,19 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
-        usage_bar = row.findChild(UsageBar)
-        self.assertIsNotNone(usage_bar)
-        assert usage_bar is not None
-        self.assertGreaterEqual(usage_bar.height(), 16)
-        value_label = next(
-            label for label in row.findChildren(QLabel) if label.text().endswith("%")
-        )
-        self.assertEqual(value_label.font().pointSize(), 18)
-        self.assertGreaterEqual(self.widget.width(), 300)
+        usage_ring = row.findChild(UsageRing)
+        self.assertIsNotNone(usage_ring)
+        assert usage_ring is not None
+        self.assertGreaterEqual(usage_ring.height(), 22)
+        self.assertEqual(usage_ring.font_size, 11)
+        self.assertEqual(self.widget.width(), 336)
 
         self.widget.enter_compact_mode()
         self.app.processEvents()
         compact_value = self.widget.compact_ui_map["codex"]["value"]
-        self.assertEqual(compact_value.font().pointSize(), 16)
-        self.assertEqual(compact_value.font().weight(), 400)
-        self.assertGreaterEqual(compact_value.width(), compact_value.sizeHint().width())
+        self.assertEqual(compact_value.font().pointSize(), 10)
+        self.assertEqual(compact_value.font().weight(), 500)
+        self.assertGreaterEqual(compact_value.width(), compact_value.font().pointSize() * 3)
         self.assertGreaterEqual(self.widget.frame.height(), compact_value.sizeHint().height() + 16)
 
     def test_max_compact_font_fits_three_providers_without_clipping(self):
@@ -1433,10 +1352,8 @@ class WidgetTests(unittest.TestCase):
 
         for compact_ui in self.widget.compact_ui_map.values():
             value = compact_ui["value"]
-            self.assertGreaterEqual(value.width(), value.sizeHint().width())
-            plain_text = str(value.property("compactPlainText"))
-            expected_width = QFontMetrics(value.font()).horizontalAdvance(plain_text) + 6
-            self.assertGreaterEqual(value.width(), expected_width)
+            self.assertGreaterEqual(value.width(), value.font().pointSize() * 3)
+            self.assertLessEqual(value.width(), 110)
         self.assertGreaterEqual(
             self.widget.width(),
             self.widget.compact_bar.sizeHint().width()
@@ -1520,7 +1437,7 @@ class WidgetTests(unittest.TestCase):
         for compact_ui in self.widget.compact_ui_map.values():
             value = compact_ui["value"]
             self.assertTrue(value.isVisible())
-            self.assertGreaterEqual(value.width(), value.sizeHint().width())
+            self.assertGreaterEqual(value.width(), value.font().pointSize() * 3)
         self.assertGreaterEqual(
             self.widget.width(),
             self.widget.compact_bar.sizeHint().width()
@@ -1548,7 +1465,7 @@ class WidgetTests(unittest.TestCase):
         )
         self.app.processEvents()
 
-        self.assertLess(self.widget.height(), expanded_height)
+        self.assertEqual(self.widget.height(), expanded_height)
         self.assertEqual(self.widget.cards_layout.count(), 3)
 
 

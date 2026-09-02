@@ -20,8 +20,8 @@ class ConfigTests(unittest.TestCase):
         first = get_default_config()
         second = get_default_config()
 
-        first["settings"]["usage_view"] = "ring"
-        self.assertEqual(second["settings"]["usage_view"], "bar")
+        first["settings"]["theme"] = "light"
+        self.assertEqual(second["settings"]["theme"], "auto")
 
     def test_new_settings_are_added_to_existing_config(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -47,12 +47,12 @@ class ConfigTests(unittest.TestCase):
 
             self.assertFalse(settings["always_on_top"])
             self.assertTrue(settings["check_updates"])
-            self.assertEqual(settings["usage_view"], "bar")
-            self.assertEqual(settings["ring_layout"], "vertical")
-            self.assertEqual(settings["widget_scale"], "medium")
+            self.assertNotIn("usage_view", settings)
+            self.assertNotIn("ring_layout", settings)
+            self.assertNotIn("widget_scale", settings)
             self.assertNotIn("expanded_font_size", settings)
             self.assertNotIn("compact_font_size", settings)
-            self.assertFalse(settings["dock_above_taskbar"])
+            self.assertNotIn("dock_above_taskbar", settings)
             self.assertFalse(settings["usage_alerts_enabled"])
             self.assertEqual(settings["usage_alert_threshold"], 90)
             self.assertEqual(settings["last_seen_version"], "legacy")
@@ -70,19 +70,27 @@ class ConfigTests(unittest.TestCase):
 
             self.assertEqual(settings["theme"], "dark")
 
-    def test_invalid_ring_layout_falls_back_to_vertical(self):
+    def test_legacy_visual_preferences_are_removed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
-                json.dumps({"settings": {"ring_layout": "diagonal"}}),
+                json.dumps(
+                    {"settings": {
+                        "ring_layout": "diagonal",
+                        "widget_scale": "large",
+                        "dock_above_taskbar": True,
+                    }}
+                ),
                 encoding="utf-8",
             )
 
             settings = load_config(str(path))["settings"]
 
-            self.assertEqual(settings["ring_layout"], "vertical")
+            self.assertNotIn("ring_layout", settings)
+            self.assertNotIn("widget_scale", settings)
+            self.assertNotIn("dock_above_taskbar", settings)
 
-    def test_legacy_usage_bold_is_removed_for_the_scale_presets(self):
+    def test_legacy_usage_bold_and_scale_are_removed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
@@ -94,9 +102,9 @@ class ConfigTests(unittest.TestCase):
 
             self.assertNotIn("usage_value_bold", settings)
             self.assertNotIn("expanded_font_bold", settings)
-            self.assertEqual(settings["widget_scale"], "medium")
+            self.assertNotIn("widget_scale", settings)
 
-    def test_legacy_font_size_is_migrated_to_the_nearest_scale(self):
+    def test_legacy_font_sizes_are_removed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
@@ -113,7 +121,7 @@ class ConfigTests(unittest.TestCase):
 
             settings = load_config(str(path))["settings"]
 
-            self.assertEqual(settings["widget_scale"], "large")
+            self.assertNotIn("widget_scale", settings)
             self.assertNotIn("expanded_font_size", settings)
             self.assertNotIn("compact_font_size", settings)
 
@@ -139,7 +147,7 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(settings["usage_alert_threshold"], 100)
             self.assertEqual(settings["last_seen_version"], "")
 
-    def test_legacy_manual_size_is_migrated_to_widget_scale(self):
+    def test_legacy_manual_size_is_removed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
@@ -158,7 +166,7 @@ class ConfigTests(unittest.TestCase):
 
             self.assertNotIn("widget_width", settings)
             self.assertNotIn("widget_size", settings)
-            self.assertEqual(settings["widget_scale"], "large")
+            self.assertNotIn("widget_scale", settings)
 
     def test_provider_window_visibility_is_normalized(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -214,7 +222,7 @@ class ConfigTests(unittest.TestCase):
 
             loaded = load_config(str(path))
 
-            self.assertEqual(loaded["schema_version"], 5)
+            self.assertEqual(loaded["schema_version"], 7)
             self.assertFalse(loaded["providers"][0]["show_five_hour"])
             self.assertTrue(loaded["providers"][0]["show_weekly"])
 

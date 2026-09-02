@@ -1,12 +1,8 @@
 {
-  "schema_version": 5,
+  "schema_version": 7,
   "settings": {
     "refresh_interval_sec": 30,
     "always_on_top": true,
-    "dock_above_taskbar": false,
-    "usage_view": "bar",
-    "ring_layout": "vertical",
-    "widget_scale": "medium",
     "usage_alerts_enabled": false,
     "usage_alert_threshold": 90,
     "check_updates": true,

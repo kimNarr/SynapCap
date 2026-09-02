@@ -62,10 +62,11 @@ DARK: dict[str, str] = {
     "danger_soft": "#EBA0AC",      # power / close glyphs
     "compact_value": "#F8FAFC",    # calm compact %
     # ── component specifics ──────────────────────────────────────────
-    "bar_track": "#1C2130",
-    "bar_track_edge": "#3A4152",
-    "compact_divider": "#3A4152",  # visible hairline between compact groups
-    "segment_off": "#23283A",
+    "focus_tab_bg": "#10131A",
+    "focus_tab_selected_bg": "#151B25",
+    "focus_tab_edge": "#252B38",
+    "focus_metric_bg": "#0B0D12",
+    "focus_metric_edge": "#202531",
     "ring_track": "#2B303D",
     "skeleton": "#1A1F2A",
     "skeleton_strong": "#1B212D",
@@ -78,6 +79,8 @@ DARK: dict[str, str] = {
     "badge_error_bg": "#3B2735",
     "badge_ok_bg": "#26372F",
     "spinner_track": "#2B303D",
+    "tooltip_bg": "#171A21",
+    "tooltip_fg": "#F8FAFC",
     # ── provider brand chips ─────────────────────────────────────────
     "provider_codex_fg": "#B4BEFE",
     "provider_codex_bg": "#252B3F",
@@ -149,10 +152,11 @@ LIGHT: dict[str, str] = {
     "danger_soft": "#A6294D",
     "compact_value": "#303446",
     # ── component specifics ──────────────────────────────────────────
-    "bar_track": "#E0E4EC",
-    "bar_track_edge": "#AEB6C6",
-    "compact_divider": "#7F899E",  # visible hairline between compact groups
-    "segment_off": "#D8DDE7",
+    "focus_tab_bg": "#EEF1F5",
+    "focus_tab_selected_bg": "#F7FAFF",
+    "focus_tab_edge": "#D4DAE4",
+    "focus_metric_bg": "#FFFFFF",
+    "focus_metric_edge": "#D8DDE6",
     "ring_track": "#C8CEDA",
     "skeleton": "#E0E4EC",
     "skeleton_strong": "#D5DAE4",
@@ -165,6 +169,8 @@ LIGHT: dict[str, str] = {
     "badge_error_bg": "#F4DDE5",
     "badge_ok_bg": "#DDECDD",
     "spinner_track": "#C8CEDA",
+    "tooltip_bg": "#171A21",
+    "tooltip_fg": "#F8FAFC",
     # ── provider brand chips ─────────────────────────────────────────
     "provider_codex_fg": "#4C4F69",
     "provider_codex_bg": "#E4E8F5",

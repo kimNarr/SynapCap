@@ -7,7 +7,7 @@ from typing import Any
 
 from version import APP_NAME
 
-CONFIG_SCHEMA_VERSION = 5
+CONFIG_SCHEMA_VERSION = 7
 
 
 def _default_config_path() -> Path:
@@ -40,10 +40,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "settings": {
         "refresh_interval_sec": 30,
         "always_on_top": True,
-        "dock_above_taskbar": False,
-        "usage_view": "bar",
-        "ring_layout": "vertical",
-        "widget_scale": "medium",
         "usage_alerts_enabled": False,
         "usage_alert_threshold": 90,
         "check_updates": True,
@@ -129,32 +125,14 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
             # Brand-new configurations return above with an empty value.
             if "last_seen_version" not in loaded_settings:
                 settings["last_seen_version"] = "legacy"
-            # v0.1.18 consolidates independent font controls into one visual
-            # scale. Preserve a user's intent by deriving the nearest preset.
-            scale = loaded_settings.get("widget_scale")
-            if scale not in {"small", "medium", "large"}:
-                legacy_size = loaded_settings.get("widget_size")
-                if isinstance(legacy_size, str) and legacy_size.lower() in {
-                    "small",
-                    "medium",
-                    "large",
-                }:
-                    scale = legacy_size.lower()
-                else:
-                    legacy_font_size = loaded_settings.get("expanded_font_size", 13)
-                    if isinstance(legacy_font_size, bool) or not isinstance(
-                        legacy_font_size,
-                        (int, float),
-                    ):
-                        legacy_font_size = 13
-                    if legacy_font_size <= 11:
-                        scale = "small"
-                    elif legacy_font_size >= 16:
-                        scale = "large"
-                    else:
-                        scale = "medium"
-            settings["widget_scale"] = scale
+            # v7 fixes the expanded widget to a 320px, focused horizontal-ring
+            # layout. Retire all previous visual-size, layout, and taskbar
+            # parking settings rather than silently keeping inert preferences.
             for legacy_key in (
+                "dock_above_taskbar",
+                "usage_view",
+                "ring_layout",
+                "widget_scale",
                 "widget_width",
                 "widget_size",
                 "expanded_font_size",
@@ -163,14 +141,8 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 "compact_font_bold",
             ):
                 settings.pop(legacy_key, None)
-            if settings.get("usage_view") not in {"bar", "segment", "ring", "number"}:
-                settings["usage_view"] = "bar"
-            if settings.get("ring_layout") not in {"vertical", "horizontal"}:
-                settings["ring_layout"] = "vertical"
             if settings.get("theme") not in {"dark", "light", "auto"}:
                 settings["theme"] = "dark"
-            if not isinstance(settings.get("dock_above_taskbar"), bool):
-                settings["dock_above_taskbar"] = False
             settings.pop("usage_value_bold", None)
             if not isinstance(settings.get("usage_alerts_enabled"), bool):
                 settings["usage_alerts_enabled"] = False

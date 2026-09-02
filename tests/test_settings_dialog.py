@@ -100,21 +100,21 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertFalse(hasattr(self.dialog, "width_spin"))
         self.assertFalse(hasattr(self.dialog, "size_combo"))
 
-    def test_widget_scale_replaces_independent_font_controls(self):
-        self.assertEqual(self.dialog.widget_scale_combo.currentData(), "medium")
+    def test_fixed_widget_policy_is_not_exposed(self):
+        self.assertFalse(hasattr(self.dialog, "widget_scale_combo"))
+        self.assertFalse(hasattr(self.dialog, "ring_layout_combo"))
+        self.assertFalse(hasattr(self.dialog, "dock_above_taskbar_check"))
         self.assertFalse(hasattr(self.dialog, "expanded_font_spin"))
         self.assertFalse(hasattr(self.dialog, "compact_font_spin"))
-
-        self.dialog.widget_scale_combo.setCurrentIndex(
-            self.dialog.widget_scale_combo.findData("large")
-        )
 
         saved = []
         self.dialog.config_saved.connect(saved.append)
         self.dialog.on_save()
 
         settings = saved[0]["settings"]
-        self.assertEqual(settings["widget_scale"], "large")
+        self.assertNotIn("widget_scale", settings)
+        self.assertNotIn("ring_layout", settings)
+        self.assertNotIn("dock_above_taskbar", settings)
         self.assertNotIn("expanded_font_size", settings)
         self.assertNotIn("compact_font_size", settings)
 
@@ -140,55 +140,26 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(self.dialog.interval_spin.value(), 45)
         self.assertFalse(self.dialog.title_bar.wordmark_label.pixmap().isNull())
 
-    def test_graph_shape_picker_shows_every_shape_with_a_preview_icon(self):
-        picker = self.dialog.graph_picker
-        keys = [key for key, _label in picker._SHAPES]
-        self.assertEqual(keys, ["bar", "segment", "ring", "number"])
-        for key in keys:
-            button = picker._buttons[key]
-            self.assertFalse(button.icon().isNull())
-        self.assertTrue(picker._buttons["bar"].isChecked())
-
-    def test_graph_shape_selector_round_trips_usage_view(self):
-        self.assertEqual(
-            self.dialog.graph_picker.current_data(),
-            self.dialog.config_data["settings"].get("usage_view", "bar"),
-        )
-        previewed = []
-        self.dialog.preview_requested.connect(previewed.append)
-        self.dialog.graph_picker.choose("segment")
-        self.assertEqual(previewed[-1]["settings"]["usage_view"], "segment")
-
-        saved = []
-        self.dialog.config_saved.connect(saved.append)
-        self.dialog.on_save()
-        self.assertEqual(saved[0]["settings"]["usage_view"], "segment")
-
-    def test_ring_layout_selector_is_scoped_to_ring_view_and_saved(self):
-        self.assertFalse(self.dialog.ring_layout_combo.isEnabled())
-        self.dialog.graph_picker.choose("ring")
-        self.assertTrue(self.dialog.ring_layout_combo.isEnabled())
-        self.dialog.ring_layout_combo.setCurrentIndex(
-            self.dialog.ring_layout_combo.findData("horizontal")
-        )
+    def test_ring_is_the_fixed_graph_without_layout_selector(self):
+        self.assertFalse(hasattr(self.dialog, "graph_picker"))
+        self.assertFalse(hasattr(self.dialog, "ring_layout_combo"))
 
         saved = []
         self.dialog.config_saved.connect(saved.append)
         self.dialog.on_save()
 
-        self.assertEqual(saved[0]["settings"]["ring_layout"], "horizontal")
+        self.assertNotIn("usage_view", saved[0]["settings"])
+        self.assertNotIn("ring_layout", saved[0]["settings"])
 
     def test_preview_applies_visual_settings_without_persisting_them(self):
-        self.dialog.widget_scale_combo.setCurrentIndex(
-            self.dialog.widget_scale_combo.findData("large")
-        )
+        self.dialog.theme_combo.setCurrentIndex(self.dialog.theme_combo.findData("light"))
         previewed = []
         self.dialog.preview_requested.connect(previewed.append)
 
         self.dialog.on_preview()
 
-        self.assertEqual(previewed[0]["settings"]["widget_scale"], "large")
-        self.assertEqual(self.dialog.config_data["settings"]["widget_scale"], "medium")
+        self.assertEqual(previewed[0]["settings"]["theme"], "light")
+        self.assertEqual(self.dialog.config_data["settings"]["theme"], "auto")
 
     def test_add_is_disabled_when_all_supported_providers_are_present(self):
         self.assertEqual(len(self.dialog.provider_widgets), 3)
@@ -222,6 +193,15 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(button.text(), "적용")
         self.assertIn("저장하지 않고", button.toolTip())
 
+    def test_footer_actions_are_equal_size_and_in_cancel_preview_save_order(self):
+        actions = [
+            self.dialog.cancel_btn,
+            self.dialog.preview_btn,
+            self.dialog.save_btn,
+        ]
+        self.assertEqual([button.text() for button in actions], ["취소", "적용", "저장"])
+        self.assertEqual({button.size() for button in actions}, {actions[0].size()})
+
     def test_cancel_after_preview_requests_a_visual_revert(self):
         reverted = []
         self.dialog.preview_reverted.connect(lambda: reverted.append(True))
@@ -248,7 +228,7 @@ class SettingsDialogTests(unittest.TestCase):
         item = self._provider_item("antigravity")
 
         self.assertIsInstance(self.dialog.always_top_check, StyledCheckBox)
-        self.assertIsInstance(self.dialog.dock_above_taskbar_check, StyledCheckBox)
+        self.assertFalse(hasattr(self.dialog, "dock_above_taskbar_check"))
         self.assertIsInstance(item["enabled_check"], StyledCheckBox)
         self.assertIsInstance(item["five_hour_check"], StyledCheckBox)
         self.assertNotIn("data:image", self.dialog.styleSheet())

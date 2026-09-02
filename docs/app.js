@@ -71,7 +71,6 @@ async function loadLatestRelease() {
     const previewVersion = document.querySelector("#preview-version");
     if (previewVersion) {
       previewVersion.textContent = release.tag_name;
-      previewVersion.dataset.tooltip = `현재 버전 ${release.tag_name}`;
     }
 
     const availableAssets = new Map((release.assets || []).map((item) => [item.name, item.browser_download_url]));

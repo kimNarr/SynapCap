@@ -2,11 +2,10 @@ import copy
 import sys
 import uuid
 
-from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPolygon
 from PySide6.QtWidgets import (
     QApplication,
-    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -26,7 +25,6 @@ from PySide6.QtWidgets import (
     QStyleOptionComboBox,
     QStyleOptionSpinBox,
     QTabWidget,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -43,7 +41,6 @@ from .icon import (
     create_plus_icon,
     create_provider_icon,
     create_trash_icon,
-    create_usage_view_icon,
     create_wordmark_pixmap,
 )
 
@@ -327,109 +324,6 @@ _PROVIDERS_SCROLL_QSS = """
     }
 """
 
-_GRAPH_PICKER_QSS = """
-    QToolButton {
-        background-color: %(control)s;
-        border: 1px solid %(control_edge)s;
-        border-radius: 8px;
-        color: %(ink_mid)s;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 7px 2px 5px;
-    }
-    QToolButton:hover {
-        border-color: %(accent_soft)s;
-    }
-    QToolButton:checked {
-        border: 1px solid %(accent)s;
-        color: %(ink)s;
-    }
-"""
-
-
-class GraphShapePicker(QWidget):
-    """Segmented control that previews each usage-graph shape inline.
-
-    Replaces the cryptic header toggle: the shape is chosen here, where every
-    option shows a small live glyph of what the widget will render.
-    """
-
-    changed = Signal(str)
-
-    _SHAPES = (
-        ("bar", "막대"),
-        ("segment", "세그먼트"),
-        ("ring", "링"),
-        ("number", "숫자만"),
-    )
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._current = "bar"
-        self._buttons: dict[str, QToolButton] = {}
-        self._group = QButtonGroup(self)
-        self._group.setExclusive(True)
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
-        for key, label in self._SHAPES:
-            button = QToolButton(self)
-            button.setText(label)
-            button.setCheckable(True)
-            button.setToolButtonStyle(
-                Qt.ToolButtonStyle.ToolButtonTextUnderIcon
-            )
-            button.setIconSize(QSize(34, 34))
-            button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.setFocusPolicy(Qt.FocusPolicy.TabFocus)
-            button.clicked.connect(
-                lambda _checked, k=key: self._on_pick(k)
-            )
-            self._group.addButton(button)
-            layout.addWidget(button, 1)
-            self._buttons[key] = button
-        self._buttons["bar"].setChecked(True)
-        self.apply_theme()
-
-    def _on_pick(self, key: str) -> None:
-        if key == self._current:
-            return
-        self.choose(key)
-
-    def choose(self, key: str) -> None:
-        """Select a shape as if the user clicked it (updates UI + emits)."""
-        if key not in self._buttons:
-            return
-        self._current = key
-        self._buttons[key].setChecked(True)
-        self._sync_icons()
-        self.changed.emit(key)
-
-    def current_data(self) -> str:
-        return self._current
-
-    def set_current_data(self, key: str) -> None:
-        if key not in self._buttons:
-            key = "bar"
-        self._current = key
-        self._buttons[key].setChecked(True)
-        self._sync_icons()
-
-    def apply_theme(self) -> None:
-        self.setStyleSheet(_GRAPH_PICKER_QSS % palette())
-        self._sync_icons()
-
-    def _sync_icons(self) -> None:
-        for key, button in self._buttons.items():
-            chosen = key == self._current
-            button.setIcon(
-                create_usage_view_icon(
-                    key, 34, t("accent") if chosen else t("ink_mid")
-                )
-            )
-
-
 class NoWheelComboBox(QComboBox):
     """마우스 휠 스크롤 시 선택 항목이 실수로 변경되지 않도록 휠 이벤트를 무시하는 콤보박스"""
 
@@ -636,8 +530,6 @@ class SettingsDialog(QDialog):
         if hasattr(self, "providers_scroll"):
             self.providers_scroll.setStyleSheet(_PROVIDERS_SCROLL_QSS % palette())
         self.title_bar.restyle()
-        if hasattr(self, "graph_picker"):
-            self.graph_picker.apply_theme()
         for widget in self.findChildren(QWidget):
             template = widget.property("synapcapThemeStyle")
             if isinstance(template, str) and template:
@@ -713,24 +605,32 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(self.tabs)
 
-        # Buttons (저장 / 취소)
+        # Footer actions share one size so the visual priority comes from colour,
+        # not a shifting button width.
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
+        button_width = 88
+        button_height = 34
+
+        self.cancel_btn = QPushButton("취소")
+        self.cancel_btn.setObjectName("cancelBtn")
+        self.cancel_btn.setFixedSize(button_width, button_height)
+        self.cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self.cancel_btn)
+
         self.preview_btn = QPushButton("적용")
         self.preview_btn.setObjectName("previewBtn")
+        self.preview_btn.setFixedSize(button_width, button_height)
         self.preview_btn.setToolTip("저장하지 않고 현재 화면에 적용합니다")
         self.preview_btn.clicked.connect(self.on_preview)
         btn_layout.addWidget(self.preview_btn)
 
-        cancel_btn = QPushButton("취소")
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
-
-        save_btn = QPushButton("저장")
-        save_btn.setObjectName("saveBtn")
-        save_btn.clicked.connect(self.on_save)
-        btn_layout.addWidget(save_btn)
+        self.save_btn = QPushButton("저장")
+        self.save_btn.setObjectName("saveBtn")
+        self.save_btn.setFixedSize(button_width, button_height)
+        self.save_btn.clicked.connect(self.on_save)
+        btn_layout.addWidget(self.save_btn)
 
         layout.addLayout(btn_layout)
         frame_layout.addWidget(content)
@@ -755,14 +655,6 @@ class SettingsDialog(QDialog):
         self.always_top_check.setChecked(settings.get("always_on_top", True))
         form.addRow("화면 고정:", self.always_top_check)
 
-        self.dock_above_taskbar_check = StyledCheckBox(
-            "하단 작업 표시줄 바로 위에 위젯 고정"
-        )
-        self.dock_above_taskbar_check.setChecked(
-            settings.get("dock_above_taskbar", False)
-        )
-        form.addRow("작업 표시줄:", self.dock_above_taskbar_check)
-
         self.update_check = StyledCheckBox("자동으로 새 버전 확인")
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
@@ -781,42 +673,6 @@ class SettingsDialog(QDialog):
             lambda _index: self.on_preview()
         )
         form.addRow("테마:", self.theme_combo)
-
-        self.widget_scale_combo = NoWheelComboBox()
-        self.widget_scale_combo.addItem("작게 · 320 px", "small")
-        self.widget_scale_combo.addItem("기본 · 360 px", "medium")
-        self.widget_scale_combo.addItem("크게 · 420 px", "large")
-        selected_scale = settings.get("widget_scale", "medium")
-        selected_index = self.widget_scale_combo.findData(selected_scale)
-        self.widget_scale_combo.setCurrentIndex(
-            selected_index if selected_index >= 0 else 1
-        )
-        self.widget_scale_combo.setToolTip(
-            "창 너비, 글자, 아이콘, 행 간격과 진행 막대 크기를 함께 조절합니다."
-        )
-        form.addRow("위젯 크기:", self.widget_scale_combo)
-
-        self.graph_picker = GraphShapePicker()
-        self.graph_picker.set_current_data(settings.get("usage_view", "bar"))
-        self.graph_picker.setToolTip(
-            "사용량을 어떤 그래프로 표시할지 고릅니다. 누르면 현재 창에 바로 적용해 볼 수 있습니다."
-        )
-        self.graph_picker.changed.connect(lambda _key: self.on_preview())
-        form.addRow("그래프 모양:", self.graph_picker)
-
-        self.ring_layout_combo = NoWheelComboBox()
-        self.ring_layout_combo.addItem("세로 · 좁은 화면", "vertical")
-        self.ring_layout_combo.addItem("가로 · 모델 나란히", "horizontal")
-        selected_ring_layout = settings.get("ring_layout", "vertical")
-        ring_layout_index = self.ring_layout_combo.findData(selected_ring_layout)
-        self.ring_layout_combo.setCurrentIndex(max(ring_layout_index, 0))
-        self.ring_layout_combo.setToolTip(
-            "링 그래프에서 모델 카드를 세로 또는 가로로 배치합니다. "
-            "화면 폭이 부족하면 가로 배치도 자동으로 세로로 표시됩니다."
-        )
-        self.graph_picker.changed.connect(self._update_ring_layout_control)
-        self._update_ring_layout_control()
-        form.addRow("링 배치:", self.ring_layout_combo)
 
         self.usage_alert_check = StyledCheckBox("설정한 사용량 이상에서 알림")
         self.usage_alert_check.setChecked(
@@ -837,11 +693,6 @@ class SettingsDialog(QDialog):
             self.usage_alert_threshold_spin.setEnabled
         )
         form.addRow("알림 기준:", self.usage_alert_threshold_spin)
-
-    def _update_ring_layout_control(self, _key: object = None) -> None:
-        self.ring_layout_combo.setEnabled(
-            self.graph_picker.current_data() == "ring"
-        )
 
     def init_feedback_tab(self):
         layout = QVBoxLayout(self.feedback_tab)
@@ -1247,16 +1098,8 @@ class SettingsDialog(QDialog):
         settings = config_data.setdefault("settings", {})
         settings["refresh_interval_sec"] = self.interval_spin.value()
         settings["always_on_top"] = self.always_top_check.isChecked()
-        settings["dock_above_taskbar"] = (
-            self.dock_above_taskbar_check.isChecked()
-        )
         settings["check_updates"] = self.update_check.isChecked()
         settings["theme"] = self.theme_combo.currentData() or "dark"
-        settings["widget_scale"] = self.widget_scale_combo.currentData() or "medium"
-        settings["usage_view"] = self.graph_picker.current_data() or "bar"
-        settings["ring_layout"] = (
-            self.ring_layout_combo.currentData() or "vertical"
-        )
         settings["usage_alerts_enabled"] = (
             self.usage_alert_check.isChecked()
         )
@@ -1264,6 +1107,10 @@ class SettingsDialog(QDialog):
             self.usage_alert_threshold_spin.value()
         )
         for legacy_key in (
+            "dock_above_taskbar",
+            "usage_view",
+            "ring_layout",
+            "widget_scale",
             "usage_value_bold",
             "widget_width",
             "widget_size",
