@@ -8,6 +8,28 @@ const assets = {
   macIntel: "SynapCap-macOS-x64.dmg",
 };
 
+function configureThemeToggle() {
+  const toggle = document.querySelector("#theme-toggle");
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (!toggle) return;
+
+  const applyTheme = (theme) => {
+    const isLight = theme === "light";
+    document.documentElement.dataset.theme = theme;
+    toggle.setAttribute("aria-pressed", String(isLight));
+    toggle.setAttribute("aria-label", isLight ? "다크 테마로 전환" : "라이트 테마로 전환");
+    toggle.firstElementChild.textContent = isLight ? "◐" : "☼";
+    if (themeMeta) themeMeta.content = isLight ? "#f6f8fc" : "#11111b";
+  };
+
+  applyTheme(document.documentElement.dataset.theme || "dark");
+  toggle.addEventListener("click", () => {
+    const nextTheme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    localStorage.setItem("synapcap-theme", nextTheme);
+    applyTheme(nextTheme);
+  });
+}
+
 function detectPlatform() {
   const value = `${navigator.userAgent} ${navigator.platform}`.toLowerCase();
   if (value.includes("win")) return "windows";
@@ -85,4 +107,5 @@ async function loadLatestRelease() {
 }
 
 configurePrimaryDownload();
+configureThemeToggle();
 loadLatestRelease();
