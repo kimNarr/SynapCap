@@ -53,7 +53,7 @@ USAGE_PAIR_SEPARATOR = " / "
 
 ResizeAnchor = tuple[QPoint, bool, bool]
 
-FIXED_WIDGET_WIDTH = 336
+FIXED_WIDGET_WIDTH = 376
 FIXED_WIDGET_PRESET = {
     "width": FIXED_WIDGET_WIDTH,
     "title_size": 13,

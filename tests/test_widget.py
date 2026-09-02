@@ -6,7 +6,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QPoint, QRect, Qt
-from PySide6.QtGui import QPalette
+from PySide6.QtGui import QFont, QFontInfo, QFontMetrics, QPalette
 from PySide6.QtWidgets import QApplication, QLabel, QToolTip, QWidget
 
 from providers import (
@@ -18,7 +18,7 @@ from providers import (
     UsageWindow,
 )
 from theme import apply_theme_setting, t
-from ui.widget import FocusProviderButton, SynapCapWidget, UsageRing
+from ui.widget import FIXED_WIDGET_WIDTH, FocusProviderButton, SynapCapWidget, UsageRing
 from version import APP_VERSION
 
 
@@ -211,7 +211,7 @@ class WidgetTests(unittest.TestCase):
         compact_value = self.widget.compact_ui_map["codex"]["value"]
         self.assertEqual(compact_value.font().weight(), 500)
 
-    def test_expanded_widget_uses_fixed_336px_width(self):
+    def test_expanded_widget_uses_fixed_width(self):
         self.widget.rebuild_ui(
             {
                 "settings": {
@@ -224,7 +224,7 @@ class WidgetTests(unittest.TestCase):
             preserve_usage=False,
         )
 
-        self.assertEqual(self.widget.width(), 336)
+        self.assertEqual(self.widget.width(), FIXED_WIDGET_WIDTH)
         self.assertEqual(self.widget._expanded_preset({"widget_scale": "medium"})["val_size"], 11)
 
     def test_missing_cli_reads_as_dormant_not_an_alarm(self):
@@ -823,6 +823,24 @@ class WidgetTests(unittest.TestCase):
         )
         codex_tab = self.widget.focus_provider_buttons["codex"]
         self.assertLess(codex_tab.title_size, codex_tab.summary_size)
+        for button in self.widget.focus_provider_buttons.values():
+            summary_font = QFont(
+                "Segoe UI",
+                button.summary_size,
+                QFont.Weight.DemiBold,
+            )
+            available_summary_width = button.width() - (9 + 22 + 8) - 7
+            # The offscreen Qt backend used by tests cannot resolve Windows
+            # fonts. Segoe UI 10 DemiBold measures 62 px on the real backend.
+            required_summary_width = (
+                QFontMetrics(summary_font).horizontalAdvance("100 / 100%")
+                if QFontInfo(summary_font).family()
+                else 62
+            )
+            self.assertGreaterEqual(
+                available_summary_width,
+                required_summary_width,
+            )
         self.assertIn(
             "34 / 26%", self.widget.focus_provider_buttons["codex"].text()
         )
@@ -898,7 +916,7 @@ class WidgetTests(unittest.TestCase):
         ]
         self.assertTrue(self.widget._horizontal_ring_active)
         self.assertEqual(set(self.widget.focus_provider_buttons), {"codex", "gemini", "claude"})
-        self.assertEqual(self.widget.width(), 336)
+        self.assertEqual(self.widget.width(), FIXED_WIDGET_WIDTH)
         self.assertTrue(cards[0].isVisible())
         self.assertTrue(all(card.isHidden() for card in cards[1:]))
 
@@ -985,12 +1003,12 @@ class WidgetTests(unittest.TestCase):
         )
         widget.show()
         self.app.processEvents()
-        self.assertEqual(widget.width(), 336)
+        self.assertEqual(widget.width(), FIXED_WIDGET_WIDTH)
 
         widget.enter_compact_mode()
         self.app.processEvents()
 
-        self.assertLessEqual(widget.width(), 336)
+        self.assertLessEqual(widget.width(), FIXED_WIDGET_WIDTH)
         self.assertGreaterEqual(
             widget.width(),
             widget.compact_bar.sizeHint().width()
@@ -999,7 +1017,7 @@ class WidgetTests(unittest.TestCase):
         )
         widget.exit_compact_mode()
         self.app.processEvents()
-        self.assertEqual(widget.width(), 336)
+        self.assertEqual(widget.width(), FIXED_WIDGET_WIDTH)
         widget.close()
         widget.deleteLater()
 
@@ -1018,7 +1036,7 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data([self.usage])
         self.app.processEvents()
         expected_width = self.widget._expanded_width
-        self.assertEqual(expected_width, 336)
+        self.assertEqual(expected_width, FIXED_WIDGET_WIDTH)
         self.assertEqual(self.widget.width(), expected_width)
 
         self.widget.enter_compact_mode()
@@ -1117,7 +1135,7 @@ class WidgetTests(unittest.TestCase):
 
         self.assertLess(widths[0], widths[1])
         self.assertLess(widths[1], widths[2])
-        self.assertEqual(self.widget.width(), 336)
+        self.assertEqual(self.widget.width(), FIXED_WIDGET_WIDTH)
 
     def test_compact_toggle_expands_downward_near_top_edge(self):
         available = self.widget.screen().availableGeometry()
@@ -1268,7 +1286,7 @@ class WidgetTests(unittest.TestCase):
         assert ring is not None
         self.assertEqual(ring.font_size, 11)
         self.assertTrue(ring.bold)
-        self.assertEqual(self.widget.width(), 336)
+        self.assertEqual(self.widget.width(), FIXED_WIDGET_WIDTH)
 
     def test_fixed_metrics_ignore_legacy_font_preferences(self):
         config = {
@@ -1296,7 +1314,7 @@ class WidgetTests(unittest.TestCase):
         assert usage_ring is not None
         self.assertGreaterEqual(usage_ring.height(), 22)
         self.assertEqual(usage_ring.font_size, 11)
-        self.assertEqual(self.widget.width(), 336)
+        self.assertEqual(self.widget.width(), FIXED_WIDGET_WIDTH)
 
         self.widget.enter_compact_mode()
         self.app.processEvents()
