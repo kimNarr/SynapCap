@@ -824,18 +824,16 @@ class WidgetTests(unittest.TestCase):
         codex_tab = self.widget.focus_provider_buttons["codex"]
         self.assertLess(codex_tab.title_size, codex_tab.summary_size)
         for button in self.widget.focus_provider_buttons.values():
-            summary_font = QFont(
-                "Segoe UI",
-                button.summary_size,
-                QFont.Weight.DemiBold,
-            )
+            summary_font = QFont("Segoe UI")
+            summary_font.setPixelSize(button.summary_size)
+            summary_font.setWeight(QFont.Weight.DemiBold)
             available_summary_width = button.width() - (9 + 22 + 8) - 7
             # The offscreen Qt backend used by tests cannot resolve Windows
-            # fonts. Segoe UI 10 DemiBold measures 62 px on the real backend.
+            # fonts. Segoe UI 11 px DemiBold measures 55 px on Windows.
             required_summary_width = (
                 QFontMetrics(summary_font).horizontalAdvance("100 / 100%")
                 if QFontInfo(summary_font).family()
-                else 62
+                else 55
             )
             self.assertGreaterEqual(
                 available_summary_width,

@@ -53,7 +53,7 @@ USAGE_PAIR_SEPARATOR = " / "
 
 ResizeAnchor = tuple[QPoint, bool, bool]
 
-FIXED_WIDGET_WIDTH = 376
+FIXED_WIDGET_WIDTH = 384
 FIXED_WIDGET_PRESET = {
     "width": FIXED_WIDGET_WIDTH,
     "title_size": 13,
@@ -295,8 +295,8 @@ class FocusProviderButton(QPushButton):
         super().__init__(parent)
         self.provider_name = provider_name
         self.summary = "—"
-        self.title_size = max(8, preset["val_size"] - 4)
-        self.summary_size = max(10, preset["val_size"] - 1)
+        self.title_size = max(9, preset["val_size"] - 2)
+        self.summary_size = max(11, preset["val_size"])
         self.provider_pixmap = create_provider_pixmap(provider_type, 22)
         self.setText(f"{provider_name}\n—")
         self.setCheckable(True)
@@ -337,14 +337,20 @@ class FocusProviderButton(QPushButton):
         text_left = icon_x + icon_size + 8
         text_width = max(0, self.width() - text_left - 7)
 
-        painter.setFont(QFont("Segoe UI", self.title_size, QFont.Weight.Medium))
+        title_font = QFont("Segoe UI")
+        title_font.setPixelSize(self.title_size)
+        title_font.setWeight(QFont.Weight.Medium)
+        painter.setFont(title_font)
         painter.setPen(QColor(t("ink_mid")))
         painter.drawText(
             QRectF(text_left, 4, text_width, 15),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             self.provider_name,
         )
-        painter.setFont(QFont("Segoe UI", self.summary_size, QFont.Weight.DemiBold))
+        summary_font = QFont("Segoe UI")
+        summary_font.setPixelSize(self.summary_size)
+        summary_font.setWeight(QFont.Weight.DemiBold)
+        painter.setFont(summary_font)
         painter.setPen(QColor(t("ink")))
         painter.drawText(
             QRectF(text_left, 18, text_width, self.height() - 21),
