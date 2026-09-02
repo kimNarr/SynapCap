@@ -471,10 +471,18 @@ class SynapCapWidget(QWidget):
         header_layout.setSpacing(3)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Use the supplied horizontal brand mark in the expanded widget. The
-        # compact bar keeps its symbol-only mark to preserve its narrow width.
+        # Pair the gauge symbol with the horizontal wordmark in the expanded
+        # header. The compact bar still keeps its symbol-only mark to preserve
+        # its narrow width.
+        self.header_logo = QLabel()
+        self.header_logo.setFixedSize(20, 20)
+        self.header_logo.setPixmap(create_app_pixmap(20))
+        self.header_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(self.header_logo)
+
         self.wordmark_label = QLabel()
         self.wordmark_label.setFixedSize(92, 28)
+        self.header_logo.setPixmap(create_app_pixmap(20))
         self.wordmark_label.setPixmap(create_wordmark_pixmap(92, 28))
         self.wordmark_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(self.wordmark_label)

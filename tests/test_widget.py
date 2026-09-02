@@ -69,6 +69,10 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(tooltip, "8/12 09:49 초기화")
 
     def test_expanded_header_uses_horizontal_wordmark(self):
+        self.assertTrue(hasattr(self.widget, "header_logo"))
+        self.assertFalse(self.widget.header_logo.pixmap().isNull())
+        self.assertEqual(self.widget.header_logo.size().width(), 20)
+        self.assertEqual(self.widget.header_logo.size().height(), 20)
         self.assertTrue(hasattr(self.widget, "wordmark_label"))
         self.assertFalse(self.widget.wordmark_label.pixmap().isNull())
         self.assertEqual(self.widget.wordmark_label.size().width(), 92)
