@@ -1,28 +1,14 @@
-# SynapCap — 작업 현황 & 남은 일 (최종본)
+# SynapCap — 작업 현황 (최종본)
 
-> `dev` `7101448` 기준. 테스트 **175개 통과**. 이번 라운드의 디자인/UX backlog는
-> **딱 하나(자산 의존)만 남기고 전부 완료**. push/tag/배포는 오너가 직접.
+> `dev` 기준. 테스트 **175개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
+> push/tag/배포는 오너가 직접.
 
 ---
 
-## 남은 일 (1개)
+## 남은 일
 
-### 공식 Claude 마크 SVG 교체
-
-현재 Claude 프로바이더 칩의 글리프는 **손으로 그린 방사형 버스트 근사치**다
-(`ui/icon.py::_claude_burst_markup` — `<line>` 11개 + 중심 원, 코럴).
-라이선스 가능한 공식 Claude 마크를 확보하면:
-
-1. `ui/icon.py` — `_PROVIDER_BRANDS["claude"]`의 `"markup"`(또는 `"path"`) 값만 교체.
-   `create_provider_pixmap`는 두 키를 다 처리한다. `"path"`면 `{fg}` 없이 `d="..."`만,
-   `"markup"`이면 `{fg}` 플레이스홀더 포함 inner SVG.
-2. `docs/assets/provider-claude.svg` — 같은 아트로 교체(`fill="#d97757"` 유지 또는
-   `provider_claude_fg`에 맞춤).
-3. `assets/PROVIDER_ICONS_NOTICE.md` — Claude 항목을 실제 출처/라이선스로 갱신.
-4. `theme.py`의 `provider_claude_fg`(다크 `#D97757` / 라이트 `#A8431C`)는 그대로 두거나
-   공식 마크 색에 맞춤. 라이트는 `#F3E3DE` 배경 대비 3:1 이상 유지.
-
-그 외 코드 변경 불필요.
+없음. 마지막 항목(공식 Claude 마크)은 오너가 SVG를 전달해 반영 완료(`_CLAUDE_MARK`,
+`ui/icon.py` — Anthropic 상표, 프로바이더 식별용).
 
 ---
 
@@ -94,6 +80,6 @@
 | 3 | 위험 비색 신호 — **E안**: 집중 링 타일 테두리 `<75` 1px / `75–89` 2px / `≥90` 3px severity 색 | `c53ac1d` |
 | 4 | 헤더 간소화(I-10) — 설정 그래프 미리보기 + 헤더 뷰 전환 제거 (※ 이후 뷰 재설계로 흡수) | `7706456` |
 | 5 | 로고 accent 통일 — **B안**: `logo_mark` = `accent` (`#89B4FA`/`#1857C9`). SVG·아이콘·`docs/` 자산 재생성 | `0904d3e` · `12898c7` |
-| 6 | 프로바이더 칩 통일 — **D안**: Gemini 흰 박스 제거(테마 틴트) + Claude 격자 → 방사형 버스트(근사치) | `0098e22` |
+| 6 | 프로바이더 칩 통일 — **D안**: Gemini 흰 박스 제거(테마 틴트) + Claude 격자 → 방사형 버스트 | `0098e22` |
 | 7 | 홈페이지 위젯 미리보기 — 4단계 색·흐린 라벨·검정 프레임·창제어 구분선·버전 칩 제거 | `5a2c864` |
-| — | 프로바이더 아이콘 notice 정정(Claude 플레이스홀더 반영) | `7101448` |
+| 6+ | Claude 칩 글리프를 공식 Claude 마크(`_CLAUDE_MARK`)로 교체 | (이 커밋) |

@@ -164,11 +164,10 @@ README도 새 SVG/PNG로 교체. 홈페이지 위젯 미리보기 목업도 현�
 | --- | --- | --- | --- |
 | GPT / Codex | `#B4BEFE` / `#4C4F69` | `#252B3F` / `#E4E8F5` | Simple Icons OpenAI |
 | Gemini | `#8AB4F8` / `#2C64C9` | `#1E2A3D` / `#E3EDFB` | Simple Icons Google Gemini |
-| Claude | `#D97757` / `#A8431C` | `#3A2B2B` / `#F3E3DE` | **방사형 버스트** (`_claude_burst_markup`) |
+| Claude | `#D97757` / `#A8431C` | `#3A2B2B` / `#F3E3DE` | 공식 Claude 마크 (`_CLAUDE_MARK`) |
 
-> Claude 글리프는 "Claude Code" 격자에서 Claude의 방사형 버스트로 교체. 현재는 손으로 그린
-> 근사치(`<line>` 11개 + 중심 원) — 공식 Claude 마크 확보 시 `_PROVIDER_BRANDS["claude"]["markup"]`을
-> 교체(`path` 키도 지원). `assets/PROVIDER_ICONS_NOTICE.md` 참고.
+> Claude 글리프는 "Claude Code" 격자에서 **공식 Claude 마크**(방사형 버스트)로 교체.
+> `_brand_colors`로 `provider_claude_fg` 색을 입힌다. `assets/PROVIDER_ICONS_NOTICE.md` 참고.
 
 ### 타이포그래피
 
