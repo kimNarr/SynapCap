@@ -186,7 +186,7 @@ LIGHT: dict[str, str] = {
     # ── logo ─────────────────────────────────────────────────────────
     "logo_mark": "#1857C9",  # unified with `accent` — one blue everywhere
     "logo_text": "#303446",
-    "logo_track": "#D5D9E4",
+    "logo_track": "#AEB6C6",  # closed gauge ring — must read on the light panel
 }
 
 PALETTES: dict[str, dict[str, str]] = {"dark": DARK, "light": LIGHT}

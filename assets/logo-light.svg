@@ -2,7 +2,7 @@
   <title>SynapCap</title>
   <desc>Concept A, light-ground palette. Full ring track with a ~66% fill.</desc>
 
-  <circle cx="16" cy="16" r="11" fill="none" stroke="#D5D9E4" stroke-width="2.8"/>
+  <circle cx="16" cy="16" r="11" fill="none" stroke="#AEB6C6" stroke-width="2.8"/>
   <path d="M8.222 23.778A11 11 0 0 1 23.53 7.981"
         fill="none" stroke="#1857C9" stroke-width="2.8" stroke-linecap="round"/>
   <circle cx="23.53" cy="7.981" r="2" fill="#1857C9"/>

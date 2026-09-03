@@ -54,7 +54,7 @@
 | --- | --- | --- |
 | `mark-glyph` | `#EAEEF7` (라이트 `#1B1D26`) | `S` |
 | `mark-fill` | `#89B4FA` (라이트 `#1857C9`) | 채움 아크 · 선단 노드 — **앱 UI `accent`와 동일** |
-| `mark-track` | `#363B4D` (라이트 `#D5D9E4`) | 닫힌 게이지 원 |
+| `mark-track` | `#363B4D` (라이트 `#AEB6C6`) | 닫힌 게이지 원 |
 
 **로고 = UI accent 통일 (완료)**: `theme.py`의 `logo_mark` = `accent`
 (`#89B4FA` / 라이트 `#1857C9`). `assets/*.svg`·`docs/assets/*.svg`의 하드코딩 hex와
@@ -111,7 +111,7 @@ README도 새 SVG/PNG로 교체. 홈페이지 위젯 미리보기 목업도 현�
 | `good` | `#2E6F37` | 정상 상태 |
 | `logo-mark` | `#1857C9` | 라이트 로고 채움 (= 라이트 `accent`) |
 | `logo-text` | `#303446` | 라이트 워드마크 본문 |
-| `logo-track` | `#D5D9E4` | 라이트 로고의 닫힌 게이지 원 |
+| `logo-track` | `#AEB6C6` | 라이트 로고의 닫힌 게이지 원 |
 
 테마 설정은 `auto`(기본)·`light`·`dark` 세 가지다. `auto`는
 `QStyleHints.colorScheme()`을 따르고 OS 설정이 실행 중 바뀌면 위젯·설정창·트레이를
