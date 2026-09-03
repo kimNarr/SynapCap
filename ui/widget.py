@@ -23,13 +23,13 @@ from version import APP_VERSION
 
 from .icon import (
     create_app_pixmap,
-    create_arrow_down_icon,
-    create_arrow_up_icon,
     create_close_icon,
+    create_expand_square_icon,
     create_minimize_icon,
     create_provider_pixmap,
     create_refresh_icon,
     create_settings_icon,
+    create_to_tray_icon,
     create_wordmark_pixmap,
 )
 
@@ -546,6 +546,19 @@ class SynapCapWidget(QWidget):
         )
         header_layout.addSpacing(5)
 
+        # Window controls, same order in both modes: to-tray, mode toggle, quit.
+        self.header_tray_btn = QPushButton()
+        self.header_tray_btn.setFixedSize(22, 22)
+        self.header_tray_btn.setIcon(create_to_tray_icon(14, t("ink_mid")))
+        self.header_tray_btn.setStyleSheet(btn_style)
+        self.header_tray_btn.clicked.connect(
+            lambda: self._request_window_mode("none")
+        )
+        self._enable_instant_tooltip(
+            self.header_tray_btn, "트레이 아이콘만 · 트레이에서 다시 열기"
+        )
+        header_layout.addWidget(self.header_tray_btn)
+
         self.minimize_btn = QPushButton()
         self.minimize_btn.setFixedSize(22, 22)
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
@@ -553,7 +566,7 @@ class SynapCapWidget(QWidget):
         self.minimize_btn.clicked.connect(
             lambda: self._request_window_mode("bar")
         )
-        self._enable_instant_tooltip(self.minimize_btn, "가로 요약으로 접기")
+        self._enable_instant_tooltip(self.minimize_btn, "가로 막대로 접기")
         header_layout.addWidget(self.minimize_btn)
 
         self.close_btn = QPushButton()
@@ -585,29 +598,29 @@ class SynapCapWidget(QWidget):
         self.compact_layout.addLayout(self.compact_items_layout)
 
         compact_btn_style = _COMPACT_BTN_QSS % palette()
+
+        # Same window-control order as the expanded header: to-tray, toggle, quit.
+        self.compact_tray_btn = QPushButton()
+        self.compact_tray_btn.setFixedSize(24, 24)
+        self.compact_tray_btn.setIcon(create_to_tray_icon(14, t("ink_mid")))
+        self.compact_tray_btn.setStyleSheet(compact_btn_style)
+        self.compact_tray_btn.clicked.connect(
+            lambda: self._request_window_mode("none")
+        )
+        self._enable_instant_tooltip(
+            self.compact_tray_btn, "트레이 아이콘만 · 트레이에서 다시 열기"
+        )
+        self.compact_layout.addWidget(self.compact_tray_btn)
+
         self.expand_btn = QPushButton()
         self.expand_btn.setFixedSize(24, 24)
-        self.expand_btn.setIcon(create_arrow_down_icon(14, t("accent")))
+        self.expand_btn.setIcon(create_expand_square_icon(14, t("accent")))
         self.expand_btn.setStyleSheet(compact_btn_style)
         self.expand_btn.clicked.connect(
             lambda: self._request_window_mode("expanded")
         )
         self._enable_instant_tooltip(self.expand_btn, "전체 위젯 펼치기")
         self.compact_layout.addWidget(self.expand_btn)
-
-        # One more step of collapsing: bar -> tray only. Click the tray icon
-        # (or pick a mode in its menu) to bring a window back.
-        self.compact_tray_btn = QPushButton()
-        self.compact_tray_btn.setFixedSize(24, 24)
-        self.compact_tray_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
-        self.compact_tray_btn.setStyleSheet(compact_btn_style)
-        self.compact_tray_btn.clicked.connect(
-            lambda: self._request_window_mode("none")
-        )
-        self._enable_instant_tooltip(
-            self.compact_tray_btn, "트레이로 접기 · 트레이 아이콘을 눌러 다시 열기"
-        )
-        self.compact_layout.addWidget(self.compact_tray_btn)
 
         self.compact_close_btn = QPushButton()
         self.compact_close_btn.setFixedSize(24, 24)
@@ -661,6 +674,7 @@ class SynapCapWidget(QWidget):
         for button in (
             self.refresh_btn,
             self.settings_btn,
+            self.header_tray_btn,
             self.minimize_btn,
             self.close_btn,
         ):
@@ -674,6 +688,7 @@ class SynapCapWidget(QWidget):
         self.wordmark_label.setPixmap(create_wordmark_pixmap(92, 28))
         self.refresh_btn.setIcon(create_refresh_icon(14, t("accent")))
         self.settings_btn.setIcon(create_settings_icon(14, t("ink_mid")))
+        self.header_tray_btn.setIcon(create_to_tray_icon(14, t("ink_mid")))
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
         self.close_btn.setIcon(create_close_icon(14, t("danger_soft")))
         self.freshness_label.setStyleSheet(f"color: {t('ink_faint')};")
@@ -814,8 +829,8 @@ class SynapCapWidget(QWidget):
         self.expand_btn.setFixedSize(button_size, button_size)
         self.compact_tray_btn.setFixedSize(button_size, button_size)
         self.compact_close_btn.setFixedSize(button_size, button_size)
-        self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, t("accent")))
-        self.compact_tray_btn.setIcon(create_minimize_icon(glyph_size, t("ink_mid")))
+        self.expand_btn.setIcon(create_expand_square_icon(glyph_size, t("accent")))
+        self.compact_tray_btn.setIcon(create_to_tray_icon(glyph_size, t("ink_mid")))
         self.compact_close_btn.setIcon(create_close_icon(glyph_size, t("danger_soft")))
 
     def _schedule_fit_to_content(
@@ -909,14 +924,9 @@ class SynapCapWidget(QWidget):
         self._snap_to_screen_edges()
 
     def _update_expand_direction(self, resize_anchor: ResizeAnchor) -> None:
+        # The glyph is a stable square; the pop-up direction lives in the tooltip.
         _point, _anchor_left, anchor_top = resize_anchor
-        glyph_size = self._compact_metrics()["glyph_size"]
-        if anchor_top:
-            self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, t("accent")))
-            tooltip = "아래로 전체 위젯 펼치기"
-        else:
-            self.expand_btn.setIcon(create_arrow_up_icon(glyph_size, t("accent")))
-            tooltip = "위로 전체 위젯 펼치기"
+        tooltip = "아래로 전체 위젯 펼치기" if anchor_top else "위로 전체 위젯 펼치기"
         self._enable_instant_tooltip(self.expand_btn, tooltip)
 
     def _snap_to_screen_edges(self) -> None:

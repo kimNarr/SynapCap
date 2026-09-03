@@ -529,19 +529,76 @@ def create_close_icon(size: int = 16, color: str | None = None) -> QIcon:
 
 
 def create_minimize_icon(size: int = 16, color: str | None = None) -> QIcon:
-    """작업 표시줄/Dock 최소화용 가로선 아이콘."""
+    """A centred horizontal bar — "collapse to the compact strip"."""
     color = color or t("ink_mid")
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-    pen = QPen(QColor(color), 1.8)
+    pen = QPen(QColor(color), 2.4)
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
     painter.setPen(pen)
     painter.drawLine(
-        QPointF(size * 0.26, size * 0.68),
-        QPointF(size * 0.74, size * 0.68),
+        QPointF(size * 0.24, size * 0.5),
+        QPointF(size * 0.76, size * 0.5),
+    )
+
+    painter.end()
+    return QIcon(pixmap)
+
+
+def create_expand_square_icon(size: int = 16, color: str | None = None) -> QIcon:
+    """A rounded square outline — "open the full widget"."""
+    color = color or t("ink_mid")
+    pixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+    pen = QPen(QColor(color), 1.7)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    margin = size * 0.27
+    painter.drawRoundedRect(
+        QRectF(margin, margin, size - margin * 2, size - margin * 2),
+        size * 0.12,
+        size * 0.12,
+    )
+
+    painter.end()
+    return QIcon(pixmap)
+
+
+def create_to_tray_icon(size: int = 16, color: str | None = None) -> QIcon:
+    """A downward arrow tucking into a small tray chip — "tray icon only"."""
+    color = color or t("ink_mid")
+    pixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+    pen = QPen(QColor(color), 1.7)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pen)
+
+    # arrow stem + head, pointing down
+    painter.drawLine(QPointF(size * 0.5, size * 0.16), QPointF(size * 0.5, size * 0.52))
+    head = QPainterPath()
+    head.moveTo(size * 0.34, size * 0.38)
+    head.lineTo(size * 0.5, size * 0.55)
+    head.lineTo(size * 0.66, size * 0.38)
+    painter.drawPath(head)
+
+    # the tray chip it drops into
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(color))
+    painter.drawRoundedRect(
+        QRectF(size * 0.24, size * 0.7, size * 0.52, size * 0.16),
+        size * 0.06,
+        size * 0.06,
     )
 
     painter.end()

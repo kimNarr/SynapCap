@@ -641,6 +641,48 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("none", requested)
         self.assertEqual(self.widget.window_mode(), "none")
 
+    def test_expanded_header_can_go_straight_to_tray(self):
+        requested = []
+        self.widget.window_mode_requested.connect(
+            lambda mode, _restore: requested.append(mode)
+        )
+
+        self.widget.header_tray_btn.click()
+
+        self.assertEqual(requested, ["none"])
+        self.assertEqual(self.widget.window_mode(), "none")
+
+    def test_window_controls_share_one_order_in_both_modes(self):
+        def order(layout):
+            names = []
+            for i in range(layout.count()):
+                w = layout.itemAt(i).widget()
+                if w in (
+                    self.widget.header_tray_btn,
+                    self.widget.minimize_btn,
+                    self.widget.close_btn,
+                    self.widget.compact_tray_btn,
+                    self.widget.expand_btn,
+                    self.widget.compact_close_btn,
+                ):
+                    names.append(w)
+            return names
+
+        header = order(self.widget.header_widget.layout())
+        self.assertEqual(
+            header,
+            [self.widget.header_tray_btn, self.widget.minimize_btn, self.widget.close_btn],
+        )
+        compact = order(self.widget.compact_layout)
+        self.assertEqual(
+            compact,
+            [
+                self.widget.compact_tray_btn,
+                self.widget.expand_btn,
+                self.widget.compact_close_btn,
+            ],
+        )
+
     def test_compact_bar_shows_latest_provider_usage(self):
         self.widget.update_data([self.usage])
         self.widget.enter_compact_mode()
