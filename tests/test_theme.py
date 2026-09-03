@@ -46,9 +46,11 @@ class ThemeTests(unittest.TestCase):
         self.assertEqual(t("ground"), LIGHT["ground"])
         self.assertEqual(palette(), LIGHT)
 
-    def test_light_brand_choices_keep_gemini_white_and_logo_contrasted(self):
+    def test_light_brand_choices_keep_gemini_white_and_unify_logo_with_accent(self):
         self.assertEqual(LIGHT["provider_gemini_bg"], "#FFFFFF")
-        self.assertEqual(LIGHT["logo_mark"], "#3B6FD4")
+        # The logo mark is the same blue as the app accent in both themes.
+        self.assertEqual(LIGHT["logo_mark"], LIGHT["accent"])
+        self.assertEqual(DARK["logo_mark"], DARK["accent"])
 
     @patch("theme.QApplication.instance", return_value=None)
     def test_system_theme_without_an_app_falls_back_to_dark(self, _instance):

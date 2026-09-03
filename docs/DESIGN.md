@@ -52,11 +52,13 @@
 | 토큰 | 값 | 위치 |
 | --- | --- | --- |
 | `mark-glyph` | `#EAEEF7` (라이트 `#1B1D26`) | `S` |
-| `mark-fill` | `#5B8DEF` (라이트 `#3B6FD4`) | 채움 아크 · 선단 노드 |
+| `mark-fill` | `#89B4FA` (라이트 `#1857C9`) | 채움 아크 · 선단 노드 — **앱 UI `accent`와 동일** |
 | `mark-track` | `#363B4D` (라이트 `#D5D9E4`) | 빈 아크 |
 
-**미결정**: 로고 accent(`#5B8DEF`)와 앱 UI accent(`#89B4FA`)의 통일 여부.
-통일 시 `logo.svg`의 `#5B8DEF`를 앱 accent에 맞춘다.
+**로고 = UI accent 통일 (결정됨)**: `theme.py`의 `logo_mark`가 `accent`와 같은 블루
+(`#89B4FA` / 라이트 `#1857C9`). 인앱은 `ui/icon.py` 런타임 recolor로 이미 반영.
+**남은 자산 작업**: `assets/*.svg`의 하드코딩 `#5B8DEF`/`#3B6FD4` 교체 →
+`scripts/generate_icons.py` 재실행 → `docs/`·README 아이콘 자산 갱신.
 
 **연동 완료**: `ui/icon.py`가 `logo.svg`/`logo-icon.svg`/`wordmark.svg`를 런타임 래스터라이즈,
 `scripts/generate_icons.py`가 빌드 시 `synapcap.ico`/`.icns`/`.png` 생성. 홈페이지(`docs/`)와
@@ -81,7 +83,7 @@ README도 새 SVG/PNG로 교체. 기존 3D 래스터 자산 제거.
 | `ink-mid` | `#A6ADC8` | 보조 설명 |
 | `ink-dim` | `#8087A0` | 링뷰 리셋 텍스트 |
 | `compact value` | `#F8FAFC` | 컴팩트 기본 수치(경고 전) |
-| `accent` | `#89B4FA` | 링크·포커스·링 사용량·`CLI 기준` 배지 (로고 accent는 별도 `#5B8DEF`) |
+| `accent` | `#89B4FA` | 링크·포커스·링 사용량·`CLI 기준` 배지·**로고 마크** (`logo_mark` = `accent`) |
 | `period label` | `#8087A0` (`ink_dim`), 테두리 없음 | `5h`/`7d` 행 라벨 — 컨트롤처럼 보이면 안 되므로 아웃라인 없이 흐린 텍스트 |
 
 사용량 시각화는 `UsageRing` 하나를 사용한다. 링 트랙은 `ring_track`, 사용량 아크는
@@ -106,7 +108,7 @@ README도 새 SVG/PNG로 교체. 기존 3D 래스터 자산 제거.
 | `usage-warn` | `#C2410C` | 사용량 75–89% (경고, 번트 오렌지) |
 | `usage-crit` | `#B42352` | 사용량 90% 이상 (위험) |
 | `good` | `#2E6F37` | 정상 상태 |
-| `logo-mark` | `#3B6FD4` | 라이트 전용 로고 채움 |
+| `logo-mark` | `#1857C9` | 라이트 로고 채움 (= 라이트 `accent`) |
 | `logo-text` | `#303446` | 라이트 워드마크 본문 |
 | `logo-track` | `#D5D9E4` | 라이트 로고의 빈 게이지 |
 
@@ -423,9 +425,9 @@ README도 새 SVG/PNG로 교체. 기존 3D 래스터 자산 제거.
 2. **큰 재설계** (시안 `SynapCap UI 시안` 참고, 오너 확인 필요):
    - ~~**테마** — 다크/라이트/자동~~ — ✅ `LIGHT` 팔레트, OS 자동 감지·실시간 전환, 설정 토글·미리보기, 위젯·설정·트레이 재스타일 완료
    - ~~배경 — 순수 검정 `#000000` vs 근접흑~~ — ✅ 근접흑 `#050608` / `#020304` 유지 결정 (OLED가 아니면 경계 뭉개짐)
-   - 위험 표식 — `▲` vs 타일 왼쪽 severity 스트라이프 (오너: 예시 비교 후 결정)
+   - ~~위험 표식~~ — ✅ 집중 링 카드 테두리로 단계 표시 (`< 75` 1px / `75–89` 2px / `>= 90` 3px severity 색)
    - ~~헤더 간소화(I-10)~~ — ✅ 그래프 전환 UI 제거, 헤더 `view_btn` 제거(아이콘 4개)
-   - 로고/앱 accent 통일 (`#5B8DEF` vs `#89B4FA`) (오너: 예시 비교 후 결정)
+   - ~~로고/앱 accent 통일~~ — ✅ `logo_mark` = `accent`로 통일(`#89B4FA` / 라이트 `#1857C9`). 인앱 반영 완료, 자산 재생성만 남음
 
 ### 링 레이아웃
 

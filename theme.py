@@ -102,7 +102,7 @@ DARK: dict[str, str] = {
     "privacy_note_bg": "rgba(249, 226, 175, 0.06)",
     "privacy_note_edge": "rgba(249, 226, 175, 0.2)",
     # ── logo ─────────────────────────────────────────────────────────
-    "logo_mark": "#5B8DEF",
+    "logo_mark": "#89B4FA",  # unified with `accent` — one blue everywhere
     "logo_text": "#EAEEF7",
     "logo_track": "#363B4D",
 }
@@ -192,7 +192,7 @@ LIGHT: dict[str, str] = {
     "privacy_note_bg": "rgba(128, 84, 0, 0.08)",
     "privacy_note_edge": "rgba(128, 84, 0, 0.28)",
     # ── logo ─────────────────────────────────────────────────────────
-    "logo_mark": "#3B6FD4",
+    "logo_mark": "#1857C9",  # unified with `accent` — one blue everywhere
     "logo_text": "#303446",
     "logo_track": "#D5D9E4",
 }
