@@ -55,6 +55,15 @@ def _provider_settings_changed(previous: dict, current: dict) -> bool:
     return previous.get("providers", []) != current.get("providers", [])
 
 
+def _should_start_centered(settings: dict, updated: bool) -> bool:
+    """Centre on the first ever launch or right after an update; otherwise
+    reuse the last-used position."""
+    never_positioned = not any(
+        settings.get(f"window_pos_{mode}") for mode in ("expanded", "bar")
+    )
+    return bool(updated or never_positioned)
+
+
 def _provider_query_signature(config: dict) -> tuple:
     ignored_keys = {
         "name",
@@ -171,8 +180,11 @@ def main():
     # 1. Config 로드
     config_data = load_config()
     show_whats_new = consume_whats_new(config_data)
-    save_config(config_data)
     settings = config_data.get("settings", {})
+    # First run (no saved position yet) or a fresh update → open dead-centre;
+    # every launch after that reuses the last position and mode.
+    start_centered = _should_start_centered(settings, show_whats_new)
+    save_config(config_data)
     apply_theme_setting(settings.get("theme", "auto"))
     app.setWindowIcon(create_app_icon(64))
     refresh_interval = settings.get("refresh_interval_sec", 30)
@@ -270,7 +282,19 @@ def main():
         widget.activateWindow()
 
     single_instance.activation_requested.connect(show_widget)
-    apply_window_mode(initial_window_mode, persist=False)
+    apply_window_mode(
+        initial_window_mode,
+        restore_position=not start_centered,
+        persist=False,
+    )
+    if start_centered and initial_window_mode in {"expanded", "bar"}:
+        def _place_centered() -> None:
+            # Deferred so the expanded layout has settled to its real size.
+            widget.center_on_screen()
+            remember_widget_position(initial_window_mode)
+            save_config(config_data)
+
+        QTimer.singleShot(0, _place_centered)
 
     update_worker = UpdateCheckWorker(APP_VERSION)
     pending_update: UpdateInfo | None = None

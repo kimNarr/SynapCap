@@ -641,6 +641,22 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("none", requested)
         self.assertEqual(self.widget.window_mode(), "none")
 
+    def test_center_on_screen_places_the_widget_mid_screen(self):
+        self.widget.set_window_mode("expanded")
+        self.widget.restore_position(0, 0)
+        self.app.processEvents()
+
+        self.widget.center_on_screen()
+
+        available = self.widget._available_geometry()
+        frame = self.widget.frameGeometry()
+        self.assertAlmostEqual(
+            frame.center().x(), available.center().x(), delta=4
+        )
+        self.assertAlmostEqual(
+            frame.center().y(), available.center().y(), delta=4
+        )
+
     def test_expanded_header_can_go_straight_to_tray(self):
         requested = []
         self.widget.window_mode_requested.connect(
@@ -694,7 +710,7 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("Codex", compact_item.toolTip())
         self.assertEqual(compact_value.font().pointSize(), 10)
         self.assertIn("color: #F8FAFC", compact_value.styleSheet())
-        self.assertEqual(self.widget.compact_logo.size().width(), 17)
+        self.assertEqual(self.widget.compact_logo.size().width(), 22)
         self.assertEqual(self.widget.expand_btn.height(), 20)
         self.assertLess(self.widget.frame.height(), 50)
         self.assertTrue(self.widget.frame.property("compactMode"))

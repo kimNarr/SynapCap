@@ -1,6 +1,6 @@
 # SynapCap — 작업 현황 (최종본)
 
-> `dev` 기준. 테스트 **185개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
+> `dev` 기준. 테스트 **187개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
 > push/tag/배포는 오너가 직접.
 
 ---
@@ -37,7 +37,7 @@
 ## 공통 작업 규칙
 
 - 브랜치 `dev`만. 커밋 OK, **push/tag/배포 금지.**
-- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **185개 통과 유지.**
+- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **187개 통과 유지.**
 - 린트 `python -m ruff check ui/ tests/`. **기존 에러(건드리지 말 것)**:
   `test_subscription_usage.py`(FLY002), `test_updates.py`(UP012 ×3), `config.py`(blind-except ×2).
 - QSS: 리터럴 `{}` 블록 → `%(name)s` 퍼센트 스타일, **모듈 레벨 named constant**로 올려
@@ -89,7 +89,9 @@
 | 항목 | 내용 | 커밋 |
 | --- | --- | --- |
 | 트레이 접기 버튼 | 컴팩트 막대에 `compact_tray_btn` → 위젯 안에서 펼침→막대→트레이만 | `8913399` |
-| 창 제어 통일 | 펼침·막대 모두 `[트레이로] [모드 토글] [종료]` 순서. `header_tray_btn` 신규(펼침→`none`). 토글 아이콘: 펼침 `create_minimize_icon`(가운데 막대)·막대 `create_expand_square_icon`(□). to-tray = `create_to_tray_icon`(↓+칩) | (이번 커밋) |
+| 창 제어 통일 | 펼침·막대 모두 `[트레이로] [모드 토글] [종료]` 순서. `header_tray_btn` 신규(펼침→`none`). 토글 아이콘: 펼침 `create_minimize_icon`(가운데 막대)·막대 `create_expand_square_icon`(□). to-tray = `create_to_tray_icon`(↓+칩) | `6a84b99` |
+| 컴팩트 로고 확대 | `logo_size` `max(17,f+5)` → `max(22,f+12)` (막대 h 43 유지) | (이번 커밋) |
+| 첫 실행/업데이트 중앙 배치 | `main._should_start_centered(settings, updated)` — 저장 위치 없음 or `last_seen_version` 변경 → `widget.center_on_screen()` + 좌표 저장. 이후엔 복원 | (이번 커밋) |
 | 트레이 수치 선택 | `settings["tray_metric"]` (`highest` \| provider id \| `none`) + 설정 "트레이 표시" 콤보. `none`이면 앱 아이콘만 | `c649a5c` · `f508f7b` |
 | 트레이 글리프 확대 | `create_usage_tray_icon` 여백 축소(`inset` 3%) + 자릿수별 폰트 비율 → 작은 트레이 가독성 | `9ff9729` |
 | 설정 푸터 2버튼 | `적용` 제거 → `취소`/`저장`만. 테마·표시모드·트레이표시는 즉시 라이브 미리보기 유지. 고아 토큰(`preview_*`, `accent_soft`) 제거 | `9ff9729` |

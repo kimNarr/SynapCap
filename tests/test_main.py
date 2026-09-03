@@ -12,6 +12,7 @@ from main import (
     _provider_query_settings_changed,
     _provider_settings_changed,
     _setting_changed,
+    _should_start_centered,
     confirm_quit,
 )
 
@@ -60,6 +61,18 @@ class SettingsChangeTests(unittest.TestCase):
         current = {"settings": {"window_mode": "none"}}
 
         self.assertTrue(_setting_changed(previous, current, "window_mode"))
+
+    def test_start_centered_on_first_run_and_after_update_only(self):
+        # First run: no saved position anywhere.
+        self.assertTrue(_should_start_centered({}, updated=False))
+        # Fresh update, even with a saved position.
+        self.assertTrue(
+            _should_start_centered({"window_pos_bar": [10, 20]}, updated=True)
+        )
+        # Normal launch: reuse the saved position.
+        self.assertFalse(
+            _should_start_centered({"window_pos_expanded": [10, 20]}, updated=False)
+        )
 
     def test_visual_setting_does_not_change_providers(self):
         previous = {

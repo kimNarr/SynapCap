@@ -587,8 +587,8 @@ class SynapCapWidget(QWidget):
         self.compact_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.compact_logo = QLabel()
-        self.compact_logo.setPixmap(create_app_pixmap(20))
-        self.compact_logo.setFixedSize(20, 20)
+        self.compact_logo.setPixmap(create_app_pixmap(22))
+        self.compact_logo.setFixedSize(22, 22)
         self.compact_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.compact_layout.addWidget(self.compact_logo)
 
@@ -765,7 +765,7 @@ class SynapCapWidget(QWidget):
             # text scale remains user-configurable; surrounding geometry grows
             # from it so a larger font cannot be clipped.
             "icon_size": max(19, font_size + 8),
-            "logo_size": max(17, font_size + 5),
+            "logo_size": max(22, font_size + 12),
             "button_size": max(20, font_size + 9),
             "glyph_size": max(11, font_size),
             "item_spacing": max(6, round(font_size * 0.55)),
@@ -1055,6 +1055,16 @@ class SynapCapWidget(QWidget):
     def restore_position(self, x: int, y: int) -> None:
         """Restore a saved position and constrain it to the usable desktop."""
         self.move(x, y)
+        self._snap_to_screen_edges()
+
+    def center_on_screen(self) -> None:
+        """Middle of the active screen — used on first run and after an update."""
+        available = self._available_geometry()
+        frame = self.frameGeometry()
+        self.move(
+            available.center().x() - frame.width() // 2,
+            available.center().y() - frame.height() // 2,
+        )
         self._snap_to_screen_edges()
 
     def _apply_layout_visibility(self) -> None:
