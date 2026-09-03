@@ -103,6 +103,18 @@ class ConfigTests(unittest.TestCase):
 
             self.assertEqual(settings["tray_metric"], "claude")
 
+    def test_tray_metric_accepts_the_none_sentinel(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps({"settings": {"tray_metric": "none"}}),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertEqual(settings["tray_metric"], "none")
+
     def test_invalid_theme_falls_back_to_dark(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "synapcap.json"

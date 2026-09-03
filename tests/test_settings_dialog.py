@@ -155,7 +155,9 @@ class SettingsDialogTests(unittest.TestCase):
         combo = self.dialog.tray_metric_combo
         self.assertEqual(combo.itemData(0), "highest")
         options = {combo.itemData(i) for i in range(combo.count())}
-        self.assertEqual(options, {"highest", "codex", "antigravity", "claude"})
+        self.assertEqual(
+            options, {"highest", "codex", "antigravity", "claude", "none"}
+        )
 
         combo.setCurrentIndex(combo.findData("claude"))
         saved = []

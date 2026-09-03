@@ -163,6 +163,21 @@ class TrayTests(unittest.TestCase):
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()
 
+    def test_tray_metric_none_keeps_the_plain_app_icon(self):
+        tray = SynapCapTray(tray_metric="none")
+        usages = [ModelUsage("claude", "Claude", "Claude", 88, 100, "%")]
+        with patch("ui.tray.create_usage_tray_icon") as create_icon, \
+                patch("ui.tray.create_app_icon") as app_icon:
+            create_icon.return_value = QIcon()
+            app_icon.return_value = QIcon()
+            tray.update_usage(usages)
+        create_icon.assert_not_called()
+        app_icon.assert_called()
+        # Tooltip still carries the numbers.
+        self.assertIn("Claude 88%", tray.tray_icon.toolTip())
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
     def test_three_digit_usage_tray_icon_is_rendered(self):
         self.assertFalse(create_usage_tray_icon(100).isNull())
 

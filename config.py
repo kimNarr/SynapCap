@@ -199,7 +199,7 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 if not provider["show_five_hour"] and not provider["show_weekly"]:
                     provider["show_weekly"] = True
             provider_ids = {p.get("id") for p in data["providers"]}
-            if settings.get("tray_metric") not in provider_ids | {"highest"}:
+            if settings.get("tray_metric") not in provider_ids | {"highest", "none"}:
                 settings["tray_metric"] = "highest"
             data["schema_version"] = CONFIG_SCHEMA_VERSION
             if source_path != requested_path:

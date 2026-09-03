@@ -224,6 +224,8 @@ class SynapCapTray(QObject):
 
     def _tray_metric_value(self) -> float | None:
         """The number the icon should show, per settings["tray_metric"]."""
+        if self.tray_metric == "none":
+            return None
         valid = [u for u in self._latest_usage if not u.error]
         if self.tray_metric != "highest":
             picked = next(
