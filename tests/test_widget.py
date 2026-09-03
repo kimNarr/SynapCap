@@ -628,6 +628,19 @@ class WidgetTests(unittest.TestCase):
             [("bar", False), ("expanded", False)],
         )
 
+    def test_compact_bar_can_collapse_to_tray_only(self):
+        requested = []
+        self.widget.window_mode_requested.connect(
+            lambda mode, _restore: requested.append(mode)
+        )
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+
+        self.widget.compact_tray_btn.click()
+
+        self.assertIn("none", requested)
+        self.assertEqual(self.widget.window_mode(), "none")
+
     def test_compact_bar_shows_latest_provider_usage(self):
         self.widget.update_data([self.usage])
         self.widget.enter_compact_mode()

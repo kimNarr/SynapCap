@@ -595,6 +595,20 @@ class SynapCapWidget(QWidget):
         self._enable_instant_tooltip(self.expand_btn, "전체 위젯 펼치기")
         self.compact_layout.addWidget(self.expand_btn)
 
+        # One more step of collapsing: bar -> tray only. Click the tray icon
+        # (or pick a mode in its menu) to bring a window back.
+        self.compact_tray_btn = QPushButton()
+        self.compact_tray_btn.setFixedSize(24, 24)
+        self.compact_tray_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
+        self.compact_tray_btn.setStyleSheet(compact_btn_style)
+        self.compact_tray_btn.clicked.connect(
+            lambda: self._request_window_mode("none")
+        )
+        self._enable_instant_tooltip(
+            self.compact_tray_btn, "트레이로 접기 · 트레이 아이콘을 눌러 다시 열기"
+        )
+        self.compact_layout.addWidget(self.compact_tray_btn)
+
         self.compact_close_btn = QPushButton()
         self.compact_close_btn.setFixedSize(24, 24)
         self.compact_close_btn.setIcon(create_close_icon(14, t("danger_soft")))
@@ -653,6 +667,7 @@ class SynapCapWidget(QWidget):
             button.setStyleSheet(button_style)
         compact_button_style = _COMPACT_BTN_QSS % palette()
         self.expand_btn.setStyleSheet(compact_button_style)
+        self.compact_tray_btn.setStyleSheet(compact_button_style)
         self.compact_close_btn.setStyleSheet(compact_button_style)
 
         self.wordmark_label.setPixmap(create_wordmark_pixmap(92, 28))
@@ -796,8 +811,10 @@ class SynapCapWidget(QWidget):
         button_size = metrics["button_size"]
         glyph_size = metrics["glyph_size"]
         self.expand_btn.setFixedSize(button_size, button_size)
+        self.compact_tray_btn.setFixedSize(button_size, button_size)
         self.compact_close_btn.setFixedSize(button_size, button_size)
         self.expand_btn.setIcon(create_arrow_down_icon(glyph_size, t("accent")))
+        self.compact_tray_btn.setIcon(create_minimize_icon(glyph_size, t("ink_mid")))
         self.compact_close_btn.setIcon(create_close_icon(glyph_size, t("danger_soft")))
 
     def _schedule_fit_to_content(
