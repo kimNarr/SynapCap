@@ -2010,8 +2010,10 @@ class SynapCapWidget(QWidget):
             )
             period_label = QLabel(context)
             period_label.setObjectName("windowBadge")
-            period_label.setStyleSheet(f"color: {t('accent_soft')};")
-            self._set_label_font(period_label, max(9, preset["val_size"] - 1), 600)
+            # A quiet category label, not a headline — the ring's % is the
+            # thing to read. Keep it a dim caption above the number.
+            period_label.setStyleSheet(f"color: {t('ink_mid')};")
+            self._set_label_font(period_label, max(9, preset["val_size"] - 2), 600)
             period_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(period_label)
 
@@ -2030,11 +2032,13 @@ class SynapCapWidget(QWidget):
             reset_label = QLabel(self._condensed_reset(reset_display))
             reset_label.setObjectName("resetCountdown")
             reset_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            reset_label.setStyleSheet(f"color: {t('ink')};")
+            # Reset countdown is secondary metadata (Part 1 typography): dim,
+            # regular weight, so it never competes with the usage number.
+            reset_label.setStyleSheet(f"color: {t('ink_dim')};")
             self._set_label_font(
                 reset_label,
-                max(10, preset["val_size"] - 1),
-                600,
+                max(9, preset["val_size"] - 2),
+                400,
             )
             layout.addWidget(reset_label)
 

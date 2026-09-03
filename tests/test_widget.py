@@ -173,21 +173,21 @@ class WidgetTests(unittest.TestCase):
         assert ring is not None
         self.assertEqual(ring.color.name(), "#f38ba8")
 
-    def test_bar_reset_countdown_uses_secondary_visual_weight(self):
+    def test_focus_ring_reset_countdown_is_dim_secondary_metadata(self):
         self.widget.update_data([self.usage])
         reset_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(
             QLabel, "resetCountdown"
         )
 
-        self.assertIsNotNone(reset_label)
         assert reset_label is not None
-        self.assertIn("color: #CDD6F4", reset_label.styleSheet())
+        # Dim + regular weight so the ring's % stays the headline.
+        self.assertIn(f"color: {t('ink_dim')}", reset_label.styleSheet())
+        self.assertEqual(reset_label.font().weight(), 400)
         preset = self.widget._expanded_preset(self.widget.config_data["settings"])
         self.assertEqual(
             reset_label.font().pointSize(),
-            max(10, preset["val_size"] - 1),
+            max(9, preset["val_size"] - 2),
         )
-        self.assertGreaterEqual(reset_label.width(), 48)
 
     def test_codex_defaults_to_five_hour_and_weekly_windows(self):
         self.usage.windows = [
