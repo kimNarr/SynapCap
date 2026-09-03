@@ -215,21 +215,12 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(item["header_title"].text(), "Codex")
         self.assertFalse(item["header_icon"].pixmap().isNull())
 
-    def test_apply_button_applies_visual_preview_without_saving(self):
-        button = self.dialog.findChild(QPushButton, "previewBtn")
+    def test_footer_is_just_cancel_and_save_without_a_separate_apply(self):
+        self.assertFalse(hasattr(self.dialog, "preview_btn"))
+        self.assertIsNone(self.dialog.findChild(QPushButton, "previewBtn"))
 
-        self.assertIsNotNone(button)
-        assert button is not None
-        self.assertEqual(button.text(), "적용")
-        self.assertIn("저장하지 않고", button.toolTip())
-
-    def test_footer_actions_are_equal_size_and_in_cancel_preview_save_order(self):
-        actions = [
-            self.dialog.cancel_btn,
-            self.dialog.preview_btn,
-            self.dialog.save_btn,
-        ]
-        self.assertEqual([button.text() for button in actions], ["취소", "적용", "저장"])
+        actions = [self.dialog.cancel_btn, self.dialog.save_btn]
+        self.assertEqual([button.text() for button in actions], ["취소", "저장"])
         self.assertEqual({button.size() for button in actions}, {actions[0].size()})
 
     def test_cancel_after_preview_requests_a_visual_revert(self):

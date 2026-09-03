@@ -374,6 +374,9 @@ def main():
             ):
                 widget.restore_position(*preview_position)
             tray.set_window_mode(preview_mode)
+            tray.set_tray_metric(
+                preview_config.get("settings", {}).get("tray_metric", "highest")
+            )
             apply_active_theme()
 
         def revert_preview():
@@ -394,6 +397,9 @@ def main():
             ):
                 widget.restore_position(*saved_position)
             tray.set_window_mode(saved_mode)
+            tray.set_tray_metric(
+                config_data.get("settings", {}).get("tray_metric", "highest")
+            )
             apply_active_theme()
 
         def handle_config_saved(new_config: dict):

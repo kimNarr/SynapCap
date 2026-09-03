@@ -66,7 +66,9 @@ def create_usage_tray_icon(value: float) -> QIcon:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(_usage_color(value)))
-        inset = max(0.75, logical_size * 0.06)
+        # The OS gives the icon a fixed box; fill nearly all of it so the
+        # number stays legible in a crowded tray.
+        inset = max(0.5, logical_size * 0.03)
         painter.drawRoundedRect(
             QRectF(
                 inset,
@@ -74,13 +76,12 @@ def create_usage_tray_icon(value: float) -> QIcon:
                 logical_size - inset * 2,
                 logical_size - inset * 2,
             ),
-            logical_size * 0.28,
-            logical_size * 0.28,
+            logical_size * 0.3,
+            logical_size * 0.3,
         )
         font = QFont("Segoe UI")
-        font.setPixelSize(
-            max(7, round(logical_size * (0.43 if len(text) == 3 else 0.53)))
-        )
+        digit_ratio = {1: 0.66, 2: 0.6, 3: 0.46}.get(len(text), 0.53)
+        font.setPixelSize(max(7, round(logical_size * digit_ratio)))
         font.setWeight(QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QColor(t("on_accent")))

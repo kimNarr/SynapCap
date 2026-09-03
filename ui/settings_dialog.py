@@ -2,7 +2,7 @@ import copy
 import sys
 import uuid
 
-from PySide6.QtCore import QPoint, Qt, QTimer, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPolygon
 from PySide6.QtWidgets import (
     QApplication,
@@ -283,15 +283,6 @@ _DIALOG_QSS = """
     QPushButton#saveBtn:hover {
         background-color: %(accent_bright)s;
     }
-    QPushButton#previewBtn {
-        background-color: %(preview_bg)s;
-        color: %(accent_soft)s;
-        border-color: %(preview_edge)s;
-    }
-    QPushButton#previewBtn:hover {
-        background-color: %(preview_hover_bg)s;
-        border-color: %(accent)s;
-    }
 """
 
 _PROVIDERS_SCROLL_QSS = """
@@ -512,11 +503,6 @@ class SettingsDialog(QDialog):
         self.config_data = copy.deepcopy(current_config)
         self._preview_active = False
         self.provider_widgets = []
-        self._preview_label_timer = QTimer(self)
-        self._preview_label_timer.setSingleShot(True)
-        self._preview_label_timer.timeout.connect(
-            lambda: self.preview_btn.setText("적용")
-        )
         self.init_ui()
 
     @staticmethod
@@ -605,8 +591,8 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(self.tabs)
 
-        # Footer actions share one size so the visual priority comes from colour,
-        # not a shifting button width.
+        # Cancel and Save only. Theme and window mode preview live the moment
+        # they change; Save commits everything and Cancel reverts the preview.
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
@@ -618,13 +604,6 @@ class SettingsDialog(QDialog):
         self.cancel_btn.setFixedSize(button_width, button_height)
         self.cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self.cancel_btn)
-
-        self.preview_btn = QPushButton("적용")
-        self.preview_btn.setObjectName("previewBtn")
-        self.preview_btn.setFixedSize(button_width, button_height)
-        self.preview_btn.setToolTip("저장하지 않고 현재 화면에 적용합니다")
-        self.preview_btn.clicked.connect(self.on_preview)
-        btn_layout.addWidget(self.preview_btn)
 
         self.save_btn = QPushButton("저장")
         self.save_btn.setObjectName("saveBtn")
@@ -1164,12 +1143,11 @@ class SettingsDialog(QDialog):
             settings.pop(legacy_key, None)
 
     def on_preview(self):
+        """Live-preview visual settings (theme, window mode) without saving."""
         preview_config = copy.deepcopy(self.config_data)
         self._apply_general_settings(preview_config)
         self._preview_active = True
         self.preview_requested.emit(preview_config)
-        self.preview_btn.setText("적용됨 ✓")
-        self._preview_label_timer.start(1400)
 
     def reject(self):
         if self._preview_active:

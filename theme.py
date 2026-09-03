@@ -50,7 +50,6 @@ DARK: dict[str, str] = {
     "ink_faintest": "#5B6274",     # the "/" between compact values
     # ── brand + semantic ─────────────────────────────────────────────
     "accent": "#89B4FA",
-    "accent_soft": "#AFCBFF",
     "on_accent": "#11111B",        # text on an accent fill
     "usage_calm": "#8087A0",       # < 60 % — muted, plenty of headroom
     "usage_ok": "#89B4FA",         # 60-74 % — worth noting
@@ -96,9 +95,6 @@ DARK: dict[str, str] = {
     "accent_bright": "#B4BEFE",      # add-provider hover edge
     "control_disabled_bg": "#12151C",
     "control_disabled_fg": "#697187",
-    "preview_bg": "#1B2030",
-    "preview_edge": "#5B80C7",
-    "preview_hover_bg": "#252D43",
     "privacy_note_bg": "rgba(249, 226, 175, 0.06)",
     "privacy_note_edge": "rgba(249, 226, 175, 0.2)",
     # ── logo ─────────────────────────────────────────────────────────
@@ -140,7 +136,6 @@ LIGHT: dict[str, str] = {
     "ink_faintest": "#6C6F85",
     # ── brand + semantic ─────────────────────────────────────────────
     "accent": "#1857C9",
-    "accent_soft": "#244F9E",
     "on_accent": "#FFFFFF",
     "usage_calm": "#7C8296",       # < 60 % — muted, plenty of headroom
     "usage_ok": "#1857C9",         # 60-74 % — worth noting
@@ -186,9 +181,6 @@ LIGHT: dict[str, str] = {
     "accent_bright": "#174BAA",
     "control_disabled_bg": "#ECEEF3",
     "control_disabled_fg": "#747C8E",
-    "preview_bg": "#E1E8F5",
-    "preview_edge": "#6F8FC6",
-    "preview_hover_bg": "#D4DFF1",
     "privacy_note_bg": "rgba(128, 84, 0, 0.08)",
     "privacy_note_edge": "rgba(128, 84, 0, 0.28)",
     # ── logo ─────────────────────────────────────────────────────────

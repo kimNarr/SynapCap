@@ -1,6 +1,6 @@
 # SynapCap — 작업 현황 (최종본)
 
-> `dev` 기준. 테스트 **180개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
+> `dev` 기준. 테스트 **179개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
 > push/tag/배포는 오너가 직접.
 
 ---
@@ -36,7 +36,7 @@
 ## 공통 작업 규칙
 
 - 브랜치 `dev`만. 커밋 OK, **push/tag/배포 금지.**
-- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **180개 통과 유지.**
+- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **179개 통과 유지.**
 - 린트 `python -m ruff check ui/ tests/`. **기존 에러(건드리지 말 것)**:
   `test_subscription_usage.py`(FLY002), `test_updates.py`(UP012 ×3), `config.py`(blind-except ×2).
 - QSS: 리터럴 `{}` 블록 → `%(name)s` 퍼센트 스타일, **모듈 레벨 named constant**로 올려
@@ -89,3 +89,5 @@
 | --- | --- | --- |
 | 트레이 접기 버튼 | 컴팩트 막대에 `–`(`compact_tray_btn`) → 위젯 안에서 펼침→막대→트레이만 | `8913399` |
 | 트레이 수치 선택 | `settings["tray_metric"]` (`highest` \| provider id) + 설정 "트레이 표시" 콤보 | `c649a5c` |
+| 트레이 글리프 확대 | `create_usage_tray_icon` 여백 축소(`inset` 3%) + 자릿수별 폰트 비율 → 작은 트레이 가독성 | (이번 커밋) |
+| 설정 푸터 2버튼 | `적용` 제거 → `취소`/`저장`만. 테마·표시모드·트레이표시는 즉시 라이브 미리보기 유지. 고아 토큰(`preview_*`, `accent_soft`) 제거 | (이번 커밋) |
