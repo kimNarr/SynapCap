@@ -9,15 +9,16 @@
 
 | 파일 | 용도 | 색 |
 | --- | --- | --- |
-| `logo.svg` | 마스터 · 어두운 바탕 | glyph `#EAEEF7` · fill `#5B8DEF` · track `#363B4D` |
-| `logo-light.svg` | 밝은 바탕 | glyph `#1B1D26` · fill `#3B6FD4` · track `#D5D9E4` |
+| `logo.svg` | 마스터 · 어두운 바탕 | glyph `#EAEEF7` · fill `#89B4FA` · track `#363B4D` |
+| `logo-light.svg` | 밝은 바탕 | glyph `#1B1D26` · fill `#1857C9` · track `#D5D9E4` |
 | `logo-mono.svg` | 단색 (트레이) | `currentColor`, track `stroke-opacity 0.32` — 부모에 `color` 지정 |
 | `logo-icon.svg` | 앱 아이콘 빌드 소스 | 근접흑 라운드 타일 + 마스터 마크(78% 인셋) |
 
 ## 색 토큰
 
-로고 accent는 `#5B8DEF`. 앱 UI accent(`#89B4FA`)와 통일 여부는 미결(→ `docs/DESIGN.md`).
-통일 시 `logo.svg`의 `#5B8DEF`를 앱 accent로 맞추면 됨.
+로고 accent = 앱 UI accent로 **통일**: `#89B4FA` (라이트 `#1857C9`). SVG 자산은 이 hex를
+직접 쓰고, `theme.py`의 `logo_mark`가 같은 값이라 `ui/icon.py`의 런타임 recolor가 항상 일치한다.
+`_themed_brand_asset`의 치환 키도 `b"#89B4FA"`.
 
 ## 앱 코드 연동 — 완료
 
@@ -48,7 +49,6 @@ Inno Setup이 사용. 두 빌드 스크립트가 PyInstaller 전에 이 스크�
 
 - 홈페이지 위젯 미리보기 목업이 아직 구버전 UI(막대 전용·구 리셋 표기) — 앱 재설계와 함께 갱신.
 - 라이트 테마 도입 시 `create_wordmark_pixmap`이 `wordmark-light.svg`를 고르도록 분기.
-- 로고/앱 accent 통일 결정.
 
 ## 워드마크
 
@@ -57,7 +57,7 @@ SIL OFL이라 재배포 문제 없음. viewBox `0 0 223.8 52`, 자간 -1%.
 
 | 파일 | 색 |
 | --- | --- |
-| `wordmark.svg` | Synap `#EAEEF7` · Cap `#5B8DEF` (어두운 바탕) |
-| `wordmark-light.svg` | Synap `#1B1D26` · Cap `#3B6FD4` |
+| `wordmark.svg` | Synap `#EAEEF7` · Cap `#89B4FA` (어두운 바탕) |
+| `wordmark-light.svg` | Synap `#1B1D26` · Cap `#1857C9` |
 | `wordmark-mono.svg` | 전체 `currentColor` |
 | `wordmark-lockup.svg` | 마크 + 워드마크 가로 조합 (README·홈페이지 헤더) |

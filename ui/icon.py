@@ -138,7 +138,7 @@ def _themed_brand_asset(name: str) -> bytes:
     """Recolour in-app logo art while leaving the packaged app tile fixed."""
     data = _asset_bytes(name)
     replacements = {
-        b"#5B8DEF": t("logo_mark").encode("ascii"),
+        b"#89B4FA": t("logo_mark").encode("ascii"),
         b"#EAEEF7": t("logo_text").encode("ascii"),
         b"#363B4D": t("logo_track").encode("ascii"),
     }
