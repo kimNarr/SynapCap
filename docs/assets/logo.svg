@@ -3,16 +3,16 @@
   <desc>Concept A — an S inside a capacity gauge: a full ring track with a ~66% fill.</desc>
 
   <!-- gauge track (full ring, so the mark never reads as a loading spinner) -->
-  <circle cx="16" cy="16" r="11" fill="none" stroke="#5A6480" stroke-width="2.8"/>
+  <circle cx="16" cy="16" r="11" fill="none" stroke="#5A6480" stroke-width="3"/>
 
   <!-- gauge fill (~66% of capacity) -->
   <path d="M8.222 23.778A11 11 0 0 1 23.53 7.981"
-        fill="none" stroke="#89B4FA" stroke-width="2.8" stroke-linecap="round"/>
+        fill="none" stroke="#89B4FA" stroke-width="3" stroke-linecap="round"/>
 
   <!-- leading node -->
-  <circle cx="23.53" cy="7.981" r="2" fill="#89B4FA"/>
+  <circle cx="23.53" cy="7.981" r="2.1" fill="#89B4FA"/>
 
   <!-- S glyph -->
   <path d="M19.8 11.9C19.8 9.7 17.6 9 16 9C13.4 9 11.9 10.5 11.9 12.4C11.9 14.5 14 15.4 16 16C18 16.6 20.1 17.5 20.1 19.6C20.1 21.5 18.6 23 16 23C14.2 23 11.9 22.2 11.9 20.1"
-        fill="none" stroke="#EAEEF7" stroke-width="3" stroke-linecap="round"/>
+        fill="none" stroke="#EAEEF7" stroke-width="3.6" stroke-linecap="round"/>
 </svg>

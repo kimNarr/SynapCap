@@ -45,7 +45,8 @@
 | `wordmark.svg` / `-light` / `-mono` | `Synap`(ink) + `Cap`(accent 단색). Noto Sans KR Bold 아웃라인(OFL) |
 | `wordmark-lockup.svg` | 마크 + 워드마크 가로 조합 |
 
-기하: viewBox `0 0 32 32`, 중심 `(16,16)`, 트랙 원 반경 11 · 굵기 2.8, 채움 아크 66%, `S` 스트로크 굵기 3.
+기하: viewBox `0 0 32 32`, 중심 `(16,16)`, 트랙 원 반경 11 · 굵기 3, 채움 아크 66%, `S` 스트로크 굵기 3.6
+(얇은 `S`가 20px에서 안티에일리어싱에 먹혀 링만 남던 문제 → 굵게). 펼침 헤더 마크는 26px.
 자세한 스펙·파이프라인은 [`assets/LOGO.md`](../assets/LOGO.md).
 
 **로고 팔레트**:
@@ -63,8 +64,9 @@
 
 **HiDPI**: 인앱 아트(`create_app_pixmap`·`create_wordmark_pixmap`·`create_provider_pixmap`)는
 `_render_svg(..., dpr)`로 화면 배율만큼 더 큰 비트맵을 그리고 `setDevicePixelRatio`를 붙인다.
-안 그러면 125%↑ 배율에서 20px 마크가 뭉개져 스피너처럼 보인다. 파일로 저장하는
-`create_app_icon_pixmap`은 dpr 1 고정(빌드 산출물 크기 유지).
+안 그러면 125%↑ 배율에서 마크가 뭉개진다. 파일로 저장하는 `create_app_icon_pixmap`은 dpr 1 고정.
+또한 `_apply_theme_chrome`가 테마 전환 시 `header_logo` 픽스맵을 다시 칠한다 — 안 그러면
+라이트에서 만든 어두운 `S`가 다크 헤더에 남아 안 보인다(= 빈 링).
 
 **연동 완료**: `ui/icon.py`가 `logo.svg`/`logo-icon.svg`/`wordmark.svg`를 런타임 래스터라이즈,
 `scripts/generate_icons.py`가 빌드 시 `synapcap.ico`/`.icns`/`.png` 생성. 홈페이지(`docs/`)와

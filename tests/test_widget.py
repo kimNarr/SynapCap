@@ -78,8 +78,8 @@ class WidgetTests(unittest.TestCase):
     def test_expanded_header_uses_horizontal_wordmark(self):
         self.assertTrue(hasattr(self.widget, "header_logo"))
         self.assertFalse(self.widget.header_logo.pixmap().isNull())
-        self.assertEqual(self.widget.header_logo.size().width(), 20)
-        self.assertEqual(self.widget.header_logo.size().height(), 20)
+        self.assertEqual(self.widget.header_logo.size().width(), 26)
+        self.assertEqual(self.widget.header_logo.size().height(), 26)
         self.assertTrue(hasattr(self.widget, "wordmark_label"))
         self.assertFalse(self.widget.wordmark_label.pixmap().isNull())
         self.assertEqual(self.widget.wordmark_label.size().width(), 92)
@@ -1018,6 +1018,18 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(
             self.widget.compact_items_layout.spacing(), metrics["provider_spacing"]
         )
+
+    def test_header_logo_recolours_on_theme_switch(self):
+        apply_theme_setting("dark")
+        self.widget.apply_theme()
+        self.app.processEvents()
+        dark_key = self.widget.header_logo.pixmap().cacheKey()
+
+        apply_theme_setting("light")
+        self.widget.apply_theme()
+        self.app.processEvents()
+
+        self.assertNotEqual(self.widget.header_logo.pixmap().cacheKey(), dark_key)
 
     def test_apply_theme_preserves_ring_and_compact_state(self):
         self.widget.config_data["settings"]["usage_view"] = "segment"

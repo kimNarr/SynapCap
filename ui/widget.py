@@ -486,14 +486,14 @@ class SynapCapWidget(QWidget):
         # header. The compact bar still keeps its symbol-only mark to preserve
         # its narrow width.
         self.header_logo = QLabel()
-        self.header_logo.setFixedSize(20, 20)
-        self.header_logo.setPixmap(create_app_pixmap(20))
+        self.header_logo.setFixedSize(26, 26)
+        self.header_logo.setPixmap(create_app_pixmap(26))
         self.header_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(self.header_logo)
 
         self.wordmark_label = QLabel()
         self.wordmark_label.setFixedSize(92, 28)
-        self.header_logo.setPixmap(create_app_pixmap(20))
+        self.header_logo.setPixmap(create_app_pixmap(26))
         self.wordmark_label.setPixmap(create_wordmark_pixmap(92, 28))
         self.wordmark_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(self.wordmark_label)
@@ -670,6 +670,7 @@ class SynapCapWidget(QWidget):
         self.compact_tray_btn.setStyleSheet(compact_button_style)
         self.compact_close_btn.setStyleSheet(compact_button_style)
 
+        self.header_logo.setPixmap(create_app_pixmap(26))
         self.wordmark_label.setPixmap(create_wordmark_pixmap(92, 28))
         self.refresh_btn.setIcon(create_refresh_icon(14, t("accent")))
         self.settings_btn.setIcon(create_settings_icon(14, t("ink_mid")))
