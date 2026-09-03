@@ -1,7 +1,8 @@
+import ctypes
 import os
 import unittest
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -551,19 +552,45 @@ class WidgetTests(unittest.TestCase):
         widget.close()
         widget.deleteLater()
 
-    def test_pinned_windows_widget_re_raises_after_taskbar_deactivation(self):
+    def test_pinned_windows_widget_restores_topmost_after_taskbar_deactivation(self):
         provider = CodexProvider({"id": "codex", "name": "Codex"})
         with patch("ui.widget.sys.platform", "win32"):
             widget = SynapCapWidget(
                 {"settings": {"always_on_top": True}},
                 [provider],
             )
-            with patch.object(widget, "raise_") as raise_window:
+            with patch.object(widget, "_restore_windows_topmost") as restore:
                 widget.show()
                 widget.event(QEvent(QEvent.Type.WindowDeactivate))
                 self.app.processEvents()
 
-        raise_window.assert_called_once_with()
+        restore.assert_called_once_with()
+        self.assertTrue(widget._windows_topmost_timer.isActive())
+        widget.close()
+        widget.deleteLater()
+
+    def test_windows_topmost_refresh_uses_no_activate_native_call(self):
+        provider = CodexProvider({"id": "codex", "name": "Codex"})
+        user32 = MagicMock()
+        user32.SetWindowPos.return_value = True
+        windll = MagicMock(user32=user32)
+        with (
+            patch("ui.widget.sys.platform", "win32"),
+            patch("ui.widget.ctypes.windll", windll, create=True),
+        ):
+            widget = SynapCapWidget(
+                {"settings": {"always_on_top": True}},
+                [provider],
+            )
+            widget.show()
+            widget._restore_windows_topmost()
+
+        args = user32.SetWindowPos.call_args.args
+        self.assertEqual(args[0].value, int(widget.winId()))
+        self.assertEqual(args[1].value, ctypes.c_void_p(-1).value)
+        self.assertTrue(args[-1].value & 0x0010)
+        widget.set_always_on_top(False)
+        self.assertFalse(widget._windows_topmost_timer.isActive())
         widget.close()
         widget.deleteLater()
 

@@ -1,5 +1,7 @@
+import ctypes
 import re
 import sys
+from ctypes import wintypes
 from datetime import datetime, timedelta
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt, QTimer, Signal
@@ -36,6 +38,7 @@ from .icon import (
 # A frameless widget has no visible resize border, so a slightly wider magnetic
 # zone feels natural and avoids leaving a narrow unusable gap near an edge.
 EDGE_SNAP_DISTANCE = 48
+WINDOWS_TOPMOST_REFRESH_MS = 750
 
 # The expanded widget has one visual language: rings. ``usage_view`` remains
 # in persisted configs only as a migration bridge for older installations.
@@ -429,8 +432,14 @@ class SynapCapWidget(QWidget):
         self._fit_timer = QTimer(self)
         self._fit_timer.setSingleShot(True)
         self._fit_timer.timeout.connect(self._fit_to_content)
+        self._windows_topmost_timer = QTimer(self)
+        self._windows_topmost_timer.setInterval(WINDOWS_TOPMOST_REFRESH_MS)
+        self._windows_topmost_timer.timeout.connect(
+            self._restore_windows_topmost
+        )
 
         self.init_ui()
+        self._sync_windows_topmost_timer()
 
     def init_ui(self):
         # Frameless Window & Translucent Background
@@ -2230,16 +2239,72 @@ class SynapCapWidget(QWidget):
             and self.isVisible()
             and bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         ):
-            # Defer until Windows has activated the taskbar target. ``raise_``
-            # does not activate this tool window, so keyboard focus remains in
-            # the app the user chose.
-            QTimer.singleShot(0, self.raise_)
+            # Defer until Windows has activated the taskbar target. The native
+            # call does not activate this tool window, so keyboard focus stays
+            # in the app the user chose.
+            QTimer.singleShot(0, self._restore_windows_topmost)
         return result
+
+    def _sync_windows_topmost_timer(self) -> None:
+        should_run = (
+            sys.platform.startswith("win")
+            and bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        )
+        if should_run:
+            self._windows_topmost_timer.start()
+        else:
+            self._windows_topmost_timer.stop()
+
+    def _restore_windows_topmost(self) -> None:
+        """Reassert Windows topmost Z-order without stealing keyboard focus."""
+        if (
+            not sys.platform.startswith("win")
+            or not self.isVisible()
+            or not bool(
+                self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+            )
+        ):
+            return
+
+        # HWND_TOPMOST plus NOACTIVATE keeps the compact widget above the
+        # taskbar even after repeated taskbar clicks without taking focus.
+        hwnd_topmost = -1
+        swp_no_size = 0x0001
+        swp_no_move = 0x0002
+        swp_no_activate = 0x0010
+        swp_show_window = 0x0040
+        flags = swp_no_size | swp_no_move | swp_no_activate | swp_show_window
+        try:
+            set_window_pos = ctypes.windll.user32.SetWindowPos
+            set_window_pos.argtypes = [
+                wintypes.HWND,
+                wintypes.HWND,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                wintypes.UINT,
+            ]
+            set_window_pos.restype = wintypes.BOOL
+            restored = set_window_pos(
+                wintypes.HWND(int(self.winId())),
+                wintypes.HWND(hwnd_topmost),
+                0,
+                0,
+                0,
+                0,
+                wintypes.UINT(flags),
+            )
+        except (AttributeError, OSError):
+            restored = False
+        if not restored:
+            self.raise_()
 
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
         currently_enabled = bool(flags & Qt.WindowType.WindowStaysOnTopHint)
         if currently_enabled == always_on_top:
+            self._sync_windows_topmost_timer()
             return
         if always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
@@ -2249,6 +2314,8 @@ class SynapCapWidget(QWidget):
         self.setWindowFlags(flags)
         self._apply_platform_window_attributes()
         self.show()
+        self._sync_windows_topmost_timer()
+        self._restore_windows_topmost()
 
     def _apply_platform_window_attributes(self) -> None:
         if sys.platform == "darwin":
