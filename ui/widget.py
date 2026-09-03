@@ -408,7 +408,7 @@ class SynapCapWidget(QWidget):
     quit_requested = Signal()
     update_requested = Signal(str)
     diagnostics_requested = Signal(str)
-    window_mode_requested = Signal(str)
+    window_mode_requested = Signal(str, bool)
     position_changed = Signal(str, int, int)
 
     def __init__(self, config_data: dict, providers: list[BaseAIProvider]):
@@ -1002,7 +1002,7 @@ class SynapCapWidget(QWidget):
         self._refresh_compact_values(resize_anchor)
 
     def _request_window_mode(self, mode: str) -> None:
-        self.window_mode_requested.emit(mode)
+        self.window_mode_requested.emit(mode, False)
         if self._window_mode != mode:
             self.set_window_mode(mode)
 

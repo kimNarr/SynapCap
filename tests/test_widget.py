@@ -587,12 +587,19 @@ class WidgetTests(unittest.TestCase):
 
     def test_header_controls_request_the_visible_window_modes(self):
         requested = []
-        self.widget.window_mode_requested.connect(requested.append)
+        self.widget.window_mode_requested.connect(
+            lambda mode, restore_position: requested.append(
+                (mode, restore_position)
+            )
+        )
 
         self.widget.minimize_btn.click()
         self.widget.expand_btn.click()
 
-        self.assertEqual(requested, ["bar", "expanded"])
+        self.assertEqual(
+            requested,
+            [("bar", False), ("expanded", False)],
+        )
 
     def test_compact_bar_shows_latest_provider_usage(self):
         self.widget.update_data([self.usage])

@@ -203,9 +203,9 @@ def main():
 
     def apply_window_mode(
         mode: str,
+        restore_position: bool = True,
         *,
         persist: bool = True,
-        restore_position: bool = True,
         show_guidance: bool = True,
     ) -> None:
         if mode not in {"expanded", "bar", "none"}:
@@ -228,6 +228,8 @@ def main():
                 and all(isinstance(value, int) for value in position)
             ):
                 widget.restore_position(position[0], position[1])
+        if mode in {"expanded", "bar"}:
+            remember_widget_position(mode)
         tray.set_window_mode(mode)
 
         if (
@@ -656,6 +658,8 @@ def main():
     tray.quit_requested.connect(request_quit)
 
     widget.settings_requested.connect(open_settings_dialog)
+    # Header controls are spatial transitions: preserve the current edge
+    # anchor instead of jumping to an older position saved for the target mode.
     widget.window_mode_requested.connect(apply_window_mode)
     widget.position_changed.connect(handle_position_changed)
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
