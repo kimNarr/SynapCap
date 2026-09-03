@@ -671,6 +671,26 @@ class SettingsDialog(QDialog):
         )
         form.addRow("표시 모드:", self.window_mode_combo)
 
+        self.tray_metric_combo = NoWheelComboBox()
+        self.tray_metric_combo.addItem("최고 사용률", "highest")
+        for provider in self.config_data.get("providers", []):
+            if provider.get("enabled", True):
+                self.tray_metric_combo.addItem(
+                    provider.get("name", provider.get("id", "")),
+                    provider.get("id"),
+                )
+        selected_metric = settings.get("tray_metric", "highest")
+        metric_index = self.tray_metric_combo.findData(selected_metric)
+        self.tray_metric_combo.setCurrentIndex(max(metric_index, 0))
+        self.tray_metric_combo.setToolTip(
+            "트레이 아이콘에 표시할 수치입니다. "
+            "특정 서비스를 고르면 그 서비스의 최고 사용률만 보여 줍니다."
+        )
+        self.tray_metric_combo.currentIndexChanged.connect(
+            lambda _index: self.on_preview()
+        )
+        form.addRow("트레이 표시:", self.tray_metric_combo)
+
         self.update_check = StyledCheckBox("자동으로 새 버전 확인")
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
@@ -1116,6 +1136,9 @@ class SettingsDialog(QDialog):
         settings["always_on_top"] = self.always_top_check.isChecked()
         settings["window_mode"] = (
             self.window_mode_combo.currentData() or "expanded"
+        )
+        settings["tray_metric"] = (
+            self.tray_metric_combo.currentData() or "highest"
         )
         settings["check_updates"] = self.update_check.isChecked()
         settings["theme"] = self.theme_combo.currentData() or "dark"

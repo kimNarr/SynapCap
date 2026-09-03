@@ -111,11 +111,13 @@ class SynapCapTray(QObject):
         parent_widget=None,
         always_on_top: bool = True,
         window_mode: str = "expanded",
+        tray_metric: str = "highest",
     ):
         super().__init__()
         self.widget = parent_widget
         self.always_on_top = always_on_top
         self.window_mode = window_mode
+        self.tray_metric = tray_metric or "highest"
         self._latest_usage: list[ModelUsage] = []
 
         self.tray_icon = QSystemTrayIcon()
@@ -211,19 +213,36 @@ class SynapCapTray(QObject):
         if action is not None:
             action.setChecked(True)
 
+    def set_tray_metric(self, metric: str) -> None:
+        self.tray_metric = metric or "highest"
+        self._update_usage_icon()
+
     def update_usage(self, usage_list: list[ModelUsage]) -> None:
         self._latest_usage = list(usage_list)
         self._update_usage_icon()
 
+    def _tray_metric_value(self) -> float | None:
+        """The number the icon should show, per settings["tray_metric"]."""
+        valid = [u for u in self._latest_usage if not u.error]
+        if self.tray_metric != "highest":
+            picked = next(
+                (u for u in valid if u.provider_id == self.tray_metric), None
+            )
+            return _usage_value(picked) if picked is not None else None
+        return max((_usage_value(u) for u in valid), default=None)
+
     def _update_usage_icon(self) -> None:
         valid_usage = [usage for usage in self._latest_usage if not usage.error]
-        if not valid_usage:
+        headline = self._tray_metric_value()
+        if headline is None:
             self.tray_icon.setIcon(create_app_icon(32))
+        else:
+            self.tray_icon.setIcon(create_usage_tray_icon(headline))
+
+        if not self._latest_usage:
             self.tray_icon.setToolTip(f"SynapCap {APP_VERSION} · 조회 전")
             return
 
-        highest = max(_usage_value(usage) for usage in valid_usage)
-        self.tray_icon.setIcon(create_usage_tray_icon(highest))
         details = []
         for usage in self._latest_usage:
             if usage.error:

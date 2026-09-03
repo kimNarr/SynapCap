@@ -190,6 +190,7 @@ def main():
         parent_widget=widget,
         always_on_top=always_on_top,
         window_mode=initial_window_mode,
+        tray_metric=settings.get("tray_metric", "highest"),
     )
     active_settings_dialog: SettingsDialog | None = None
 
@@ -474,6 +475,10 @@ def main():
                     update_timer.stop()
             if provider_query_changed:
                 worker.trigger_manual_refresh()
+            if _setting_changed(previous_config, new_config, "tray_metric"):
+                tray.set_tray_metric(
+                    config_data.get("settings", {}).get("tray_metric", "highest")
+                )
 
             # Tray Always-on-top 체크박스 동기화
             new_always_top = config_data.get("settings", {}).get("always_on_top", True)

@@ -121,6 +121,48 @@ class TrayTests(unittest.TestCase):
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()
 
+    def test_tray_metric_can_pin_a_single_provider(self):
+        tray = SynapCapTray(tray_metric="codex")
+        usages = [
+            ModelUsage(
+                "codex", "Codex", "Codex", 40, 100, "%",
+                windows=[UsageWindow("5h", 40, "1h"), UsageWindow("7d", 55, "4d")],
+            ),
+            ModelUsage("claude", "Claude", "Claude", 92, 100, "%"),
+        ]
+        with patch("ui.tray.create_usage_tray_icon") as create_icon:
+            create_icon.return_value = QIcon()
+            tray.update_usage(usages)
+        # Shows Codex's highest window (55), not Claude's 92.
+        create_icon.assert_called_once_with(55)
+        # Tooltip still lists every provider.
+        self.assertIn("Claude 92%", tray.tray_icon.toolTip())
+
+        # Switching back to "highest" re-reads without new data.
+        with patch("ui.tray.create_usage_tray_icon") as create_icon:
+            create_icon.return_value = QIcon()
+            tray.set_tray_metric("highest")
+        create_icon.assert_called_once_with(92)
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
+    def test_tray_metric_falls_back_when_pinned_provider_errors(self):
+        tray = SynapCapTray(tray_metric="codex")
+        usages = [
+            ModelUsage("codex", "Codex", "Codex", 0, 100, "%", error="codex CLI를 찾을 수 없음"),
+            ModelUsage("claude", "Claude", "Claude", 70, 100, "%"),
+        ]
+        with patch("ui.tray.create_usage_tray_icon") as create_icon, \
+                patch("ui.tray.create_app_icon") as app_icon:
+            create_icon.return_value = QIcon()
+            app_icon.return_value = QIcon()
+            tray.update_usage(usages)
+        create_icon.assert_not_called()
+        app_icon.assert_called()
+        self.assertIn("Codex 조회 오류", tray.tray_icon.toolTip())
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
     def test_three_digit_usage_tray_icon_is_rendered(self):
         self.assertFalse(create_usage_tray_icon(100).isNull())
 

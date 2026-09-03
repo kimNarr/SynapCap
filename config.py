@@ -50,6 +50,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "window_pos_expanded": None,
         "window_pos_bar": None,
         "tray_pin_guidance_shown": False,
+        "tray_metric": "highest",
     },
     "providers": [
         {
@@ -197,6 +198,9 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 provider["show_weekly"] = bool(show_weekly)
                 if not provider["show_five_hour"] and not provider["show_weekly"]:
                     provider["show_weekly"] = True
+            provider_ids = {p.get("id") for p in data["providers"]}
+            if settings.get("tray_metric") not in provider_ids | {"highest"}:
+                settings["tray_metric"] = "highest"
             data["schema_version"] = CONFIG_SCHEMA_VERSION
             if source_path != requested_path:
                 save_config(data, str(requested_path))

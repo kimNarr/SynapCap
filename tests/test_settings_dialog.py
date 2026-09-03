@@ -151,6 +151,18 @@ class SettingsDialogTests(unittest.TestCase):
         self.dialog.on_save()
         self.assertEqual(saved[0]["settings"]["window_mode"], "none")
 
+    def test_tray_metric_selector_lists_providers_and_round_trips(self):
+        combo = self.dialog.tray_metric_combo
+        self.assertEqual(combo.itemData(0), "highest")
+        options = {combo.itemData(i) for i in range(combo.count())}
+        self.assertEqual(options, {"highest", "codex", "antigravity", "claude"})
+
+        combo.setCurrentIndex(combo.findData("claude"))
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+        self.assertEqual(saved[0]["settings"]["tray_metric"], "claude")
+
     def test_restyle_preserves_unsaved_form_values(self):
         self.dialog.interval_spin.setValue(45)
         self.dialog.restyle()
