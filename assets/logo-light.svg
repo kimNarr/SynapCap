@@ -1,12 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="SynapCap">
   <title>SynapCap</title>
-  <desc>Concept A, light-ground palette.</desc>
+  <desc>Concept A, light-ground palette. Full ring track with a ~66% fill.</desc>
 
-  <path d="M8.222 23.778A11 11 0 1 1 23.778 23.778"
-        fill="none" stroke="#D5D9E4" stroke-width="2.8" stroke-linecap="round"/>
+  <circle cx="16" cy="16" r="11" fill="none" stroke="#D5D9E4" stroke-width="2.8"/>
   <path d="M8.222 23.778A11 11 0 0 1 23.53 7.981"
         fill="none" stroke="#1857C9" stroke-width="2.8" stroke-linecap="round"/>
-  <circle cx="23.53" cy="7.981" r="1.9" fill="#1857C9"/>
+  <circle cx="23.53" cy="7.981" r="2" fill="#1857C9"/>
   <path d="M19.8 11.9C19.8 9.7 17.6 9 16 9C13.4 9 11.9 10.5 11.9 12.4C11.9 14.5 14 15.4 16 16C18 16.6 20.1 17.5 20.1 19.6C20.1 21.5 18.6 23 16 23C14.2 23 11.9 22.2 11.9 20.1"
-        fill="none" stroke="#1B1D26" stroke-width="2.6" stroke-linecap="round"/>
+        fill="none" stroke="#1B1D26" stroke-width="3" stroke-linecap="round"/>
 </svg>

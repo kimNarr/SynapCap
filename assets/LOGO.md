@@ -1,9 +1,10 @@
 # SynapCap 로고 자산
 
-컨셉 **A · 게이지** — 용량 게이지 아크 안에 `S`. 플랫, 광택·그라디언트 없음, 16px 생존.
+컨셉 **A · 게이지** — 용량 게이지 안에 `S`. 플랫, 광택·그라디언트 없음, 16px 생존.
 
-기하: `viewBox 0 0 32 32`, 중심 `(16,16)`. 게이지 아크 반경 11, 굵기 2.8, 하단 90° 공백.
-채움 ~66%. `S`는 스트로크(굵기 2.6, 라운드 캡). 선단 노드는 채움 끝의 작은 점.
+기하: `viewBox 0 0 32 32`, 중심 `(16,16)`. 게이지 트랙은 **닫힌 원**(반경 11, 굵기 2.8) —
+작은 크기에서 로딩 스피너로 오인되지 않도록. 그 위에 파란 채움 아크 ~66% + 선단 노드(점).
+`S`는 스트로크(굵기 3, 라운드 캡).
 
 ## 파일
 
@@ -42,7 +43,7 @@ Inno Setup이 사용. 두 빌드 스크립트가 PyInstaller 전에 이 스크�
 ## 홈페이지 · README
 
 `docs/assets/`에 `logo.svg`·`logo-icon.svg`·`wordmark.svg` 사본, `logo.png`는
-`logo-icon.svg`의 256px 래스터(README·favicon fallback). `docs/index.html`은 favicon(SVG),
+`logo.svg`의 256px 래스터(README·favicon fallback). `docs/index.html`은 favicon(SVG),
 헤더·푸터 워드마크, CTA·미리보기 로고를 새 자산으로 교체. `docs/assets/synapcap-wordmark.png` 제거.
 
 ## 남은 것
