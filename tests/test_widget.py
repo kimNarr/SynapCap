@@ -19,7 +19,14 @@ from providers import (
     UsageWindow,
 )
 from theme import apply_theme_setting, t
-from ui.widget import FIXED_WIDGET_WIDTH, FocusProviderButton, SynapCapWidget, UsageRing
+from ui.widget import (
+    COMPACT_BOTTOM_SAFE_GAP,
+    FIXED_WIDGET_WIDTH,
+    TOOLTIP_CONTROL_GAP,
+    FocusProviderButton,
+    SynapCapWidget,
+    UsageRing,
+)
 from version import APP_VERSION
 
 
@@ -441,6 +448,15 @@ class WidgetTests(unittest.TestCase):
         )
 
         self.assertLess(position.y(), watched.mapToGlobal(QPoint(0, 0)).y())
+        tooltip_lines = 3
+        tooltip_height = (
+            QFontMetrics(QToolTip.font()).lineSpacing() * tooltip_lines
+        ) + 16
+        self.assertGreaterEqual(
+            watched.mapToGlobal(QPoint(0, 0)).y()
+            - (position.y() + tooltip_height),
+            TOOLTIP_CONTROL_GAP,
+        )
 
     def test_usage_windows_can_be_filtered_per_provider(self):
         ui = {"show_five_hour": False, "show_weekly": True}
@@ -591,6 +607,28 @@ class WidgetTests(unittest.TestCase):
         self.assertTrue(args[-1].value & 0x0010)
         widget.set_always_on_top(False)
         self.assertFalse(widget._windows_topmost_timer.isActive())
+        widget.close()
+        widget.deleteLater()
+
+    def test_windows_topmost_refresh_pauses_while_taskbar_is_hovered(self):
+        provider = CodexProvider({"id": "codex", "name": "Codex"})
+        with patch("ui.widget.sys.platform", "win32"):
+            widget = SynapCapWidget(
+                {"settings": {"always_on_top": True}},
+                [provider],
+            )
+            widget.show()
+            with (
+                patch.object(
+                    widget,
+                    "_windows_cursor_over_taskbar",
+                    return_value=True,
+                ),
+                patch("ui.widget.ctypes.windll", create=True) as windll,
+            ):
+                widget._restore_windows_topmost()
+
+        windll.user32.SetWindowPos.assert_not_called()
         widget.close()
         widget.deleteLater()
 
@@ -1009,6 +1047,23 @@ class WidgetTests(unittest.TestCase):
         screen = self.widget.screen()
         assert screen is not None
         self.assertEqual(self.widget._available_geometry(), screen.geometry())
+
+    def test_compact_bottom_snap_keeps_a_small_screen_edge_gap(self):
+        screen = self.widget.screen()
+        assert screen is not None
+        geometry = screen.geometry()
+        self.widget.enter_compact_mode()
+        self.widget.move(
+            geometry.left() + 40,
+            geometry.bottom() - self.widget.height() + 1,
+        )
+
+        self.widget._snap_to_screen_edges()
+
+        self.assertEqual(
+            self.widget.frameGeometry().bottom(),
+            geometry.bottom() - COMPACT_BOTTOM_SAFE_GAP,
+        )
 
     def test_legacy_size_setting_uses_responsive_minimum_and_compact_fits_content(self):
         widget = SynapCapWidget(

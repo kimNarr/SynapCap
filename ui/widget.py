@@ -39,6 +39,8 @@ from .icon import (
 # zone feels natural and avoids leaving a narrow unusable gap near an edge.
 EDGE_SNAP_DISTANCE = 48
 WINDOWS_TOPMOST_REFRESH_MS = 750
+COMPACT_BOTTOM_SAFE_GAP = 6
+TOOLTIP_CONTROL_GAP = 12
 
 # The expanded widget has one visual language: rings. ``usage_view`` remains
 # in persisted configs only as a migration bridge for older installations.
@@ -900,6 +902,8 @@ class SynapCapWidget(QWidget):
         """Keep a dragged widget on-screen and magnetize it near an edge."""
         geometry = self.frameGeometry()
         available = self._available_geometry(geometry.center())
+        bottom_inset = COMPACT_BOTTOM_SAFE_GAP if self.is_compact else 0
+        bottom_edge = available.bottom() - bottom_inset
         x = geometry.left()
         y = geometry.top()
 
@@ -910,11 +914,14 @@ class SynapCapWidget(QWidget):
 
         if abs(geometry.top() - available.top()) <= EDGE_SNAP_DISTANCE:
             y = available.top()
-        elif abs(available.bottom() - geometry.bottom()) <= EDGE_SNAP_DISTANCE:
-            y = available.bottom() - geometry.height() + 1
+        elif (
+            abs(available.bottom() - geometry.bottom()) <= EDGE_SNAP_DISTANCE
+            or abs(bottom_edge - geometry.bottom()) <= EDGE_SNAP_DISTANCE
+        ):
+            y = bottom_edge - geometry.height() + 1
 
         max_x = max(available.left(), available.right() - geometry.width() + 1)
-        max_y = max(available.top(), available.bottom() - geometry.height() + 1)
+        max_y = max(available.top(), bottom_edge - geometry.height() + 1)
         self.move(
             max(available.left(), min(x, max_x)),
             max(available.top(), min(y, max_y)),
@@ -1604,7 +1611,7 @@ class SynapCapWidget(QWidget):
         # Anchor slightly inside the hovered control so the rendered popup sits
         # close to its lower edge instead of receiving two visible gaps.
         anchor_inset = 10
-        edge_gap = 6
+        edge_gap = TOOLTIP_CONTROL_GAP
         lines = text.splitlines() or [""]
         metrics = QFontMetrics(QToolTip.font())
         tooltip_width = max(metrics.horizontalAdvance(line) for line in lines) + 24
@@ -2265,6 +2272,12 @@ class SynapCapWidget(QWidget):
             )
         ):
             return
+        if self._windows_cursor_over_taskbar():
+            # Let the shell own the Z-order while the user is operating the
+            # taskbar. Reasserting here makes two topmost windows visibly
+            # trade places; the next timer tick restores SynapCap after the
+            # pointer leaves the taskbar.
+            return
 
         # HWND_TOPMOST plus NOACTIVATE keeps the compact widget above the
         # taskbar even after repeated taskbar clicks without taking focus.
@@ -2299,6 +2312,47 @@ class SynapCapWidget(QWidget):
             restored = False
         if not restored:
             self.raise_()
+
+    @staticmethod
+    def _windows_cursor_over_taskbar() -> bool:
+        if not sys.platform.startswith("win"):
+            return False
+        try:
+            user32 = ctypes.windll.user32
+            point = wintypes.POINT()
+            user32.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
+            user32.GetCursorPos.restype = wintypes.BOOL
+            if not user32.GetCursorPos(ctypes.byref(point)):
+                return False
+
+            user32.WindowFromPoint.argtypes = [wintypes.POINT]
+            user32.WindowFromPoint.restype = wintypes.HWND
+            window = user32.WindowFromPoint(point)
+            if not window:
+                return False
+
+            user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+            user32.GetAncestor.restype = wintypes.HWND
+            root_window = user32.GetAncestor(window, 2) or window
+            class_name = ctypes.create_unicode_buffer(64)
+            user32.GetClassNameW.argtypes = [
+                wintypes.HWND,
+                wintypes.LPWSTR,
+                ctypes.c_int,
+            ]
+            user32.GetClassNameW.restype = ctypes.c_int
+            if not user32.GetClassNameW(
+                root_window,
+                class_name,
+                len(class_name),
+            ):
+                return False
+            return class_name.value in {
+                "Shell_TrayWnd",
+                "Shell_SecondaryTrayWnd",
+            }
+        except (AttributeError, OSError):
+            return False
 
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
