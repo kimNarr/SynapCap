@@ -1,6 +1,7 @@
 import ctypes
 import subprocess
 import sys
+from copy import deepcopy
 
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -176,17 +177,69 @@ def main():
     app.setWindowIcon(create_app_icon(64))
     refresh_interval = settings.get("refresh_interval_sec", 30)
     always_on_top = settings.get("always_on_top", True)
+    initial_window_mode = settings.get("window_mode", "expanded")
 
     # 2. Providers 로드
     providers = load_providers_from_config(config_data)
 
     # 3. HUD Widget 생성
     widget = SynapCapWidget(config_data, providers)
-    widget.show()
 
     # 4. System Tray 생성
-    tray = SynapCapTray(parent_widget=widget, always_on_top=always_on_top)
+    tray = SynapCapTray(
+        parent_widget=widget,
+        always_on_top=always_on_top,
+        window_mode=initial_window_mode,
+    )
     active_settings_dialog: SettingsDialog | None = None
+
+    def remember_widget_position(mode: str | None = None) -> None:
+        selected_mode = mode or widget.window_mode()
+        if selected_mode not in {"expanded", "bar"} or not widget.isVisible():
+            return
+        config_data.setdefault("settings", {})[
+            f"window_pos_{selected_mode}"
+        ] = [widget.x(), widget.y()]
+
+    def apply_window_mode(
+        mode: str,
+        *,
+        persist: bool = True,
+        restore_position: bool = True,
+        show_guidance: bool = True,
+    ) -> None:
+        if mode not in {"expanded", "bar", "none"}:
+            mode = "expanded"
+        previous_mode = widget.window_mode()
+        if previous_mode in {"expanded", "bar"}:
+            remember_widget_position(previous_mode)
+
+        current_settings = config_data.setdefault("settings", {})
+        current_settings["window_mode"] = mode
+        if mode in {"expanded", "bar"}:
+            current_settings["last_window_mode"] = mode
+
+        widget.set_window_mode(mode)
+        if restore_position and mode in {"expanded", "bar"}:
+            position = current_settings.get(f"window_pos_{mode}")
+            if (
+                isinstance(position, list)
+                and len(position) == 2
+                and all(isinstance(value, int) for value in position)
+            ):
+                widget.restore_position(position[0], position[1])
+        tray.set_window_mode(mode)
+
+        if (
+            show_guidance
+            and sys.platform == "win32"
+            and mode == "none"
+            and not current_settings.get("tray_pin_guidance_shown", False)
+        ):
+            tray.show_tray_pin_guidance()
+            current_settings["tray_pin_guidance_shown"] = True
+        if persist:
+            save_config(config_data)
 
     def apply_active_theme() -> None:
         widget.apply_theme()
@@ -203,14 +256,18 @@ def main():
     app.styleHints().colorSchemeChanged.connect(on_system_scheme_changed)
 
     def show_widget():
+        mode = config_data.get("settings", {}).get(
+            "last_window_mode",
+            "expanded",
+        )
+        apply_window_mode(mode)
         if widget.isMinimized():
             widget.showNormal()
-        else:
-            widget.show()
         widget.raise_()
         widget.activateWindow()
 
     single_instance.activation_requested.connect(show_widget)
+    apply_window_mode(initial_window_mode, persist=False)
 
     update_worker = UpdateCheckWorker(APP_VERSION)
     pending_update: UpdateInfo | None = None
@@ -263,6 +320,7 @@ def main():
 
     def handle_usage_updated(usage_list):
         widget.update_data(usage_list)
+        tray.update_usage(usage_list)
         threshold = int(
             config_data.get("settings", {}).get("usage_alert_threshold", 90)
         )
@@ -284,6 +342,8 @@ def main():
     # 6. GUI Settings Dialog 오픈 및 Hot-Reload 연결
     def open_settings_dialog():
         nonlocal active_settings_dialog
+        remember_widget_position()
+        config_before_dialog = deepcopy(config_data)
         dialog = SettingsDialog(config_data, parent=widget)
         active_settings_dialog = dialog
         dialog.feedback_requested.connect(
@@ -296,17 +356,46 @@ def main():
             preview_theme = preview_config.get("settings", {}).get("theme", "auto")
             apply_theme_setting(preview_theme)
             widget.rebuild_ui(preview_config, providers, preserve_usage=True)
+            preview_mode = preview_config.get("settings", {}).get(
+                "window_mode",
+                "expanded",
+            )
+            widget.set_window_mode(preview_mode)
+            preview_position = config_data.get("settings", {}).get(
+                f"window_pos_{preview_mode}"
+            )
+            if (
+                preview_mode in {"expanded", "bar"}
+                and isinstance(preview_position, list)
+                and len(preview_position) == 2
+            ):
+                widget.restore_position(*preview_position)
+            tray.set_window_mode(preview_mode)
             apply_active_theme()
 
         def revert_preview():
             saved_theme = config_data.get("settings", {}).get("theme", "auto")
             apply_theme_setting(saved_theme)
             widget.rebuild_ui(config_data, providers, preserve_usage=True)
+            saved_mode = config_data.get("settings", {}).get(
+                "window_mode",
+                "expanded",
+            )
+            widget.set_window_mode(saved_mode)
+            saved_position = config_data.get("settings", {}).get(
+                f"window_pos_{saved_mode}"
+            )
+            if (
+                isinstance(saved_position, list)
+                and len(saved_position) == 2
+            ):
+                widget.restore_position(*saved_position)
+            tray.set_window_mode(saved_mode)
             apply_active_theme()
 
         def handle_config_saved(new_config: dict):
             nonlocal config_data, providers
-            previous_config = config_data
+            previous_config = config_before_dialog
             provider_layout_changed = _provider_settings_changed(previous_config, new_config)
             provider_query_changed = _provider_query_settings_changed(previous_config, new_config)
             interval_changed = _setting_changed(previous_config, new_config, "refresh_interval_sec")
@@ -316,6 +405,24 @@ def main():
                 "check_updates",
             )
             theme_changed = _setting_changed(previous_config, new_config, "theme")
+            window_mode_changed = _setting_changed(
+                previous_config,
+                new_config,
+                "window_mode",
+            )
+            previous_visible_mode = widget.window_mode()
+            if previous_visible_mode in {"expanded", "bar"}:
+                remember_widget_position(previous_visible_mode)
+            previous_settings = config_data.get("settings", {})
+            new_settings = new_config.setdefault("settings", {})
+            for runtime_key in (
+                "last_window_mode",
+                "window_pos_expanded",
+                "window_pos_bar",
+                "tray_pin_guidance_shown",
+            ):
+                if runtime_key in previous_settings:
+                    new_settings[runtime_key] = previous_settings[runtime_key]
             config_data = new_config
 
             # synapcap.json 저장
@@ -333,6 +440,22 @@ def main():
                 providers,
                 preserve_usage=not provider_query_changed,
             )
+            if window_mode_changed:
+                apply_window_mode(
+                    config_data.get("settings", {}).get(
+                        "window_mode",
+                        "expanded",
+                    ),
+                    persist=False,
+                )
+            else:
+                widget.set_window_mode(
+                    config_data.get("settings", {}).get(
+                        "window_mode",
+                        "expanded",
+                    )
+                )
+                tray.set_window_mode(widget.window_mode())
             if theme_changed:
                 apply_theme_setting(
                     config_data.get("settings", {}).get("theme", "auto")
@@ -399,20 +522,16 @@ def main():
             QApplication.clipboard().setText(report)
 
     # 7. Signal/Slot 연결
-    def toggle_widget():
-        if widget.isMinimized():
-            widget.showNormal()
-            widget.raise_()
-            widget.activateWindow()
-        elif widget.isVisible():
-            widget.hide()
-        else:
-            show_widget()
-
     def handle_always_on_top(checked: bool):
         config_data["settings"]["always_on_top"] = checked
         save_config(config_data)
         widget.set_always_on_top(checked)
+
+    def handle_position_changed(mode: str, x: int, y: int) -> None:
+        config_data.setdefault("settings", {})[
+            f"window_pos_{mode}"
+        ] = [x, y]
+        save_config(config_data)
 
     quit_in_progress = False
 
@@ -523,7 +642,8 @@ def main():
         widget.set_update_progress(info.version, 0)
         current_download.start()
 
-    tray.toggle_widget_requested.connect(toggle_widget)
+    tray.window_mode_requested.connect(apply_window_mode)
+    tray.restore_window_requested.connect(show_widget)
     tray.refresh_requested.connect(worker.trigger_manual_refresh)
     tray.update_check_requested.connect(lambda: request_update_check(True))
     tray.always_on_top_toggled.connect(handle_always_on_top)
@@ -536,6 +656,8 @@ def main():
     tray.quit_requested.connect(request_quit)
 
     widget.settings_requested.connect(open_settings_dialog)
+    widget.window_mode_requested.connect(apply_window_mode)
+    widget.position_changed.connect(handle_position_changed)
     widget.refresh_requested.connect(worker.trigger_manual_refresh)
     widget.update_requested.connect(start_one_click_update)
     widget.diagnostics_requested.connect(open_provider_diagnostics)

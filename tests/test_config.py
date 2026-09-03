@@ -57,6 +57,37 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(settings["usage_alert_threshold"], 90)
             self.assertEqual(settings["last_seen_version"], "legacy")
             self.assertEqual(settings["theme"], "auto")
+            self.assertEqual(settings["window_mode"], "expanded")
+            self.assertEqual(settings["last_window_mode"], "expanded")
+            self.assertIsNone(settings["window_pos_expanded"])
+            self.assertIsNone(settings["window_pos_bar"])
+            self.assertFalse(settings["tray_pin_guidance_shown"])
+
+    def test_invalid_window_state_falls_back_to_safe_defaults(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "settings": {
+                            "window_mode": "floating",
+                            "last_window_mode": "none",
+                            "window_pos_expanded": [10, "20"],
+                            "window_pos_bar": [10],
+                            "tray_pin_guidance_shown": "yes",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_config(str(path))["settings"]
+
+            self.assertEqual(settings["window_mode"], "expanded")
+            self.assertEqual(settings["last_window_mode"], "expanded")
+            self.assertIsNone(settings["window_pos_expanded"])
+            self.assertIsNone(settings["window_pos_bar"])
+            self.assertFalse(settings["tray_pin_guidance_shown"])
 
     def test_invalid_theme_falls_back_to_dark(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -222,7 +253,7 @@ class ConfigTests(unittest.TestCase):
 
             loaded = load_config(str(path))
 
-            self.assertEqual(loaded["schema_version"], 7)
+            self.assertEqual(loaded["schema_version"], 8)
             self.assertFalse(loaded["providers"][0]["show_five_hour"])
             self.assertTrue(loaded["providers"][0]["show_weekly"])
 

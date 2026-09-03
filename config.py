@@ -7,7 +7,7 @@ from typing import Any
 
 from version import APP_NAME
 
-CONFIG_SCHEMA_VERSION = 7
+CONFIG_SCHEMA_VERSION = 8
 
 
 def _default_config_path() -> Path:
@@ -44,7 +44,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "usage_alert_threshold": 90,
         "check_updates": True,
         "last_seen_version": "",
-        "theme": "auto"
+        "theme": "auto",
+        "window_mode": "expanded",
+        "last_window_mode": "expanded",
+        "window_pos_expanded": None,
+        "window_pos_bar": None,
+        "tray_pin_guidance_shown": False,
     },
     "providers": [
         {
@@ -143,6 +148,24 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 settings.pop(legacy_key, None)
             if settings.get("theme") not in {"dark", "light", "auto"}:
                 settings["theme"] = "dark"
+            if settings.get("window_mode") not in {
+                "expanded",
+                "bar",
+                "none",
+            }:
+                settings["window_mode"] = "expanded"
+            if settings.get("last_window_mode") not in {"expanded", "bar"}:
+                settings["last_window_mode"] = "expanded"
+            for position_key in ("window_pos_expanded", "window_pos_bar"):
+                position = settings.get(position_key)
+                if not (
+                    isinstance(position, list)
+                    and len(position) == 2
+                    and all(isinstance(value, int) for value in position)
+                ):
+                    settings[position_key] = None
+            if not isinstance(settings.get("tray_pin_guidance_shown"), bool):
+                settings["tray_pin_guidance_shown"] = False
             settings.pop("usage_value_bold", None)
             if not isinstance(settings.get("usage_alerts_enabled"), bool):
                 settings["usage_alerts_enabled"] = False

@@ -1,7 +1,5 @@
-import ctypes
 import re
 import sys
-from ctypes import wintypes
 from datetime import datetime, timedelta
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt, QTimer, Signal
@@ -38,8 +36,6 @@ from .icon import (
 # A frameless widget has no visible resize border, so a slightly wider magnetic
 # zone feels natural and avoids leaving a narrow unusable gap near an edge.
 EDGE_SNAP_DISTANCE = 48
-WINDOWS_TOPMOST_WATCHDOG_MS = 5000
-WINDOWS_TASKBAR_RETRY_MS = 250
 COMPACT_BOTTOM_SAFE_GAP = 6
 TOOLTIP_CONTROL_GAP = 12
 
@@ -412,7 +408,8 @@ class SynapCapWidget(QWidget):
     quit_requested = Signal()
     update_requested = Signal(str)
     diagnostics_requested = Signal(str)
-    _windows_foreground_changed = Signal()
+    window_mode_requested = Signal(str)
+    position_changed = Signal(str, int, int)
 
     def __init__(self, config_data: dict, providers: list[BaseAIProvider]):
         super().__init__()
@@ -424,6 +421,7 @@ class SynapCapWidget(QWidget):
         self._update_version = ""
         self._shutdown_in_progress = False
         self.is_compact = False
+        self._window_mode = "expanded"
         self.compact_ui_map = {}
         self._pending_resize_anchor: ResizeAnchor | None = None
         self.usage_view = "ring"
@@ -436,27 +434,8 @@ class SynapCapWidget(QWidget):
         self._fit_timer = QTimer(self)
         self._fit_timer.setSingleShot(True)
         self._fit_timer.timeout.connect(self._fit_to_content)
-        self._windows_foreground_hook = None
-        self._windows_foreground_callback = None
-        self._windows_foreground_changed.connect(
-            self._schedule_windows_topmost_restore
-        )
-        self._windows_topmost_timer = QTimer(self)
-        self._windows_topmost_timer.setInterval(WINDOWS_TOPMOST_WATCHDOG_MS)
-        self._windows_topmost_timer.timeout.connect(
-            self._restore_windows_topmost
-        )
-        self._windows_taskbar_retry_timer = QTimer(self)
-        self._windows_taskbar_retry_timer.setSingleShot(True)
-        self._windows_taskbar_retry_timer.setInterval(
-            WINDOWS_TASKBAR_RETRY_MS
-        )
-        self._windows_taskbar_retry_timer.timeout.connect(
-            self._restore_windows_topmost
-        )
 
         self.init_ui()
-        self._sync_windows_topmost_monitor()
 
     def init_ui(self):
         # Frameless Window & Translucent Background
@@ -571,7 +550,9 @@ class SynapCapWidget(QWidget):
         self.minimize_btn.setFixedSize(22, 22)
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
         self.minimize_btn.setStyleSheet(btn_style)
-        self.minimize_btn.clicked.connect(self.enter_compact_mode)
+        self.minimize_btn.clicked.connect(
+            lambda: self._request_window_mode("bar")
+        )
         self._enable_instant_tooltip(self.minimize_btn, "가로 요약으로 접기")
         header_layout.addWidget(self.minimize_btn)
 
@@ -608,7 +589,9 @@ class SynapCapWidget(QWidget):
         self.expand_btn.setFixedSize(24, 24)
         self.expand_btn.setIcon(create_arrow_down_icon(14, t("accent")))
         self.expand_btn.setStyleSheet(compact_btn_style)
-        self.expand_btn.clicked.connect(self.exit_compact_mode)
+        self.expand_btn.clicked.connect(
+            lambda: self._request_window_mode("expanded")
+        )
         self._enable_instant_tooltip(self.expand_btn, "전체 위젯 펼치기")
         self.compact_layout.addWidget(self.expand_btn)
 
@@ -868,9 +851,14 @@ class SynapCapWidget(QWidget):
         screen = QApplication.screenAt(point) if point is not None else self.screen()
         if screen is None:
             screen = self.screen() or QApplication.primaryScreen()
-        # Use the full screen, not availableGeometry(): the widget may overlap
-        # the taskbar/Dock but must never leave the visible display.
-        return screen.geometry() if screen is not None else self.frameGeometry()
+        # Both visible modes stay inside the OS work area. Avoiding the
+        # taskbar/Dock entirely removes the need to compete with shell windows
+        # in the topmost Z-order band.
+        return (
+            screen.availableGeometry()
+            if screen is not None
+            else self.frameGeometry()
+        )
 
     def _capture_resize_anchor(self) -> ResizeAnchor:
         """Choose the nearest screen corner so resizing grows into free space."""
@@ -1005,11 +993,41 @@ class SynapCapWidget(QWidget):
 
     def enter_compact_mode(self) -> None:
         if self.is_compact:
+            self._window_mode = "bar"
             return
         resize_anchor = self._capture_resize_anchor()
         self.is_compact = True
+        self._window_mode = "bar"
         self._apply_layout_visibility()
         self._refresh_compact_values(resize_anchor)
+
+    def _request_window_mode(self, mode: str) -> None:
+        self.window_mode_requested.emit(mode)
+        if self._window_mode != mode:
+            self.set_window_mode(mode)
+
+    def set_window_mode(self, mode: str) -> None:
+        if mode not in {"expanded", "bar", "none"}:
+            mode = "expanded"
+        if mode == "none":
+            self._window_mode = "none"
+            self.hide()
+            return
+        if mode == "bar":
+            self.enter_compact_mode()
+        else:
+            self.exit_compact_mode()
+            self._window_mode = "expanded"
+        self.show()
+        self._snap_to_screen_edges()
+
+    def window_mode(self) -> str:
+        return self._window_mode
+
+    def restore_position(self, x: int, y: int) -> None:
+        """Restore a saved position and constrain it to the usable desktop."""
+        self.move(x, y)
+        self._snap_to_screen_edges()
 
     def _apply_layout_visibility(self) -> None:
         """Apply one coherent layout state before measuring or resizing."""
@@ -1048,6 +1066,7 @@ class SynapCapWidget(QWidget):
 
     def exit_compact_mode(self) -> None:
         if not self.is_compact:
+            self._window_mode = "expanded"
             return
         resize_anchor = self._capture_resize_anchor()
         # Expanding can make the window several times taller. If that resize
@@ -1058,6 +1077,7 @@ class SynapCapWidget(QWidget):
         self.setUpdatesEnabled(False)
         try:
             self.is_compact = False
+            self._window_mode = "expanded"
             self._apply_layout_visibility()
             self._set_fixed_window_width(self._expanded_width)
             self._pending_resize_anchor = resize_anchor
@@ -2252,205 +2272,10 @@ class SynapCapWidget(QWidget):
         """Grow or shrink the window while preserving its current position."""
         self.resize(self.width(), height)
 
-    def event(self, event):
-        """Keep a pinned Windows tool window above the app selected from the taskbar."""
-        result = super().event(event)
-        if (
-            event.type() == QEvent.Type.WindowDeactivate
-            and sys.platform.startswith("win")
-            and self.isVisible()
-            and bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
-        ):
-            # Defer until Windows has activated the taskbar target. The native
-            # call does not activate this tool window, so keyboard focus stays
-            # in the app the user chose.
-            self._schedule_windows_topmost_restore()
-        return result
-
-    def _schedule_windows_topmost_restore(self) -> None:
-        QTimer.singleShot(0, self._restore_windows_topmost)
-
-    def _sync_windows_topmost_monitor(self) -> None:
-        should_run = (
-            sys.platform.startswith("win")
-            and bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
-        )
-        if should_run:
-            self._install_windows_foreground_hook()
-            self._windows_topmost_timer.start()
-        else:
-            self._windows_topmost_timer.stop()
-            self._windows_taskbar_retry_timer.stop()
-            self._uninstall_windows_foreground_hook()
-
-    def _install_windows_foreground_hook(self) -> None:
-        if (
-            not sys.platform.startswith("win")
-            or self._windows_foreground_hook
-        ):
-            return
-        try:
-            callback_factory = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)
-            callback_type = callback_factory(
-                None,
-                wintypes.HANDLE,
-                wintypes.DWORD,
-                wintypes.HWND,
-                wintypes.LONG,
-                wintypes.LONG,
-                wintypes.DWORD,
-                wintypes.DWORD,
-            )
-            self._windows_foreground_callback = callback_type(
-                self._on_windows_foreground_event
-            )
-            set_hook = ctypes.windll.user32.SetWinEventHook
-            set_hook.argtypes = [
-                wintypes.DWORD,
-                wintypes.DWORD,
-                wintypes.HANDLE,
-                callback_type,
-                wintypes.DWORD,
-                wintypes.DWORD,
-                wintypes.DWORD,
-            ]
-            set_hook.restype = wintypes.HANDLE
-            self._windows_foreground_hook = set_hook(
-                0x0003,
-                0x0003,
-                None,
-                self._windows_foreground_callback,
-                0,
-                0,
-                0x0002,
-            )
-            if not self._windows_foreground_hook:
-                self._windows_foreground_callback = None
-        except (AttributeError, OSError):
-            self._windows_foreground_hook = None
-            self._windows_foreground_callback = None
-
-    def _uninstall_windows_foreground_hook(self) -> None:
-        hook = self._windows_foreground_hook
-        if not hook:
-            self._windows_foreground_callback = None
-            return
-        try:
-            unhook = ctypes.windll.user32.UnhookWinEvent
-            unhook.argtypes = [wintypes.HANDLE]
-            unhook.restype = wintypes.BOOL
-            unhook(hook)
-        except (AttributeError, OSError):
-            pass
-        self._windows_foreground_hook = None
-        self._windows_foreground_callback = None
-
-    def _on_windows_foreground_event(self, *_args) -> None:
-        # A Qt signal safely crosses back to the widget's GUI thread if the
-        # out-of-context callback is delivered from a Windows helper thread.
-        self._windows_foreground_changed.emit()
-
-    def _restore_windows_topmost(self) -> None:
-        """Reassert Windows topmost Z-order without stealing keyboard focus."""
-        if (
-            not sys.platform.startswith("win")
-            or not self.isVisible()
-            or not bool(
-                self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
-            )
-        ):
-            self._windows_taskbar_retry_timer.stop()
-            return
-        if self._windows_cursor_over_taskbar():
-            # Let the shell own the Z-order while the user is operating the
-            # taskbar. Reasserting here makes two topmost windows visibly
-            # trade places; the next timer tick restores SynapCap after the
-            # pointer leaves the taskbar. Retry only during this interaction;
-            # the normal idle path is driven by foreground events.
-            self._windows_taskbar_retry_timer.start()
-            return
-        self._windows_taskbar_retry_timer.stop()
-
-        # HWND_TOPMOST plus NOACTIVATE keeps the compact widget above the
-        # taskbar even after repeated taskbar clicks without taking focus.
-        hwnd_topmost = -1
-        swp_no_size = 0x0001
-        swp_no_move = 0x0002
-        swp_no_activate = 0x0010
-        swp_show_window = 0x0040
-        flags = swp_no_size | swp_no_move | swp_no_activate | swp_show_window
-        try:
-            set_window_pos = ctypes.windll.user32.SetWindowPos
-            set_window_pos.argtypes = [
-                wintypes.HWND,
-                wintypes.HWND,
-                ctypes.c_int,
-                ctypes.c_int,
-                ctypes.c_int,
-                ctypes.c_int,
-                wintypes.UINT,
-            ]
-            set_window_pos.restype = wintypes.BOOL
-            restored = set_window_pos(
-                wintypes.HWND(int(self.winId())),
-                wintypes.HWND(hwnd_topmost),
-                0,
-                0,
-                0,
-                0,
-                wintypes.UINT(flags),
-            )
-        except (AttributeError, OSError):
-            restored = False
-        if not restored:
-            self.raise_()
-
-    @staticmethod
-    def _windows_cursor_over_taskbar() -> bool:
-        if not sys.platform.startswith("win"):
-            return False
-        try:
-            user32 = ctypes.windll.user32
-            point = wintypes.POINT()
-            user32.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
-            user32.GetCursorPos.restype = wintypes.BOOL
-            if not user32.GetCursorPos(ctypes.byref(point)):
-                return False
-
-            user32.WindowFromPoint.argtypes = [wintypes.POINT]
-            user32.WindowFromPoint.restype = wintypes.HWND
-            window = user32.WindowFromPoint(point)
-            if not window:
-                return False
-
-            user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
-            user32.GetAncestor.restype = wintypes.HWND
-            root_window = user32.GetAncestor(window, 2) or window
-            class_name = ctypes.create_unicode_buffer(64)
-            user32.GetClassNameW.argtypes = [
-                wintypes.HWND,
-                wintypes.LPWSTR,
-                ctypes.c_int,
-            ]
-            user32.GetClassNameW.restype = ctypes.c_int
-            if not user32.GetClassNameW(
-                root_window,
-                class_name,
-                len(class_name),
-            ):
-                return False
-            return class_name.value in {
-                "Shell_TrayWnd",
-                "Shell_SecondaryTrayWnd",
-            }
-        except (AttributeError, OSError):
-            return False
-
     def set_always_on_top(self, always_on_top: bool):
         flags = self.windowFlags()
         currently_enabled = bool(flags & Qt.WindowType.WindowStaysOnTopHint)
         if currently_enabled == always_on_top:
-            self._sync_windows_topmost_monitor()
             return
         if always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
@@ -2459,9 +2284,8 @@ class SynapCapWidget(QWidget):
 
         self.setWindowFlags(flags)
         self._apply_platform_window_attributes()
-        self.show()
-        self._sync_windows_topmost_monitor()
-        self._restore_windows_topmost()
+        if self._window_mode != "none":
+            self.show()
 
     def _apply_platform_window_attributes(self) -> None:
         if sys.platform == "darwin":
@@ -2484,9 +2308,6 @@ class SynapCapWidget(QWidget):
     def begin_shutdown(self):
         """Allow the confirmed application shutdown to close this window."""
         self._shutdown_in_progress = True
-        self._windows_topmost_timer.stop()
-        self._windows_taskbar_retry_timer.stop()
-        self._uninstall_windows_foreground_hook()
 
     # Drag-and-Drop Mouse Events
     def mousePressEvent(self, event):
@@ -2504,6 +2325,12 @@ class SynapCapWidget(QWidget):
             self._snap_to_screen_edges()
             if self.is_compact:
                 self._update_expand_direction(self._capture_resize_anchor())
+            if self._window_mode in {"expanded", "bar"}:
+                self.position_changed.emit(
+                    self._window_mode,
+                    self.x(),
+                    self.y(),
+                )
             event.accept()
             return
         super().mouseReleaseEvent(event)

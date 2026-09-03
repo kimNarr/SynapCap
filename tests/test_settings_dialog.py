@@ -133,6 +133,24 @@ class SettingsDialogTests(unittest.TestCase):
         self.dialog.on_save()
         self.assertEqual(saved[0]["settings"]["theme"], "light")
 
+    def test_window_mode_selector_round_trips_and_previews_immediately(self):
+        self.assertEqual(
+            self.dialog.window_mode_combo.currentData(),
+            "expanded",
+        )
+        previewed = []
+        self.dialog.preview_requested.connect(previewed.append)
+
+        self.dialog.window_mode_combo.setCurrentIndex(
+            self.dialog.window_mode_combo.findData("none")
+        )
+
+        self.assertEqual(previewed[-1]["settings"]["window_mode"], "none")
+        saved = []
+        self.dialog.config_saved.connect(saved.append)
+        self.dialog.on_save()
+        self.assertEqual(saved[0]["settings"]["window_mode"], "none")
+
     def test_restyle_preserves_unsaved_form_values(self):
         self.dialog.interval_spin.setValue(45)
         self.dialog.restyle()

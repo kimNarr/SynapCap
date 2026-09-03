@@ -6,7 +6,12 @@
     "usage_alerts_enabled": false,
     "usage_alert_threshold": 90,
     "check_updates": true,
-    "theme": "auto"
+    "theme": "auto",
+    "window_mode": "expanded",
+    "last_window_mode": "expanded",
+    "window_pos_expanded": null,
+    "window_pos_bar": null,
+    "tray_pin_guidance_shown": false
   },
   "providers": [
     {

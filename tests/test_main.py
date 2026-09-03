@@ -55,6 +55,12 @@ class SettingsChangeTests(unittest.TestCase):
 
         self.assertTrue(_setting_changed(previous, current, "theme"))
 
+    def test_window_mode_change_is_detected(self):
+        previous = {"settings": {"window_mode": "expanded"}}
+        current = {"settings": {"window_mode": "none"}}
+
+        self.assertTrue(_setting_changed(previous, current, "window_mode"))
+
     def test_visual_setting_does_not_change_providers(self):
         previous = {
             "settings": {"usage_value_bold": True},

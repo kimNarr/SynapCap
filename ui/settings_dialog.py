@@ -655,6 +655,22 @@ class SettingsDialog(QDialog):
         self.always_top_check.setChecked(settings.get("always_on_top", True))
         form.addRow("화면 고정:", self.always_top_check)
 
+        self.window_mode_combo = NoWheelComboBox()
+        self.window_mode_combo.addItem("펼침", "expanded")
+        self.window_mode_combo.addItem("막대", "bar")
+        self.window_mode_combo.addItem("트레이만", "none")
+        selected_mode = settings.get("window_mode", "expanded")
+        mode_index = self.window_mode_combo.findData(selected_mode)
+        self.window_mode_combo.setCurrentIndex(max(mode_index, 0))
+        self.window_mode_combo.setToolTip(
+            "펼침과 막대는 작업표시줄을 침범하지 않으며, "
+            "트레이만은 창을 숨깁니다."
+        )
+        self.window_mode_combo.currentIndexChanged.connect(
+            lambda _index: self.on_preview()
+        )
+        form.addRow("표시 모드:", self.window_mode_combo)
+
         self.update_check = StyledCheckBox("자동으로 새 버전 확인")
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
@@ -1098,6 +1114,9 @@ class SettingsDialog(QDialog):
         settings = config_data.setdefault("settings", {})
         settings["refresh_interval_sec"] = self.interval_spin.value()
         settings["always_on_top"] = self.always_top_check.isChecked()
+        settings["window_mode"] = (
+            self.window_mode_combo.currentData() or "expanded"
+        )
         settings["check_updates"] = self.update_check.isChecked()
         settings["theme"] = self.theme_combo.currentData() or "dark"
         settings["usage_alerts_enabled"] = (
