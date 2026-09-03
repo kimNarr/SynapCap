@@ -38,7 +38,8 @@ from .icon import (
 # A frameless widget has no visible resize border, so a slightly wider magnetic
 # zone feels natural and avoids leaving a narrow unusable gap near an edge.
 EDGE_SNAP_DISTANCE = 48
-WINDOWS_TOPMOST_REFRESH_MS = 750
+WINDOWS_TOPMOST_WATCHDOG_MS = 5000
+WINDOWS_TASKBAR_RETRY_MS = 250
 COMPACT_BOTTOM_SAFE_GAP = 6
 TOOLTIP_CONTROL_GAP = 12
 
@@ -411,6 +412,7 @@ class SynapCapWidget(QWidget):
     quit_requested = Signal()
     update_requested = Signal(str)
     diagnostics_requested = Signal(str)
+    _windows_foreground_changed = Signal()
 
     def __init__(self, config_data: dict, providers: list[BaseAIProvider]):
         super().__init__()
@@ -434,14 +436,27 @@ class SynapCapWidget(QWidget):
         self._fit_timer = QTimer(self)
         self._fit_timer.setSingleShot(True)
         self._fit_timer.timeout.connect(self._fit_to_content)
+        self._windows_foreground_hook = None
+        self._windows_foreground_callback = None
+        self._windows_foreground_changed.connect(
+            self._schedule_windows_topmost_restore
+        )
         self._windows_topmost_timer = QTimer(self)
-        self._windows_topmost_timer.setInterval(WINDOWS_TOPMOST_REFRESH_MS)
+        self._windows_topmost_timer.setInterval(WINDOWS_TOPMOST_WATCHDOG_MS)
         self._windows_topmost_timer.timeout.connect(
+            self._restore_windows_topmost
+        )
+        self._windows_taskbar_retry_timer = QTimer(self)
+        self._windows_taskbar_retry_timer.setSingleShot(True)
+        self._windows_taskbar_retry_timer.setInterval(
+            WINDOWS_TASKBAR_RETRY_MS
+        )
+        self._windows_taskbar_retry_timer.timeout.connect(
             self._restore_windows_topmost
         )
 
         self.init_ui()
-        self._sync_windows_topmost_timer()
+        self._sync_windows_topmost_monitor()
 
     def init_ui(self):
         # Frameless Window & Translucent Background
@@ -2249,18 +2264,91 @@ class SynapCapWidget(QWidget):
             # Defer until Windows has activated the taskbar target. The native
             # call does not activate this tool window, so keyboard focus stays
             # in the app the user chose.
-            QTimer.singleShot(0, self._restore_windows_topmost)
+            self._schedule_windows_topmost_restore()
         return result
 
-    def _sync_windows_topmost_timer(self) -> None:
+    def _schedule_windows_topmost_restore(self) -> None:
+        QTimer.singleShot(0, self._restore_windows_topmost)
+
+    def _sync_windows_topmost_monitor(self) -> None:
         should_run = (
             sys.platform.startswith("win")
             and bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         )
         if should_run:
+            self._install_windows_foreground_hook()
             self._windows_topmost_timer.start()
         else:
             self._windows_topmost_timer.stop()
+            self._windows_taskbar_retry_timer.stop()
+            self._uninstall_windows_foreground_hook()
+
+    def _install_windows_foreground_hook(self) -> None:
+        if (
+            not sys.platform.startswith("win")
+            or self._windows_foreground_hook
+        ):
+            return
+        try:
+            callback_factory = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)
+            callback_type = callback_factory(
+                None,
+                wintypes.HANDLE,
+                wintypes.DWORD,
+                wintypes.HWND,
+                wintypes.LONG,
+                wintypes.LONG,
+                wintypes.DWORD,
+                wintypes.DWORD,
+            )
+            self._windows_foreground_callback = callback_type(
+                self._on_windows_foreground_event
+            )
+            set_hook = ctypes.windll.user32.SetWinEventHook
+            set_hook.argtypes = [
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.HANDLE,
+                callback_type,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.DWORD,
+            ]
+            set_hook.restype = wintypes.HANDLE
+            self._windows_foreground_hook = set_hook(
+                0x0003,
+                0x0003,
+                None,
+                self._windows_foreground_callback,
+                0,
+                0,
+                0x0002,
+            )
+            if not self._windows_foreground_hook:
+                self._windows_foreground_callback = None
+        except (AttributeError, OSError):
+            self._windows_foreground_hook = None
+            self._windows_foreground_callback = None
+
+    def _uninstall_windows_foreground_hook(self) -> None:
+        hook = self._windows_foreground_hook
+        if not hook:
+            self._windows_foreground_callback = None
+            return
+        try:
+            unhook = ctypes.windll.user32.UnhookWinEvent
+            unhook.argtypes = [wintypes.HANDLE]
+            unhook.restype = wintypes.BOOL
+            unhook(hook)
+        except (AttributeError, OSError):
+            pass
+        self._windows_foreground_hook = None
+        self._windows_foreground_callback = None
+
+    def _on_windows_foreground_event(self, *_args) -> None:
+        # A Qt signal safely crosses back to the widget's GUI thread if the
+        # out-of-context callback is delivered from a Windows helper thread.
+        self._windows_foreground_changed.emit()
 
     def _restore_windows_topmost(self) -> None:
         """Reassert Windows topmost Z-order without stealing keyboard focus."""
@@ -2271,13 +2359,17 @@ class SynapCapWidget(QWidget):
                 self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
             )
         ):
+            self._windows_taskbar_retry_timer.stop()
             return
         if self._windows_cursor_over_taskbar():
             # Let the shell own the Z-order while the user is operating the
             # taskbar. Reasserting here makes two topmost windows visibly
             # trade places; the next timer tick restores SynapCap after the
-            # pointer leaves the taskbar.
+            # pointer leaves the taskbar. Retry only during this interaction;
+            # the normal idle path is driven by foreground events.
+            self._windows_taskbar_retry_timer.start()
             return
+        self._windows_taskbar_retry_timer.stop()
 
         # HWND_TOPMOST plus NOACTIVATE keeps the compact widget above the
         # taskbar even after repeated taskbar clicks without taking focus.
@@ -2358,7 +2450,7 @@ class SynapCapWidget(QWidget):
         flags = self.windowFlags()
         currently_enabled = bool(flags & Qt.WindowType.WindowStaysOnTopHint)
         if currently_enabled == always_on_top:
-            self._sync_windows_topmost_timer()
+            self._sync_windows_topmost_monitor()
             return
         if always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
@@ -2368,7 +2460,7 @@ class SynapCapWidget(QWidget):
         self.setWindowFlags(flags)
         self._apply_platform_window_attributes()
         self.show()
-        self._sync_windows_topmost_timer()
+        self._sync_windows_topmost_monitor()
         self._restore_windows_topmost()
 
     def _apply_platform_window_attributes(self) -> None:
@@ -2392,6 +2484,9 @@ class SynapCapWidget(QWidget):
     def begin_shutdown(self):
         """Allow the confirmed application shutdown to close this window."""
         self._shutdown_in_progress = True
+        self._windows_topmost_timer.stop()
+        self._windows_taskbar_retry_timer.stop()
+        self._uninstall_windows_foreground_hook()
 
     # Drag-and-Drop Mouse Events
     def mousePressEvent(self, event):

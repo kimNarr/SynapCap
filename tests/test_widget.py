@@ -23,6 +23,7 @@ from ui.widget import (
     COMPACT_BOTTOM_SAFE_GAP,
     FIXED_WIDGET_WIDTH,
     TOOLTIP_CONTROL_GAP,
+    WINDOWS_TOPMOST_WATCHDOG_MS,
     FocusProviderButton,
     SynapCapWidget,
     UsageRing,
@@ -570,7 +571,13 @@ class WidgetTests(unittest.TestCase):
 
     def test_pinned_windows_widget_restores_topmost_after_taskbar_deactivation(self):
         provider = CodexProvider({"id": "codex", "name": "Codex"})
-        with patch("ui.widget.sys.platform", "win32"):
+        with (
+            patch("ui.widget.sys.platform", "win32"),
+            patch.object(
+                SynapCapWidget,
+                "_install_windows_foreground_hook",
+            ),
+        ):
             widget = SynapCapWidget(
                 {"settings": {"always_on_top": True}},
                 [provider],
@@ -582,6 +589,10 @@ class WidgetTests(unittest.TestCase):
 
         restore.assert_called_once_with()
         self.assertTrue(widget._windows_topmost_timer.isActive())
+        self.assertEqual(
+            widget._windows_topmost_timer.interval(),
+            WINDOWS_TOPMOST_WATCHDOG_MS,
+        )
         widget.close()
         widget.deleteLater()
 
@@ -600,19 +611,25 @@ class WidgetTests(unittest.TestCase):
             )
             widget.show()
             widget._restore_windows_topmost()
+            widget.set_always_on_top(False)
 
         args = user32.SetWindowPos.call_args.args
         self.assertEqual(args[0].value, int(widget.winId()))
         self.assertEqual(args[1].value, ctypes.c_void_p(-1).value)
         self.assertTrue(args[-1].value & 0x0010)
-        widget.set_always_on_top(False)
         self.assertFalse(widget._windows_topmost_timer.isActive())
         widget.close()
         widget.deleteLater()
 
     def test_windows_topmost_refresh_pauses_while_taskbar_is_hovered(self):
         provider = CodexProvider({"id": "codex", "name": "Codex"})
-        with patch("ui.widget.sys.platform", "win32"):
+        with (
+            patch("ui.widget.sys.platform", "win32"),
+            patch.object(
+                SynapCapWidget,
+                "_install_windows_foreground_hook",
+            ),
+        ):
             widget = SynapCapWidget(
                 {"settings": {"always_on_top": True}},
                 [provider],
@@ -629,6 +646,33 @@ class WidgetTests(unittest.TestCase):
                 widget._restore_windows_topmost()
 
         windll.user32.SetWindowPos.assert_not_called()
+        self.assertTrue(widget._windows_taskbar_retry_timer.isActive())
+        widget.close()
+        widget.deleteLater()
+
+    def test_windows_foreground_hook_uses_skip_own_process(self):
+        provider = CodexProvider({"id": "codex", "name": "Codex"})
+        widget = SynapCapWidget(
+            {"settings": {"always_on_top": False}},
+            [provider],
+        )
+        user32 = MagicMock()
+        user32.SetWinEventHook.return_value = 123
+        windll = MagicMock(user32=user32)
+        with (
+            patch("ui.widget.sys.platform", "win32"),
+            patch("ui.widget.ctypes.windll", windll, create=True),
+        ):
+            widget._install_windows_foreground_hook()
+            hook_args = user32.SetWinEventHook.call_args.args
+            self.assertEqual(hook_args[0:2], (0x0003, 0x0003))
+            self.assertEqual(hook_args[-1], 0x0002)
+            self.assertIsNotNone(widget._windows_foreground_callback)
+            widget._uninstall_windows_foreground_hook()
+
+        user32.UnhookWinEvent.assert_called_once_with(123)
+        self.assertIsNone(widget._windows_foreground_hook)
+        self.assertIsNone(widget._windows_foreground_callback)
         widget.close()
         widget.deleteLater()
 
