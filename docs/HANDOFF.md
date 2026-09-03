@@ -1,14 +1,13 @@
 # SynapCap — 작업 현황 (최종본)
 
-> `dev` 기준. 테스트 **175개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
+> `dev` 기준. 테스트 **180개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
 > push/tag/배포는 오너가 직접.
 
 ---
 
 ## 남은 일
 
-없음. 마지막 항목(공식 Claude 마크)은 오너가 SVG를 전달해 반영 완료(`_CLAUDE_MARK`,
-`ui/icon.py` — Anthropic 상표, 프로바이더 식별용).
+없음.
 
 ---
 
@@ -37,9 +36,9 @@
 ## 공통 작업 규칙
 
 - 브랜치 `dev`만. 커밋 OK, **push/tag/배포 금지.**
-- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **175개 통과 유지.**
+- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **180개 통과 유지.**
 - 린트 `python -m ruff check ui/ tests/`. **기존 에러(건드리지 말 것)**:
-  `test_subscription_usage.py`(FLY002), `test_updates.py`(UP012 ×3), `config.py:204/216`(blind-except).
+  `test_subscription_usage.py`(FLY002), `test_updates.py`(UP012 ×3), `config.py`(blind-except ×2).
 - QSS: 리터럴 `{}` 블록 → `%(name)s` 퍼센트 스타일, **모듈 레벨 named constant**로 올려
   `_XXX_QSS % palette()`. (ruff UP031이 리터럴 `% args`만 잡음.)
 - 시각 확인 `QT_QPA_PLATFORM=windows python main.py` 스크린샷.
@@ -83,3 +82,10 @@
 | 6 | 프로바이더 칩 통일 — **D안**: Gemini 흰 박스 제거(테마 틴트) + Claude 격자 → 방사형 버스트 | `0098e22` |
 | 7 | 홈페이지 위젯 미리보기 — 4단계 색·흐린 라벨·검정 프레임·창제어 구분선·버전 칩 제거 | `5a2c864` |
 | 6+ | Claude 칩 글리프를 공식 Claude 마크(`_CLAUDE_MARK`)로 교체 | `85de758` |
+
+### 후속 (오너 요청)
+
+| 항목 | 내용 | 커밋 |
+| --- | --- | --- |
+| 트레이 접기 버튼 | 컴팩트 막대에 `–`(`compact_tray_btn`) → 위젯 안에서 펼침→막대→트레이만 | `8913399` |
+| 트레이 수치 선택 | `settings["tray_metric"]` (`highest` \| provider id) + 설정 "트레이 표시" 콤보 | `c649a5c` |
