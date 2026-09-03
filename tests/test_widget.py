@@ -279,7 +279,8 @@ class WidgetTests(unittest.TestCase):
         self.assertIsNotNone(usage_ring)
         assert usage_ring is not None
 
-        self.assertEqual(usage_ring.toolTip(), "49% 사용 · 51% 남음")
+        self.assertTrue(usage_ring.toolTip().startswith("49% 사용 · 51% 남음"))
+        self.assertIn("Codex CLI가 로컬에 기록한 구독 사용량", usage_ring.toolTip())
         with patch("ui.widget.QToolTip.showText") as show_text:
             self.widget.eventFilter(usage_ring, QEvent(QEvent.Type.Enter))
 
@@ -322,7 +323,12 @@ class WidgetTests(unittest.TestCase):
         usage_ring = ui["window_rows"][0].findChild(UsageRing)
         self.assertIsNotNone(usage_ring)
         assert usage_ring is not None
-        self.assertIn("Claude CLI 기준 사용량", usage_ring.toolTip())
+        self.assertIn("Claude CLI가 로컬에 기록한 구독 사용량", usage_ring.toolTip())
+        self.assertIn("일시적으로 차이가 날 수 있습니다", usage_ring.toolTip())
+        # In focus view the tab carries the same disclosure.
+        tab_tip = self.widget.focus_provider_buttons["claude"].toolTip()
+        self.assertIn("Claude CLI가 로컬에 기록한 구독 사용량", tab_tip)
+        self.assertIn("마지막 조회: 8/14 13:20:30", tab_tip)
 
         self.widget.enter_compact_mode()
         compact_item = self.widget.compact_ui_map["claude"]["item"]
@@ -473,13 +479,15 @@ class WidgetTests(unittest.TestCase):
         requested_urls = []
         self.widget.update_requested.connect(requested_urls.append)
 
-        self.assertEqual(self.widget.version_btn.text(), f"v{APP_VERSION}")
+        # Up to date: no version chip in the header at all.
+        self.assertFalse(self.widget.version_btn.isVisibleTo(self.widget))
         self.assertIn("background: transparent", self.widget.version_btn.styleSheet())
         self.assertIn("border: none", self.widget.version_btn.styleSheet())
         self.widget.set_update_available(
             "0.1.1",
             "https://github.com/kimNarr/SynapCap/releases/tag/v0.1.1",
         )
+        self.assertTrue(self.widget.version_btn.isVisibleTo(self.widget))
         self.widget.version_btn.click()
 
         self.assertEqual(self.widget.version_btn.text(), "v0.1.1 ↑")

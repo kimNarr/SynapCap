@@ -1196,8 +1196,9 @@ class SynapCapWidget(QWidget):
                 self._schedule_fit_to_content(resize_anchor)
 
     def _set_version_badge_style(self, update_available: bool) -> None:
-        # Keep the version as quiet, inline text. Update availability is still
-        # communicated by its accent colour and arrow, without a badge shell.
+        # The version only earns header space when there's an update to act on.
+        # Otherwise it lives in the tray tooltip and the settings title bar.
+        self.version_btn.setVisible(update_available)
         foreground = t("accent") if update_available else t("version_fg")
         self.version_btn.setStyleSheet(
             f"color: {foreground}; background: transparent; border: none; "
@@ -1268,10 +1269,20 @@ class SynapCapWidget(QWidget):
         self.cards_layout.invalidate()
         self._schedule_fit_to_content()
 
-    def _update_focus_selector_summary(self, usage: ModelUsage, ui: dict) -> None:
+    def _update_focus_selector_summary(
+        self, usage: ModelUsage, ui: dict, source_tooltip: str = ""
+    ) -> None:
         button = self.focus_provider_buttons.get(usage.provider_id)
         if button is None:
             return
+        # The tabs are the only provider identity in focus view, so hang the
+        # "where from / how fresh" disclosure here — consistently for all three.
+        tab_tooltip = f"{usage.provider_name} 사용량 보기"
+        if usage.error:
+            tab_tooltip += f"\n{usage.error}"
+        elif source_tooltip:
+            tab_tooltip += f"\n{source_tooltip}"
+        self._enable_instant_tooltip(button, tab_tooltip)
         if usage.error:
             summary = "미설치" if "찾을 수 없음" in usage.error else "조회 오류"
         else:
@@ -1906,8 +1917,9 @@ class SynapCapWidget(QWidget):
 
     def _usage_source_tooltip(self, usage: ModelUsage, provider_type: str) -> str:
         lines: list[str] = []
-        if provider_type == "claude":
-            lines.append("Claude CLI 기준 사용량")
+        # Every provider reads its own CLI's local subscription data — say so
+        # for all of them, not just Claude, so the source is never a mystery.
+        lines.append(f"{usage.provider_name} CLI가 로컬에 기록한 구독 사용량")
 
         if usage.fetched_at is not None:
             fetched_at = usage.fetched_at
@@ -2171,9 +2183,9 @@ class SynapCapWidget(QWidget):
 
             rendered_provider = True
             ui = self.provider_ui_map[usage.provider_id]
-            self._update_focus_selector_summary(usage, ui)
             provider_type = ui.get("provider_type", usage.provider_id)
             source_tooltip = self._usage_source_tooltip(usage, provider_type)
+            self._update_focus_selector_summary(usage, ui, source_tooltip)
             dormant = bool(usage.error) and "찾을 수 없음" in usage.error
             ui["name"].setStyleSheet(
                 f"color: {t('ink_dim') if dormant else t('ink')};"
