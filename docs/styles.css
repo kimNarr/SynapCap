@@ -110,8 +110,8 @@ h1 span { color: var(--blue); }
 .preview-provider-badge { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border-radius: 5px; font-size: 9px; font-style: normal; font-weight: 850; }
 .preview-provider-badge img { width: 10px; height: 10px; display: block; }
 .codex-badge { background: #252b3f; color: var(--blue); }
-.gemini-badge { background: #26372f; color: var(--green); }
-.claude-badge { background: #3a2b2b; color: #fab387; }
+.gemini-badge { background: #1e2a3d; color: #8ab4f8; }
+.claude-badge { background: #3a2b2b; color: #d97757; }
 .focus-rings { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .focus-ring-card { min-height: 164px; padding: 12px 8px 10px; display: grid; justify-items: center; align-content: space-between; border: 1px solid #1c1f29; border-radius: 9px; background: #0d0e12; }
 .focus-ring-card > strong { color: #a6adc8; font-size: 9px; font-weight: 700; letter-spacing: .04em; }
@@ -140,7 +140,7 @@ html[data-theme="light"] .preview-tab small, html[data-theme="light"] .preview-r
 html[data-theme="light"] .focus-ring-card > small { color: #5c5f77; }
 html[data-theme="light"] .preview-tab b, html[data-theme="light"] .preview-ring b { color: #1c2940; }
 html[data-theme="light"] .codex-badge { background: #e8effd; }
-html[data-theme="light"] .gemini-badge { background: #e8f5ed; }
+html[data-theme="light"] .gemini-badge { background: #e3edfb; }
 html[data-theme="light"] .claude-badge { background: #fbece6; }
 html[data-theme="light"] .preview-ring { background: conic-gradient(var(--ring-color) var(--progress), #c8ceda 0); }
 html[data-theme="light"] .preview-ring::before { background: #ffffff; }

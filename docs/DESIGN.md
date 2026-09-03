@@ -93,7 +93,7 @@ README도 새 SVG/PNG로 교체. 홈페이지 위젯 미리보기 목업도 현�
 
 구현: [`theme.py`](../theme.py)의 `LIGHT`. `DARK`와 키 집합이 완전히 같으며,
 본문과 상태색은 밝은 바탕에서 WCAG AA(일반 텍스트 4.5:1)를 넘도록 Latte 원색보다
-조금 어둡게 보정했다. Gemini 칩 배경은 브랜드 요구에 따라 `#FFFFFF`을 유지한다.
+조금 어둡게 보정했다. 프로바이더 칩은 세 개 모두 테마 틴트 배경을 쓴다("프로바이더 칩" 절).
 
 | 토큰 | 라이트 값 | 용도 |
 | --- | --- | --- |
@@ -157,20 +157,18 @@ README도 새 SVG/PNG로 교체. 홈페이지 위젯 미리보기 목업도 현�
 
 ### 프로바이더 칩
 
-`ui/icon.py` — 실제로는 공식 브랜드 SVG. 색 조합:
+`ui/icon.py` `_PROVIDER_BRANDS` + `create_provider_pixmap` — 둥근 사각 배경 위 단색 글리프.
+**세 칩 모두 테마 틴트 배경**(흰 바탕 outlier 제거).
 
-| 프로바이더 | 글자(아이콘) | 배경 |
-| --- | --- | --- |
-| GPT / Codex | `#B4BEFE` | `#252B3F` |
-| Gemini | `#4285F4` | `#FFFFFF` (흰 바탕 — 브랜드 star가 뜨도록) |
-| Claude | `#FAB387` | `#3A2B2B` |
+| 프로바이더 | 글자(글리프) | 배경 (다크 / 라이트) | 글리프 소스 |
+| --- | --- | --- | --- |
+| GPT / Codex | `#B4BEFE` / `#4C4F69` | `#252B3F` / `#E4E8F5` | Simple Icons OpenAI |
+| Gemini | `#8AB4F8` / `#2C64C9` | `#1E2A3D` / `#E3EDFB` | Simple Icons Google Gemini |
+| Claude | `#D97757` / `#A8431C` | `#3A2B2B` / `#F3E3DE` | **방사형 버스트** (`_claude_burst_markup`) |
 
-> Gemini 칩만 흰 바탕이다. 어두운 프로바이더 프레임(`#090A0D`) 위에서 밝게 튀는 것이 의도.
-> 값 위치: `ui/icon.py` — `_PROVIDER_BRANDS`.
->
-> **제안 (미적용)**: 세 칩을 "단색 글리프 + 브랜드 톤 배경"으로 통일(Gemini만 원색 유지),
-> Claude 아이콘은 현재 "Claude Code" 격자 → **Anthropic 선버스트**(방사형 별, 코럴 `#D97757`)로
-> 교체. 시안 `SynapCap UI 시안` 참고.
+> Claude 글리프는 "Claude Code" 격자에서 Claude의 방사형 버스트로 교체. 현재는 손으로 그린
+> 근사치(`<line>` 11개 + 중심 원) — 공식 Claude 마크 확보 시 `_PROVIDER_BRANDS["claude"]["markup"]`을
+> 교체(`path` 키도 지원). `assets/PROVIDER_ICONS_NOTICE.md` 참고.
 
 ### 타이포그래피
 
