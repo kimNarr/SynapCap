@@ -8,7 +8,7 @@
 
   <!-- mark, inset ~11% -->
   <g transform="translate(3.52 3.52) scale(0.78)">
-    <circle cx="16" cy="16" r="11" fill="none" stroke="#363B4D" stroke-width="2.8"/>
+    <circle cx="16" cy="16" r="11" fill="none" stroke="#5A6480" stroke-width="2.8"/>
     <path d="M8.222 23.778A11 11 0 0 1 23.53 7.981"
           fill="none" stroke="#89B4FA" stroke-width="2.8" stroke-linecap="round"/>
     <circle cx="23.53" cy="7.981" r="2" fill="#89B4FA"/>

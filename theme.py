@@ -100,7 +100,7 @@ DARK: dict[str, str] = {
     # ── logo ─────────────────────────────────────────────────────────
     "logo_mark": "#89B4FA",  # unified with `accent` — one blue everywhere
     "logo_text": "#EAEEF7",
-    "logo_track": "#363B4D",
+    "logo_track": "#5A6480",
 }
 
 # Catppuccin Latte-inspired light surfaces.  Text and semantic colours are

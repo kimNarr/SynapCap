@@ -54,7 +54,7 @@
 | --- | --- | --- |
 | `mark-glyph` | `#EAEEF7` (라이트 `#1B1D26`) | `S` |
 | `mark-fill` | `#89B4FA` (라이트 `#1857C9`) | 채움 아크 · 선단 노드 — **앱 UI `accent`와 동일** |
-| `mark-track` | `#363B4D` (라이트 `#AEB6C6`) | 닫힌 게이지 원 |
+| `mark-track` | `#5A6480` (라이트 `#AEB6C6`) | 닫힌 게이지 원 |
 
 **로고 = UI accent 통일 (완료)**: `theme.py`의 `logo_mark` = `accent`
 (`#89B4FA` / 라이트 `#1857C9`). `assets/*.svg`·`docs/assets/*.svg`의 하드코딩 hex와

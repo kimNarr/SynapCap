@@ -145,7 +145,7 @@ def _themed_brand_asset(name: str) -> bytes:
     replacements = {
         b"#89B4FA": t("logo_mark").encode("ascii"),
         b"#EAEEF7": t("logo_text").encode("ascii"),
-        b"#363B4D": t("logo_track").encode("ascii"),
+        b"#5A6480": t("logo_track").encode("ascii"),
     }
     for source, replacement in replacements.items():
         data = data.replace(source, replacement)

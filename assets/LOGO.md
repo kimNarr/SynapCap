@@ -10,7 +10,7 @@
 
 | 파일 | 용도 | 색 |
 | --- | --- | --- |
-| `logo.svg` | 마스터 · 어두운 바탕 | glyph `#EAEEF7` · fill `#89B4FA` · track `#363B4D` |
+| `logo.svg` | 마스터 · 어두운 바탕 | glyph `#EAEEF7` · fill `#89B4FA` · track `#5A6480` |
 | `logo-light.svg` | 밝은 바탕 | glyph `#1B1D26` · fill `#1857C9` · track `#AEB6C6` |
 | `logo-mono.svg` | 단색 (트레이) | `currentColor`, track `stroke-opacity 0.32` — 부모에 `color` 지정 |
 | `logo-icon.svg` | 앱 아이콘 빌드 소스 | 근접흑 라운드 타일 + 마스터 마크(78% 인셋) |
