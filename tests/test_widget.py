@@ -173,6 +173,25 @@ class WidgetTests(unittest.TestCase):
         assert ring is not None
         self.assertEqual(ring.color.name(), "#f38ba8")
 
+    def test_elevated_windows_get_a_non_colour_border_signal(self):
+        def tile_border(used: int) -> str:
+            self.usage.windows = [UsageWindow("5시간", used, "8/12 09:49", 100 - used)]
+            self.widget.update_data([self.usage], force=True)
+            tile = self.widget.provider_ui_map["codex"]["window_rows"][0]
+            return tile.styleSheet()
+
+        # calm: default thin edge, no severity colour.
+        calm = tile_border(40)
+        self.assertIn(f"1px solid {t('focus_metric_edge')}", calm)
+
+        # warn: a 2px coloured border appears (presence, not just hue).
+        warn = tile_border(80)
+        self.assertIn(f"2px solid {t('usage_warn')}", warn)
+
+        # crit: the border thickens again.
+        crit = tile_border(95)
+        self.assertIn(f"3px solid {t('usage_crit')}", crit)
+
     def test_focus_ring_reset_countdown_is_dim_secondary_metadata(self):
         self.widget.update_data([self.usage])
         reset_label = self.widget.provider_ui_map["codex"]["window_rows"][0].findChild(

@@ -2000,12 +2000,23 @@ class SynapCapWidget(QWidget):
             reset_display, _ = self._reset_presentation(window.reset_text)
             color = self._usage_color(window.used)
 
+            # Non-colour severity signal (I-03): an elevated window gets a
+            # coloured tile border — present vs absent tells "watch this"
+            # apart from a calm window without relying on hue, and the border
+            # thickens again at the critical threshold.
+            if window.used >= USAGE_CRIT:
+                border = f"3px solid {color}"
+            elif window.used >= USAGE_WARN:
+                border = f"2px solid {color}"
+            else:
+                border = f"1px solid {t('focus_metric_edge')}"
+
             tile = QWidget()
             tile.setObjectName("focusRingMetric")
             tile.setStyleSheet(
                 "QWidget#focusRingMetric {"
                 f"background-color: {t('focus_metric_bg')}; "
-                f"border: 1px solid {t('focus_metric_edge')}; "
+                f"border: {border}; "
                 "border-radius: 10px;"
                 "}"
             )
