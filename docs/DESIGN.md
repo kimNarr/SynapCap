@@ -61,6 +61,11 @@
 `ui/icon.py`의 recolor 맵 키를 모두 교체, `docs/assets/logo.png` 재생성 완료.
 패키지 `synapcap.ico`/`.icns`/`.png`는 gitignore + 빌드 시 `generate_icons.py`가 재생성.
 
+**HiDPI**: 인앱 아트(`create_app_pixmap`·`create_wordmark_pixmap`·`create_provider_pixmap`)는
+`_render_svg(..., dpr)`로 화면 배율만큼 더 큰 비트맵을 그리고 `setDevicePixelRatio`를 붙인다.
+안 그러면 125%↑ 배율에서 20px 마크가 뭉개져 스피너처럼 보인다. 파일로 저장하는
+`create_app_icon_pixmap`은 dpr 1 고정(빌드 산출물 크기 유지).
+
 **연동 완료**: `ui/icon.py`가 `logo.svg`/`logo-icon.svg`/`wordmark.svg`를 런타임 래스터라이즈,
 `scripts/generate_icons.py`가 빌드 시 `synapcap.ico`/`.icns`/`.png` 생성. 홈페이지(`docs/`)와
 README도 새 SVG/PNG로 교체. 홈페이지 위젯 미리보기 목업도 현재 앱 디자인(집중 링·4단계 색·

@@ -1,6 +1,6 @@
 # SynapCap — 작업 현황 (최종본)
 
-> `dev` 기준. 테스트 **181개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
+> `dev` 기준. 테스트 **182개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
 > push/tag/배포는 오너가 직접.
 
 ---
@@ -37,7 +37,7 @@
 ## 공통 작업 규칙
 
 - 브랜치 `dev`만. 커밋 OK, **push/tag/배포 금지.**
-- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **181개 통과 유지.**
+- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **182개 통과 유지.**
 - 린트 `python -m ruff check ui/ tests/`. **기존 에러(건드리지 말 것)**:
   `test_subscription_usage.py`(FLY002), `test_updates.py`(UP012 ×3), `config.py`(blind-except ×2).
 - QSS: 리터럴 `{}` 블록 → `%(name)s` 퍼센트 스타일, **모듈 레벨 named constant**로 올려
@@ -92,4 +92,4 @@
 | 트레이 수치 선택 | `settings["tray_metric"]` (`highest` \| provider id \| `none`) + 설정 "트레이 표시" 콤보. `none`이면 앱 아이콘만 | `c649a5c` · `f508f7b` |
 | 트레이 글리프 확대 | `create_usage_tray_icon` 여백 축소(`inset` 3%) + 자릿수별 폰트 비율 → 작은 트레이 가독성 | `9ff9729` |
 | 설정 푸터 2버튼 | `적용` 제거 → `취소`/`저장`만. 테마·표시모드·트레이표시는 즉시 라이브 미리보기 유지. 고아 토큰(`preview_*`, `accent_soft`) 제거 | `9ff9729` |
-| 로고 스피너 오인 | 게이지 트랙 270° 호 → 닫힌 원. 트랙 색 다크 `#5A6480`·라이트 `#AEB6C6`로 상향(닫힘 가시성) | `ec8f619` · `89897e4` · `ee57f31` |
+| 로고 스피너 오인 | 게이지 트랙 270° 호 → 닫힌 원. 트랙 색 다크 `#5A6480`·라이트 `#AEB6C6`로 상향. **인앱 아트 HiDPI 렌더**(`_render_svg` dpr 인자 + `setDevicePixelRatio`) — 125%↑ 배율 뭉갬 수정 | `ec8f619` · `89897e4` · `ee57f31` · (이번) |

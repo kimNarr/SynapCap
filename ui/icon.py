@@ -5,8 +5,16 @@ from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtWidgets import QApplication
 
 from theme import on_change, t
+
+
+def _device_pixel_ratio() -> float:
+    """The primary screen's DPR, so in-app art is crisp on HiDPI displays."""
+    app = QApplication.instance()
+    screen = app.primaryScreen() if app is not None else None
+    return max(1.0, screen.devicePixelRatio() if screen is not None else 1.0)
 
 try:
     from PySide6.QtSvg import QSvgRenderer
@@ -50,8 +58,10 @@ def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
     brand = _PROVIDER_BRANDS.get(provider_type, {"fallback": "AI"})
     foreground, background = _brand_colors(brand.get("token"))
 
-    pixmap = QPixmap(size, size)
+    dpr = _device_pixel_ratio()
+    pixmap = QPixmap(max(1, round(size * dpr)), max(1, round(size * dpr)))
     pixmap.fill(QColor(0, 0, 0, 0))
+    pixmap.setDevicePixelRatio(dpr)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setPen(Qt.PenStyle.NoPen)
@@ -80,7 +90,11 @@ def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
     else:
         painter.setPen(QColor(foreground))
         painter.setFont(QFont("Segoe UI", max(7, round(size * 0.28)), QFont.Weight.Bold))
-        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, brand["fallback"])
+        painter.drawText(
+            QRectF(0, 0, size, size),
+            Qt.AlignmentFlag.AlignCenter,
+            brand["fallback"],
+        )
 
     painter.end()
     return pixmap
@@ -107,16 +121,23 @@ def _asset_bytes(name: str) -> bytes:
     return b""
 
 
-def _render_svg(data: bytes, width: int, height: int) -> QPixmap | None:
-    """Rasterise an SVG into a transparent pixmap, preserving its aspect ratio."""
+def _render_svg(
+    data: bytes, width: int, height: int, dpr: float = 1.0
+) -> QPixmap | None:
+    """Rasterise an SVG into a transparent pixmap, preserving its aspect ratio.
+
+    ``dpr`` > 1 renders extra device pixels and tags the pixmap so a QLabel of
+    the logical ``width``x``height`` stays sharp on a HiDPI screen.
+    """
     if not data or QSvgRenderer is None:
         return None
     renderer = QSvgRenderer(QByteArray(data))
     if not renderer.isValid():
         return None
 
-    pixmap = QPixmap(max(1, width), max(1, height))
+    pixmap = QPixmap(max(1, round(width * dpr)), max(1, round(height * dpr)))
     pixmap.fill(QColor(0, 0, 0, 0))
+    pixmap.setDevicePixelRatio(dpr)
 
     view_box = renderer.viewBoxF()
     if view_box.width() > 0 and view_box.height() > 0:
@@ -155,7 +176,9 @@ def _themed_brand_asset(name: str) -> bytes:
 @lru_cache(maxsize=16)
 def create_app_pixmap(size: int = 32) -> QPixmap:
     """The transparent gauge mark, for in-app use (compact bar, etc.)."""
-    rendered = _render_svg(_themed_brand_asset("logo.svg"), size, size)
+    rendered = _render_svg(
+        _themed_brand_asset("logo.svg"), size, size, _device_pixel_ratio()
+    )
     if rendered is not None:
         return rendered
 
@@ -193,7 +216,9 @@ def create_app_icon(size: int = 32) -> QIcon:
 @lru_cache(maxsize=12)
 def create_wordmark_pixmap(width: int = 96, height: int = 30) -> QPixmap:
     """The SynapCap wordmark, scaled for title bars."""
-    rendered = _render_svg(_themed_brand_asset("wordmark.svg"), width, height)
+    rendered = _render_svg(
+        _themed_brand_asset("wordmark.svg"), width, height, _device_pixel_ratio()
+    )
     if rendered is not None:
         return rendered
     pixmap = QPixmap(width, height)

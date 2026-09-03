@@ -56,6 +56,15 @@ class IconTests(unittest.TestCase):
         self.assertIsNone(_render_svg(b"", 32, 32))
         self.assertIsNone(_render_svg(b"not an svg", 32, 32))
 
+    def test_render_svg_scales_device_pixels_for_hidpi(self):
+        pixmap = _render_svg(_asset_bytes("logo.svg"), 20, 20, dpr=2.0)
+        self.assertIsNotNone(pixmap)
+        assert pixmap is not None
+        # Extra device pixels for sharpness, but the pixmap still lays out as 20.
+        self.assertEqual(pixmap.width(), 40)
+        self.assertEqual(pixmap.devicePixelRatio(), 2.0)
+        self.assertEqual(pixmap.width() / pixmap.devicePixelRatio(), 20)
+
     def test_app_pixmaps_are_not_blank(self):
         for size in (16, 32, 64, 256):
             self.assertGreater(_painted_pixels(create_app_pixmap(size)), 10)
