@@ -90,10 +90,6 @@ async function loadLatestRelease() {
 
     status.textContent = `${release.tag_name} 다운로드 가능`;
     meta.textContent = `최신 ${release.tag_name} · ${published} 공개 · 누적 다운로드 ${downloads.toLocaleString("ko-KR")}회`;
-    const previewVersion = document.querySelector("#preview-version");
-    if (previewVersion) {
-      previewVersion.textContent = release.tag_name;
-    }
 
     const availableAssets = new Map((release.assets || []).map((item) => [item.name, item.browser_download_url]));
     document.querySelectorAll("[data-asset]").forEach((link) => {

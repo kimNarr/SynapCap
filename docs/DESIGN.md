@@ -55,15 +55,15 @@
 | `mark-fill` | `#89B4FA` (라이트 `#1857C9`) | 채움 아크 · 선단 노드 — **앱 UI `accent`와 동일** |
 | `mark-track` | `#363B4D` (라이트 `#D5D9E4`) | 빈 아크 |
 
-**로고 = UI accent 통일 (결정됨)**: `theme.py`의 `logo_mark`가 `accent`와 같은 블루
-(`#89B4FA` / 라이트 `#1857C9`). 인앱은 `ui/icon.py` 런타임 recolor로 이미 반영.
-**남은 자산 작업**: `assets/*.svg`의 하드코딩 `#5B8DEF`/`#3B6FD4` 교체 →
-`scripts/generate_icons.py` 재실행 → `docs/`·README 아이콘 자산 갱신.
+**로고 = UI accent 통일 (완료)**: `theme.py`의 `logo_mark` = `accent`
+(`#89B4FA` / 라이트 `#1857C9`). `assets/*.svg`·`docs/assets/*.svg`의 하드코딩 hex와
+`ui/icon.py`의 recolor 맵 키를 모두 교체, `docs/assets/logo.png` 재생성 완료.
+패키지 `synapcap.ico`/`.icns`/`.png`는 gitignore + 빌드 시 `generate_icons.py`가 재생성.
 
 **연동 완료**: `ui/icon.py`가 `logo.svg`/`logo-icon.svg`/`wordmark.svg`를 런타임 래스터라이즈,
 `scripts/generate_icons.py`가 빌드 시 `synapcap.ico`/`.icns`/`.png` 생성. 홈페이지(`docs/`)와
-README도 새 SVG/PNG로 교체. 기존 3D 래스터 자산 제거.
-**남은 것**: 홈페이지 위젯 미리보기 목업을 현재 앱 디자인에 맞추기(별도), 로고/앱 accent 통일 결정.
+README도 새 SVG/PNG로 교체. 홈페이지 위젯 미리보기 목업도 현재 앱 디자인(집중 링·4단계 색·
+통일 accent)으로 갱신.
 
 ### 색 (Catppuccin Mocha 기반, 배경은 더 어둡게)
 
