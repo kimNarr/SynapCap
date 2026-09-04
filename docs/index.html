@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="API 키 없이 Codex, Gemini, Claude의 5시간·주간 구독 사용량을 확인하는 데스크톱 위젯 SynapCap을 다운로드하세요.">
+  <meta name="description" content="API 키 없이 Codex, Gemini, Claude의 5시간·주간 구독 사용량을 펼침·막대·트레이 숫자로 확인하는 데스크톱 위젯 SynapCap을 다운로드하세요.">
   <meta name="theme-color" content="#11111b">
   <meta property="og:title" content="SynapCap — AI 사용량을 한눈에">
-  <meta property="og:description" content="API 키 없이 Codex, Gemini, Claude의 5시간·주간 한도를 보여주는 가벼운 데스크톱 위젯">
+  <meta property="og:description" content="API 키 없이 Codex, Gemini, Claude의 구독 한도를 펼침·막대·트레이 숫자로 보여주는 가벼운 데스크톱 위젯">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://kimNarr.github.io/SynapCap/">
   <link rel="canonical" href="https://kimNarr.github.io/SynapCap/">
@@ -41,7 +41,7 @@
       <div class="hero-copy">
         <div class="eyebrow"><span class="live-dot"></span><span id="release-status" aria-live="polite">최신 공개 버전 확인 중</span></div>
         <h1>AI 한도,<br><span>작게 띄워두고</span><br>한눈에.</h1>
-        <p class="hero-description">Codex, Gemini, Claude의 5시간·주간 구독 사용량과 리셋 시간을 하나의 가벼운 데스크톱 위젯에서 확인하세요.</p>
+        <p class="hero-description">Codex, Gemini, Claude의 5시간·주간 구독 사용량과 리셋 시간은 위젯에서, 가장 중요한 수치는 트레이 아이콘에서 한눈에 확인하세요.</p>
         <div class="hero-actions">
           <a id="primary-download" class="button button-primary" href="https://github.com/kimNarr/SynapCap/releases/latest">
             <span class="button-os" aria-hidden="true">↓</span>
@@ -57,10 +57,10 @@
         <div class="widget-preview">
           <div class="widget-header">
             <div class="widget-brand"><img src="assets/logo-icon.svg" alt="" width="18" height="18"><strong>SynapCap</strong></div>
-            <div class="widget-tools" aria-hidden="true"><span>↻</span><span>⚙</span><span class="widget-tools-divider"></span><span>−</span><span>×</span></div>
+            <div class="widget-tools" aria-hidden="true"><span>↻</span><span>⚙</span><span class="widget-tools-divider"></span><span>⇩</span><span>−</span><span>×</span></div>
           </div>
           <div class="provider-tabs" aria-label="사용량 제공자">
-            <div class="preview-tab is-selected"><span class="preview-provider-badge codex-badge"><img src="assets/provider-codex.svg" alt=""></span><span><small>GPT</small><b>62 / 44%</b></span></div>
+            <div class="preview-tab is-selected"><span class="preview-provider-badge codex-badge"><img src="assets/provider-codex.svg" alt=""></span><span><small>Codex</small><b>62 / 44%</b></span></div>
             <div class="preview-tab"><span class="preview-provider-badge gemini-badge"><img src="assets/provider-gemini.svg" alt=""></span><span><small>Gemini</small><b>15 / 9%</b></span></div>
             <div class="preview-tab"><span class="preview-provider-badge claude-badge"><img src="assets/provider-claude.svg" alt=""></span><span><small>Claude</small><b>55 / 21%</b></span></div>
           </div>
@@ -76,7 +76,7 @@
               <small>4d 20h</small>
             </article>
           </div>
-          <div class="stage-caption"><span></span>선택한 모델에 집중하는 고정형 위젯</div>
+          <div class="stage-caption"><span></span>펼침 · 막대 · 트레이만, 세 단계로 전환</div>
         </div>
       </div>
     </section>
@@ -91,7 +91,7 @@
         <article><div class="feature-icon">02</div><h3>한도를 내 방식대로</h3><p>5시간·주간 한도를 고르고 선택한 임계치에 도달할 때만 알림을 받을 수 있습니다.</p></article>
         <article><div class="feature-icon">03</div><h3>리셋까지 바로</h3><p>각 링 아래에 다음 리셋까지 남은 시간을 함께 표시해 한도와 여유 시간을 빠르게 파악합니다.</p></article>
         <article><div class="feature-icon">04</div><h3>로컬 우선</h3><p>API 키를 서버로 보내지 않고 로그인된 로컬 클라이언트에서 조회합니다.</p></article>
-        <article><div class="feature-icon">05</div><h3>트레이에만 가볍게</h3><p>중복 실행 없이 기존 위젯을 앞으로 표시하고, 알림 영역에서 표시·업데이트 확인·재시작을 제어합니다.</p></article>
+        <article><div class="feature-icon">05</div><h3>세 단계 표시 모드</h3><p>펼침·막대·트레이만으로 밀도를 바꾸고, 트레이에는 최고 사용률이나 선택한 서비스의 숫자를 상시 표시합니다.</p></article>
         <article><div class="feature-icon">06</div><h3>검증형 원클릭 업데이트</h3><p>새 버전을 알리고 운영체제에 맞는 설치 파일을 내려받아 SHA-256 확인 후 설치를 이어갑니다.</p></article>
       </div>
     </section>
@@ -145,7 +145,7 @@
         <p class="section-kicker">Before installing</p>
         <h2>웹 채팅이 아닌<br>로컬 로그인 기준</h2>
         <p>SynapCap은 각 서비스의 로컬 앱 또는 CLI가 제공하는 구독 한도를 읽습니다. 웹 채팅만 사용하는 계정의 사용량은 조회하지 않으며 별도의 유료 API를 호출하지 않습니다.</p>
-        <p class="usage-sync-note">Claude 사용량은 Claude Code CLI 기준입니다. 실행 중인 Claude 화면이 먼저 갱신되면 SynapCap 값에는 수분 뒤 반영될 수 있으며, 앱의 <b>CLI 기준</b> 안내에서 마지막 조회 시각을 확인할 수 있습니다.</p>
+        <p class="usage-sync-note">Claude 사용량은 Claude Code CLI 기준입니다. 실행 중인 Claude 화면이 먼저 갱신되면 SynapCap 값에는 수분 뒤 반영될 수 있으며, 앱의 프로바이더·사용량 툴팁에서 출처와 마지막 조회 시각을 확인할 수 있습니다.</p>
       </div>
       <div class="requirement-list">
         <div><span class="service-letter"><img src="assets/provider-codex.svg" alt=""></span><p><strong>Codex</strong><small>Codex CLI · Windows는 Codex 앱도 지원</small></p><b>설치·로그인 필요</b></div>
@@ -161,7 +161,7 @@
         <p>카드의 상태 배지를 누르면 CLI 감지 경로와 해결 안내가 열립니다. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다.</p>
       </div>
       <div class="error-grid">
-        <article><span class="error-badge">설치 필요</span><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다.</p></article>
+        <article><span class="error-badge dormant">미설치</span><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다. 사용하지 않는 서비스는 설정에서 숨길 수 있습니다.</p></article>
         <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행합니다. Antigravity 인증 코드는 복사해서 <code>agy</code>가 기다리는 터미널에 붙여 넣고 Enter를 누릅니다.</p></article>
         <article><span class="error-badge warning">시간 초과</span><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
         <article><span class="error-badge muted">조회 오류</span><h3>진단 정보를 확인하세요</h3><p>상태 배지를 눌러 원인을 확인하고 토큰이 없는 진단 보고서를 복사해 Issue에 첨부할 수 있습니다.</p></article>
@@ -177,7 +177,7 @@
       <div class="mac-setup">
         <div class="mac-setup-copy">
           <p class="section-kicker">macOS quick setup</p>
-          <h3>세 카드가 모두 `설치 필요`라면</h3>
+          <h3>세 카드가 모두 `미설치`라면</h3>
           <p>macOS에서는 앱이나 웹 로그인만으로 사용량을 읽을 수 없습니다. 사용하는 서비스의 CLI만 설치하세요.</p>
         </div>
         <div class="command-list" aria-label="macOS CLI 설치 명령">
@@ -197,7 +197,7 @@
       </div>
       <div class="update-flow">
         <article><span>1</span><h3>새 버전 확인</h3><p>앱 시작 시 최신 공개 버전을 확인하고, 업데이트 뒤에는 해당 Release 안내를 최초 한 번 표시합니다.</p></article>
-        <article><span>2</span><h3>다운로드·검증</h3><p>상단 버전 텍스트나 트레이 메뉴를 누르면 운영체제별 파일과 체크섬을 공식 Release에서 받아 SHA-256을 자동 확인합니다.</p></article>
+        <article><span>2</span><h3>다운로드·검증</h3><p>업데이트가 있을 때 나타나는 상단 버전 표시나 트레이 메뉴를 누르면 운영체제별 파일과 체크섬을 공식 Release에서 받아 SHA-256을 자동 확인합니다.</p></article>
         <article><span>3</span><h3>설치 이어가기</h3><p>Windows는 UAC 승인 후 자동 설치·재실행합니다. 미서명 macOS 버전은 검증된 DMG를 열어 앱 교체만 남겨 둡니다.</p></article>
       </div>
       <p class="signing-note"><strong>v0.1.4 이하를 사용 중인가요?</strong> 원클릭 기능이 없는 기존 버전에서는 이번 한 번 최신 Release 설치 파일을 직접 받아야 합니다. 그 다음 버전부터는 앱 안에서 업데이트할 수 있습니다.</p>
