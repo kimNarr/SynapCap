@@ -1,103 +1,77 @@
-# 릴리스 인수인계 — v0.2.6 이후 (2026-09-03)
+# 릴리스 절차 & 현황
 
-> 이 문서는 **다음 릴리스를 내보내기 위한** 현황 정리다. 디자인/기능 작업은 `dev`에 전부
-> 커밋되어 있고, **머지·버전 범프·태그·push·빌드·GitHub 릴리스만 남았다.**
-> Claude Code 세션은 push/tag/배포를 못 하므로 여기까지만 준비됨.
+> 마지막 갱신: 2026-09-04. **v0.3.0은 배포 완료됨.** 아래 1번은 현황, 2번은 다음 릴리스용 절차.
 
 ---
 
-## 1. 지금 git 상태
+## 1. 현재 상태 — v0.3.0 배포 끝
 
-| ref | SHA | 의미 |
-| --- | --- | --- |
-| `origin/main` | `3d81560` | **마지막 릴리스 = 태그 `v0.2.6`** (`origin/main`이 곧 `v0.2.6`) |
-| `dev` (로컬) | `25ed88f` | 이번에 낼 것. `origin/main`의 **직계 자손** → 충돌 없이 fast-forward 머지 가능 |
-| `origin/dev` | `2a3eb4c` | 오래된 상태. 로컬 `dev`가 훨씬 앞서 있고 **아직 push 안 됨** |
-| `main` (로컬) | `d578859` | 오래됨(`v0.2.0` 근처). 무시하고 `origin/main` 기준으로 작업할 것 |
+| 항목 | 상태 |
+| --- | --- |
+| `version.py` | `0.3.0` |
+| 태그 `v0.3.0` | `fefca20`, **push 됨** |
+| `origin/main` = `origin/dev` | `dd01cd5` (태그보다 2커밋 뒤 — `d3c0d9e`·`dd01cd5`는 릴리스 후 홈페이지 정리) |
+| 로컬 `dev` | `origin/dev`와 동일, 작업 트리 클린 |
+| 로컬 `main` | `fefca20`에 멈춰 있음(stale). `git checkout main && git reset --hard origin/main`으로 맞추면 됨 |
+| CI `release.yml` (`v0.3.0`) | ✅ success — Windows Setup.exe + macOS arm64/x64 dmg + `SHA256SUMS.txt` + provenance |
+| GitHub 릴리스 `v0.3.0` | ✅ 게시됨 (assets 4개 첨부, `github-actions[bot]` 작성) |
+| CI `pages.yml` (홈페이지) | ✅ `dd01cd5` 배포 성공 |
+| CI `ci.yml` (테스트) | ✅ `main` green |
 
-- `dev`는 `origin/main`보다 **27 커밋 앞섬** (`git rev-list --count origin/main..dev`).
-- 작업 트리 클린. 단 `assets/logo-concept.png`가 **untracked** — 컨셉 스케치라 커밋 대상 아님. `.gitignore`에 넣거나 그대로 두면 됨.
-- `version.py` = `0.2.6` (아직 안 올림). `CHANGELOG.md`에 `[Unreleased]` 항목 가득.
-- 테스트 **187개 통과** (`QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests`).
-- ruff: 기존 에러 6건만 (`test_subscription_usage.py` FLY002, `test_updates.py` UP012 ×3, `config.py` blind-except ×2) — 이번 변경으로 늘지 않음.
+**남은 배포 작업 없음.** 다음 기능 작업은 `dev`에서 계속하면 된다.
+
+- 로컬 `assets/synapcap.ico`/`.icns`/`.png`는 gitignore 대상이라 저장소·릴리스와 무관.
+  릴리스는 CI가 `generate_icons.py`로 매번 새로 만든다. 로컬에서 새 아이콘을 보고 싶으면
+  `python scripts/generate_icons.py`.
 
 ---
 
-## 2. v0.2.6 이후 `dev`의 27 커밋 (릴리스 노트용)
+## 2. 다음 릴리스 절차
 
-### 새 기능
-| 커밋 | 내용 |
-| --- | --- |
-| `e3daa85` | 펼침·막대·트레이만 **3단계 표시 모드** + 모드별 위치 저장 + 동적 트레이 숫자 아이콘 |
-| `8913399` | 컴팩트 막대에 "트레이로 접기" 버튼 (위젯 안에서 펼침→막대→트레이만) |
-| `c649a5c` · `56da206` · `f508f7b` | 트레이에 표시할 수치 선택 설정 `tray_metric` (`최고 사용률` / 특정 프로바이더 / `숫자 표시 안 함`) |
-| `6a84b99` | 펼침·막대 창 제어를 `[트레이로] [모드 토글] [종료]` 같은 순서·아이콘으로 통일, 펼침에서도 곧장 트레이만 모드로 |
-| `25ed88f` | 첫 실행·업데이트 직후 위젯을 화면 중앙 배치, 이후엔 마지막 위치·모드 복원 |
-| `034a81b` | 홈페이지 라이트 테마 |
+빌드·GitHub 릴리스는 **CI가 태그 push에 반응해서 자동으로 한다.** 사람이 하는 건 버전 범프 + 머지 + 태그 push뿐.
 
-### 디자인 / UX
-| 커밋 | 내용 |
-| --- | --- |
-| `f94848e` · `8e1c4d0` | 집중 링 뷰로 재설계 (단일 `UsageRing` + 프로바이더 탭, 384px 고정) |
-| `a63be2a` · `c090850` · `060cb4b` | 펼침 헤더 브랜드 마크, 탭 폭·타이포 정리 |
-| `32947a8` | 집중 카드에서 링 안 `%`가 헤드라인이 되도록 라벨 강등 (9-6) |
-| `b1da61f` | 버전 칩은 업데이트 시에만 노출 + 세 프로바이더 출처 툴팁 일관 (9-8) |
-| `c53ac1d` | 위험 단계에 색 외 신호(집중 링 타일 테두리 2/3px) (Task 3) |
-| `0904d3e` · `12898c7` | 로고 마크를 앱 accent로 통일 (`#89B4FA` / 라이트 `#1857C9`) + 자산 재생성 (Task 5) |
-| `0098e22` · `85de758` | 프로바이더 칩 테마 틴트 통일, Claude 글리프를 공식 Claude 마크로 (Task 6) |
-| `5a2c864` | 홈페이지 위젯 미리보기를 현재 디자인으로 갱신 (Task 7) |
-| `9ff9729` | 트레이 글리프 확대(여백↓·자릿수별 폰트) + 설정 푸터 `취소`/`저장` 2버튼(`적용` 제거) |
-| `ec8f619` · `89897e4` · `ee57f31` · `e9992f6` · `6f77ff3` | **로고 스피너 오인 해결**: 게이지 270°호→닫힌 원, 트랙 색 대비↑, 인앱 아트 HiDPI 렌더, 헤더 마크 20→26px·`S` 획 굵게, 테마 전환 시 헤더 로고 재도색 |
-
-### 수정
-| 커밋 | 내용 |
-| --- | --- |
-| `3d81560`\* · `b4f8c21` · `dd17729` · `2a3eb4c` | 작업표시줄 위 고정 위젯 Z-order/클릭 안정화 (\* `3d81560`은 이미 `v0.2.6`에 포함) |
-| `8e1c4d0` | 막대 펼치기 시 현재 화면 모서리 기준으로 펼치도록 (과거 좌표 이동 버그) |
-
-### 문서
-`56dc1dd` · `71bdb5c` · `f9b7c5b` · `7101448` — `docs/HANDOFF.md`(디자인 backlog) 추가·갱신, 프로바이더 아이콘 고지 정정.
-
-> 세부 결정·구현 위치는 `docs/HANDOFF.md`, `docs/DESIGN.md` 참고. `CHANGELOG.md`의 `[Unreleased]` 블록에 사용자용 문구가 이미 정리돼 있음.
-
----
-
-## 3. 남은 릴리스 절차 (오너/Codex가 직접)
-
-권장 버전: **`0.3.0`** (minor — 3단계 표시 모드·`tray_metric`·창 제어 통일 등 새 기능 다수).
+### 2-1. 사람이 하는 것
 
 ```bash
-# 0) dev 최신·클린 확인 (로컬 dev = 25ed88f)
 cd C:/project/personal/SynapCap
-git checkout dev && git status
-python scripts/manage_version.py current            # 0.2.6
+git checkout dev && git pull && git status        # 클린 확인
+QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests   # green 확인
+python -m ruff check ui/ tests/                    # 기존 에러 6건 외 없음 확인
 
-# 1) 버전 범프 (version.py + CHANGELOG [Unreleased] -> [0.3.0] - <오늘>)
-python scripts/manage_version.py bump minor         # 0.2.6 -> 0.3.0
-git commit -am "chore: release v0.3.0"
+# 버전 범프 (version.py + CHANGELOG [Unreleased] -> [X.Y.Z] - <오늘>)
+python scripts/manage_version.py bump minor        # 또는 patch / major / 1.2.3
+# CHANGELOG.md의 새 [X.Y.Z] 섹션 문구 검토·정리
 
-# 2) origin/main 기준으로 main 맞추고 fast-forward 머지
-git checkout main
-git reset --hard origin/main
+git commit -am "chore: release vX.Y.Z"
+
+# main으로 fast-forward 머지
+git checkout main && git reset --hard origin/main
 git merge --ff-only dev
 
-# 3) 태그·검증·push
-python scripts/manage_version.py check v0.3.0       # 태그↔APP_VERSION 일치 확인
-git tag v0.3.0
-git push origin main dev --tags                     # dev도 올려 origin/dev 갱신
+# 태그 + push  (dev도 같이 올려 origin/dev 동기화)
+python scripts/manage_version.py check vX.Y.Z      # 태그 == APP_VERSION 확인
+git tag vX.Y.Z
+git push origin main dev --tags
+```
 
-# 4) 빌드 (스크립트가 generate_icons.py를 먼저 돌려 새 로고 반영)
-pwsh scripts/build_windows.ps1
-bash scripts/build_macos.sh                         # macOS 러너에서
+### 2-2. CI가 자동으로 하는 것 (`.github/workflows/`)
 
-# 5) GitHub 릴리스
-python scripts/manage_version.py notes 0.3.0 > RELEASE_NOTES_v0.3.0.md
-gh release create v0.3.0 dist/* --title "SynapCap v0.3.0" --notes-file RELEASE_NOTES_v0.3.0.md
+| 트리거 | 워크플로 | 하는 일 |
+| --- | --- | --- |
+| `v*` 태그 push | `release.yml` | Ubuntu에서 소스 준비 → Windows/macOS(arm64·x64) 러너에서 `build_windows.ps1`/`build_macos.sh` (각각 `generate_icons.py` 먼저) → `SHA256SUMS.txt` + provenance → `manage_version.py notes vX.Y.Z`로 릴리스 노트 → `gh release create vX.Y.Z artifacts/* --verify-tag` |
+| `main` push (`docs/**`) | `pages.yml` | 홈페이지 배포 |
+| push / PR | `ci.yml` | 테스트 (Win/mac/Linux · Py 3.12) |
+
+### 2-3. 확인
+
+```bash
+gh run list --workflow=release.yml --limit 1       # completed / success
+gh release view vX.Y.Z --json assets --jq '.assets[].name'
+# → SHA256SUMS.txt, SynapCap-macOS-arm64.dmg, SynapCap-macOS-x64.dmg, SynapCap-Windows-x64-Setup.exe
 ```
 
 ### 주의
-- 패키지 `synapcap.ico` / `.icns` / `.png`는 `.gitignore` 대상 — 빌드 스크립트가 `scripts/generate_icons.py`로 매번 생성. 이번 로고 변경은 자동 반영됨.
-- `docs/assets/logo.png`는 저장소에 커밋돼 있고 이미 새 로고로 재생성됨.
-- `manage_version.py bump`은 `version.py`의 `APP_VERSION`과 `CHANGELOG.md`의 `[Unreleased]` 마커만 건드림(태그·push·빌드 안 함). `notes <버전>`으로 릴리스 노트 추출, `check <태그>`로 태그↔버전 일치 확인.
-- Windows 체크아웃이라 `git`이 CRLF 경고를 낼 수 있음(정상).
-- `dev` 브랜치 규칙: Claude Code 세션은 여기 커밋까지만. 이 문서도 그래서 작성됨.
+- 릴리스 노트는 `CHANGELOG.md`의 해당 `## [X.Y.Z]` 섹션에서 뽑힌다. 범프 후 그 섹션을 꼭 다듬을 것.
+- `--verify-tag` 때문에 태그가 remote에 있어야 릴리스가 만들어진다 (`git push --tags` 먼저).
+- 로컬 `main`은 자주 stale해진다. 항상 `reset --hard origin/main` 후 머지.
+- Claude Code 세션은 `dev` 커밋까지만 (push/tag/배포 금지). 이 절차는 오너/Codex가 실행.
