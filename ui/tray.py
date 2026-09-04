@@ -33,11 +33,27 @@ _MENU_QSS = """
 """
 
 
-def _usage_value(usage: ModelUsage) -> float:
+def _tray_window_label(label: str) -> str:
+    normalized = label.strip().lower()
+    if normalized in {"7d", "weekly", "week", "주간"}:
+        return "주간"
+    if normalized in {"5h", "session", "세션", "5시간"}:
+        return "세션"
+    return label.strip() or "사용량"
+
+
+def _usage_peak(usage: ModelUsage) -> tuple[float, str]:
     if usage.error:
-        return 0.0
+        return 0.0, "사용량"
     windows = usage.windows or []
-    return max((window.used for window in windows), default=usage.used)
+    if not windows:
+        return usage.used, "사용량"
+    peak = max(windows, key=lambda window: window.used)
+    return peak.used, _tray_window_label(peak.label)
+
+
+def _usage_value(usage: ModelUsage) -> float:
+    return _usage_peak(usage)[0]
 
 
 def _usage_color(value: float) -> str:
@@ -251,7 +267,10 @@ class SynapCapTray(QObject):
             if usage.error:
                 details.append(f"{usage.provider_name} 조회 오류")
             else:
-                details.append(f"{usage.provider_name} {_usage_value(usage):.0f}%")
+                value, window_label = _usage_peak(usage)
+                details.append(
+                    f"{usage.provider_name} {window_label} {value:.0f}%"
+                )
         fetched_times = [
             usage.fetched_at
             for usage in valid_usage

@@ -116,8 +116,8 @@ class TrayTests(unittest.TestCase):
             tray.update_usage(usages)
 
         create_icon.assert_called_once_with(91)
-        self.assertIn("Codex 67%", tray.tray_icon.toolTip())
-        self.assertIn("Claude 91%", tray.tray_icon.toolTip())
+        self.assertIn("Codex 주간 67%", tray.tray_icon.toolTip())
+        self.assertIn("Claude 사용량 91%", tray.tray_icon.toolTip())
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()
 
@@ -136,7 +136,8 @@ class TrayTests(unittest.TestCase):
         # Shows Codex's highest window (55), not Claude's 92.
         create_icon.assert_called_once_with(55)
         # Tooltip still lists every provider.
-        self.assertIn("Claude 92%", tray.tray_icon.toolTip())
+        self.assertIn("Codex 주간 55%", tray.tray_icon.toolTip())
+        self.assertIn("Claude 사용량 92%", tray.tray_icon.toolTip())
 
         # Switching back to "highest" re-reads without new data.
         with patch("ui.tray.create_usage_tray_icon") as create_icon:
@@ -174,7 +175,45 @@ class TrayTests(unittest.TestCase):
         create_icon.assert_not_called()
         app_icon.assert_called()
         # Tooltip still carries the numbers.
-        self.assertIn("Claude 88%", tray.tray_icon.toolTip())
+        self.assertIn("Claude 사용량 88%", tray.tray_icon.toolTip())
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
+    def test_tray_tooltip_identifies_session_and_weekly_windows(self):
+        tray = SynapCapTray()
+        usages = [
+            ModelUsage(
+                "codex",
+                "Codex",
+                "Codex",
+                85,
+                100,
+                "%",
+                windows=[
+                    UsageWindow("5시간", 85, "1h"),
+                    UsageWindow("주간", 44, "4d"),
+                ],
+            ),
+            ModelUsage(
+                "gemini",
+                "Gemini",
+                "Gemini",
+                28,
+                100,
+                "%",
+                windows=[
+                    UsageWindow("5h", 12, "1h"),
+                    UsageWindow("7d", 28, "4d"),
+                ],
+            ),
+        ]
+
+        with patch("ui.tray.create_usage_tray_icon") as create_icon:
+            create_icon.return_value = QIcon()
+            tray.update_usage(usages)
+
+        self.assertIn("Codex 세션 85%", tray.tray_icon.toolTip())
+        self.assertIn("Gemini 주간 28%", tray.tray_icon.toolTip())
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()
 
