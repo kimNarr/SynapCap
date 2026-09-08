@@ -3,7 +3,7 @@ import sys
 from datetime import datetime, timedelta
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPalette, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -520,6 +520,12 @@ class SynapCapWidget(QWidget):
         self.refresh_btn.setStyleSheet(btn_style)
         self.refresh_btn.clicked.connect(self.refresh_requested.emit)
         self._enable_instant_tooltip(self.refresh_btn, "지금 새로고침")
+        self.refresh_spinner = LoadingSpinner(18, self.refresh_btn)
+        self.refresh_spinner.move(2, 2)
+        self.refresh_spinner.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents
+        )
+        self.refresh_spinner.hide()
         header_layout.addWidget(self.refresh_btn)
 
         # 2) Settings Button (⚙ Vector Icon)
@@ -686,7 +692,8 @@ class SynapCapWidget(QWidget):
 
         self.header_logo.setPixmap(create_app_pixmap(26))
         self.wordmark_label.setPixmap(create_wordmark_pixmap(92, 28))
-        self.refresh_btn.setIcon(create_refresh_icon(14, t("accent")))
+        if not self.refresh_spinner.is_spinning():
+            self.refresh_btn.setIcon(create_refresh_icon(14, t("accent")))
         self.settings_btn.setIcon(create_settings_icon(14, t("ink_mid")))
         self.header_tray_btn.setIcon(create_to_tray_icon(14, t("ink_mid")))
         self.minimize_btn.setIcon(create_minimize_icon(14, t("ink_mid")))
@@ -1572,6 +1579,9 @@ class SynapCapWidget(QWidget):
         if self.is_compact:
             self._apply_compact_width()
             self._schedule_fit_to_content(resize_anchor)
+        self.refresh_btn.setIcon(QIcon())
+        self.refresh_spinner.start()
+        self.refresh_btn.setToolTip("새로고침 중…")
         self.refresh_btn.setEnabled(False)
 
     def _finish_loading(self) -> None:
@@ -1580,6 +1590,9 @@ class SynapCapWidget(QWidget):
         for compact_ui in self.compact_ui_map.values():
             compact_ui["spinner"].stop()
             compact_ui["value"].show()
+        self.refresh_spinner.stop()
+        self.refresh_btn.setIcon(create_refresh_icon(14, t("accent")))
+        self.refresh_btn.setToolTip("지금 새로고침")
         self.refresh_btn.setEnabled(True)
 
     def _clear_usage_rows(self, ui: dict):

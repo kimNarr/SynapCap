@@ -396,6 +396,21 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
         self.assertFalse(self.widget.freshness_label.isVisible())
 
+    def test_refresh_button_shows_visible_loading_feedback(self):
+        self.widget.set_loading()
+
+        self.assertTrue(self.widget.refresh_spinner.is_spinning())
+        self.assertTrue(self.widget.refresh_btn.icon().isNull())
+        self.assertEqual(self.widget.refresh_btn.toolTip(), "새로고침 중…")
+        self.assertFalse(self.widget.refresh_btn.isEnabled())
+
+        self.widget._finish_loading()
+
+        self.assertFalse(self.widget.refresh_spinner.is_spinning())
+        self.assertFalse(self.widget.refresh_btn.icon().isNull())
+        self.assertEqual(self.widget.refresh_btn.toolTip(), "지금 새로고침")
+        self.assertTrue(self.widget.refresh_btn.isEnabled())
+
     def test_focus_ring_has_no_legacy_column_header(self):
         providers = [
             CodexProvider({"id": "codex", "name": "Codex"}),
