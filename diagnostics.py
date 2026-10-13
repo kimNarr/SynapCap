@@ -24,6 +24,16 @@ CLI_DETAILS = {
         "command": "claude",
         "login": "claude를 실행해 Anthropic 계정으로 로그인하세요.",
     },
+    "copilot": {
+        "name": "GitHub Copilot",
+        "command": "gh",
+        "login": "gh auth login을 실행해 GitHub 계정으로 로그인하세요.",
+    },
+    "grok": {
+        "name": "xAI Grok",
+        "command": "xai",
+        "login": "설정에서 xAI API 키를 입력하거나 XAI_API_KEY 환경변수를 설정하세요.",
+    },
 }
 
 

@@ -14,8 +14,10 @@ from release_notes import consume_whats_new, release_url
 from single_instance import SingleInstanceGuard
 from theme import apply_theme_setting, current_setting, palette
 from ui import SettingsDialog, SynapCapTray, SynapCapWidget, create_app_icon
+from global_hotkey import GlobalHotkeyManager
+from startup import set_startup_enabled
 from updates import UpdateCheckWorker, UpdateDownloadWorker, UpdateInfo
-from usage_alerts import update_usage_alert_state
+from usage_alerts import update_reset_alert_state, update_usage_alert_state
 from version import APP_VERSION
 from workers import UsageWorker
 
@@ -204,6 +206,29 @@ def main():
         window_mode=initial_window_mode,
         tray_metric=settings.get("tray_metric", "highest"),
     )
+    # Sync startup registry
+    set_startup_enabled(settings.get("launch_on_startup", False))
+
+    # Global Hotkey Manager
+    hotkey_manager = GlobalHotkeyManager(parent=app)
+
+    def toggle_widget_visibility():
+        current_mode = widget.window_mode()
+        if current_mode == "none" or not widget.isVisible():
+            last_mode = config_data.get("settings", {}).get("last_window_mode", "expanded")
+            apply_window_mode(last_mode)
+            widget.show()
+            widget.raise_()
+            widget.activateWindow()
+        else:
+            apply_window_mode("none")
+
+    hotkey_manager.activated.connect(toggle_widget_visibility)
+    if settings.get("global_hotkey_enabled", True):
+        hotkey_manager.register_hotkey(
+            settings.get("global_hotkey", "Ctrl+Alt+S"),
+            widget.winId(),
+        )
     active_settings_dialog: SettingsDialog | None = None
 
     def remember_widget_position(mode: str | None = None) -> None:
@@ -254,6 +279,14 @@ def main():
             tray.show_tray_pin_guidance()
             current_settings["tray_pin_guidance_shown"] = True
         if persist:
+            set_startup_enabled(new_settings.get("launch_on_startup", False))
+            if new_settings.get("global_hotkey_enabled", True):
+                hotkey_manager.register_hotkey(
+                    new_settings.get("global_hotkey", "Ctrl+Alt+S"),
+                    widget.winId(),
+                )
+            else:
+                hotkey_manager.unregister_hotkey()
             save_config(config_data)
 
     def apply_active_theme() -> None:
@@ -344,6 +377,7 @@ def main():
     worker = UsageWorker(providers, interval_sec=refresh_interval)
     worker.refresh_started.connect(widget.set_loading)
     active_usage_alerts: set[tuple[str, str]] = set()
+    active_reset_watch: dict[tuple[str, str], float] = {}
 
     def handle_usage_updated(usage_list):
         widget.update_data(usage_list)
@@ -361,6 +395,16 @@ def main():
                 alert.window_label,
                 alert.used,
                 threshold,
+            )
+        for r_alert in update_reset_alert_state(
+            usage_list,
+            config_data,
+            active_reset_watch,
+        ):
+            tray.show_reset_alert(
+                r_alert.provider_name,
+                r_alert.window_label,
+                r_alert.used,
             )
 
     worker.updated.connect(handle_usage_updated)

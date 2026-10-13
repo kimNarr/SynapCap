@@ -87,6 +87,10 @@ DARK: dict[str, str] = {
     "provider_gemini_bg": "#1E2A3D",
     "provider_claude_fg": "#D97757",
     "provider_claude_bg": "#3A2B2B",
+    "provider_copilot_fg": "#A371F7",
+    "provider_copilot_bg": "#281C3D",
+    "provider_grok_fg": "#E2E8F0",
+    "provider_grok_bg": "#1E2028",
     "provider_fallback_fg": "#CDD6F4",
     "provider_fallback_bg": "#202531",
     # ── settings dialog specifics ────────────────────────────────────
@@ -173,6 +177,10 @@ LIGHT: dict[str, str] = {
     "provider_gemini_bg": "#E3EDFB",
     "provider_claude_fg": "#A8431C",
     "provider_claude_bg": "#F3E3DE",
+    "provider_copilot_fg": "#6E40C9",
+    "provider_copilot_bg": "#EFE8FF",
+    "provider_grok_fg": "#1E2028",
+    "provider_grok_bg": "#E2E8F0",
     "provider_fallback_fg": "#303446",
     "provider_fallback_bg": "#E2E6EE",
     # ── settings dialog specifics ────────────────────────────────────

@@ -51,6 +51,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "window_pos_bar": None,
         "tray_pin_guidance_shown": False,
         "tray_metric": "highest",
+        "launch_on_startup": False,
+        "reset_alerts_enabled": True,
+        "global_hotkey_enabled": True,
+        "global_hotkey": "Ctrl+Alt+S",
     },
     "providers": [
         {
@@ -182,6 +186,14 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
             )
             if not isinstance(settings.get("last_seen_version"), str):
                 settings["last_seen_version"] = ""
+            if not isinstance(settings.get("launch_on_startup"), bool):
+                settings["launch_on_startup"] = False
+            if not isinstance(settings.get("reset_alerts_enabled"), bool):
+                settings["reset_alerts_enabled"] = True
+            if not isinstance(settings.get("global_hotkey_enabled"), bool):
+                settings["global_hotkey_enabled"] = True
+            if not isinstance(settings.get("global_hotkey"), str) or not settings.get("global_hotkey"):
+                settings["global_hotkey"] = "Ctrl+Alt+S"
             data["settings"] = settings
             if "providers" not in data or not data["providers"]:
                 data["providers"] = deepcopy(DEFAULT_CONFIG["providers"])

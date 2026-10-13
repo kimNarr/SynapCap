@@ -675,6 +675,18 @@ class SettingsDialog(QDialog):
         self.update_check.setChecked(settings.get("check_updates", True))
         form.addRow("업데이트:", self.update_check)
 
+        self.startup_check = StyledCheckBox("Windows 시작 시 자동 실행")
+        self.startup_check.setChecked(settings.get("launch_on_startup", False))
+        form.addRow("자동 실행:", self.startup_check)
+
+        self.reset_alert_check = StyledCheckBox("한도 리셋 완료 시 알림")
+        self.reset_alert_check.setChecked(settings.get("reset_alerts_enabled", True))
+        form.addRow("리셋 알림:", self.reset_alert_check)
+
+        self.hotkey_check = StyledCheckBox("글로벌 단축키 (Ctrl+Alt+S) 사용")
+        self.hotkey_check.setChecked(settings.get("global_hotkey_enabled", True))
+        form.addRow("단축키:", self.hotkey_check)
+
         self.theme_combo = NoWheelComboBox()
         self.theme_combo.addItem("시스템 설정 따름", "auto")
         self.theme_combo.addItem("라이트", "light")
@@ -980,8 +992,13 @@ class SettingsDialog(QDialog):
                 "codex": ("Codex 앱/CLI" if sys.platform == "win32" else "Codex CLI"),
                 "antigravity": "Antigravity CLI",
                 "claude": "Claude Code CLI",
-            }[selected_type]
-            connection_label.setText(f"{cli_name} 설치 및 로컬 로그인 필요 · API 키 불필요")
+                "copilot": "GitHub CLI (gh)",
+                "grok": "xAI API 키",
+            }.get(selected_type, "로컬 도구")
+            if selected_type == "grok":
+                connection_label.setText("xAI API 키 필요 (XAI_API_KEY 환경변수 또는 설정)")
+            else:
+                connection_label.setText(f"{cli_name} 설치 및 로컬 로그인 필요 · API 키 불필요")
             update_window_options()
 
         type_combo.currentIndexChanged.connect(update_connection_mode)
@@ -1076,7 +1093,7 @@ class SettingsDialog(QDialog):
             labels = ", ".join(label for label, _value in available)
             self.add_btn.setToolTip(f"추가 가능한 프로바이더: {labels}")
         else:
-            self.add_btn.setToolTip("Codex, Gemini, Claude는 각각 하나만 추가할 수 있습니다.")
+            self.add_btn.setToolTip("지원하는 모든 프로바이더가 이미 추가되었습니다.")
 
     def _reorder_container_layout(self):
         for item in self.provider_widgets:
@@ -1094,6 +1111,8 @@ class SettingsDialog(QDialog):
             "codex": "GPT",
             "antigravity": "Gemini",
             "claude": "Claude",
+            "copilot": "Copilot",
+            "grok": "Grok",
         }
         new_id = f"{provider_type}_{str(uuid.uuid4())[:6]}"
         default_data = {
@@ -1128,6 +1147,9 @@ class SettingsDialog(QDialog):
         settings["usage_alert_threshold"] = (
             self.usage_alert_threshold_spin.value()
         )
+        settings["launch_on_startup"] = self.startup_check.isChecked()
+        settings["reset_alerts_enabled"] = self.reset_alert_check.isChecked()
+        settings["global_hotkey_enabled"] = self.hotkey_check.isChecked()
         for legacy_key in (
             "dock_above_taskbar",
             "usage_view",
@@ -1175,8 +1197,10 @@ class SettingsDialog(QDialog):
                     "unit": "%",
                 }
             )
-            for stale_key in ("api_key", "auth_token", "endpoint"):
+            for stale_key in ("auth_token", "endpoint"):
                 p_data.pop(stale_key, None)
+            if selected_type_val != "grok":
+                p_data.pop("api_key", None)
             p_data["source"] = "local_subscription"
             p_data.setdefault(
                 "cache_ttl_sec",

@@ -27,6 +27,8 @@ SynapCap은 로컬에 로그인된 AI 도구의 구독 한도와 리셋 시각�
 - 펼친 위젯은 384px 고정 폭의 가로 한 모델 집중 링 보기로 제공
 - 프로바이더별 5시간·주간 한도 표시 여부 설정
 - 선택형 사용량 임계치 알림: 기본 비활성화, 50~100% 기준 설정, 같은 한도는 하락 후 재상승할 때만 다시 알림
+- 사용량 리셋 완료 알림: 한도가 소진된 후 리셋 시각이 경과하면 복귀 알림 자동 발송
+- Windows 시작 시 자동 실행 및 글로벌 단축키 (Ctrl+Alt+S) 지원
 - 상태 배지를 눌러 감지된 CLI 경로·최근 조회·설치 및 로그인 안내를 확인하고 토큰 없는 진단 정보 복사
 - 펼침·막대·트레이만 3단계 표시 모드와 모드별 마지막 위치 저장
 - 시스템 트레이에서 가장 높은 사용률을 숫자·상태색으로 확인하고 표시 모드, 새로고침, 업데이트 확인, 재시작, 설정, 종료 제어
@@ -105,7 +107,9 @@ SynapCap은 웹 채팅 페이지를 읽지 않습니다. 각 서비스의 로컬
 | --- | --- | --- |
 | Codex | Codex CLI, 또는 Windows Codex 앱 | Codex App Server의 구독 rate limit |
 | Gemini | Antigravity CLI (`agy`) | `agy --print /usage` |
-| Claude | Claude Code CLI (`claude`) | `claude -p /usage` |
+| Claude | Claude Code CLI (`claude`) | `claude -p /usage` 및 공식 usage API |
+| Copilot | GitHub CLI (`gh`) | `gh auth token` 및 Copilot SDK 쿼터 RPC |
+| Grok | xAI API 키 (`XAI_API_KEY`) | xAI 공식 API 엔드포인트 및 Rate Limit |
 
 Claude 사용량은 Claude Code CLI가 반환한 값을 기준으로 표시합니다. 실행 중인 Claude 화면의 값이 먼저 갱신되고 새 CLI 조회에는 수분 뒤 반영되는 경우가 있으므로, 카드의 `CLI 기준` 배지나 사용량에 마우스를 올려 마지막 조회 시각을 확인하세요. SynapCap은 값을 임의로 보정하지 않습니다.
 

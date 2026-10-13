@@ -194,9 +194,11 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(self.dialog.config_data["settings"]["theme"], "auto")
 
     def test_add_is_disabled_when_all_supported_providers_are_present(self):
-        self.assertEqual(len(self.dialog.provider_widgets), 3)
+        while self.dialog.add_btn.isEnabled():
+            self.dialog.on_add_provider()
+        self.assertEqual(len(self.dialog.provider_widgets), 5)
         self.assertFalse(self.dialog.add_btn.isEnabled())
-        self.assertIn("각각 하나", self.dialog.add_btn.toolTip())
+        self.assertIn("이미 추가되었습니다", self.dialog.add_btn.toolTip())
 
     def test_add_enables_only_for_a_missing_provider_type(self):
         config = get_default_config()
@@ -208,6 +210,9 @@ class SettingsDialogTests(unittest.TestCase):
         dialog.on_add_provider()
         self.assertEqual(len(dialog.provider_widgets), 3)
         self.assertEqual(dialog.provider_widgets[-1]["type_combo"].currentData(), "claude")
+        self.assertTrue(dialog.add_btn.isEnabled())
+        dialog.on_add_provider()
+        dialog.on_add_provider()
         self.assertFalse(dialog.add_btn.isEnabled())
 
     def test_provider_card_uses_a_compact_header_instead_of_a_fieldset_title(self):

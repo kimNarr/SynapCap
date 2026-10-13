@@ -364,6 +364,19 @@ class SynapCapTray(QObject):
             7000,
         )
 
+    def show_reset_alert(
+        self,
+        provider_name: str,
+        window_label: str,
+        used: float,
+    ):
+        self.tray_icon.showMessage(
+            f"{provider_name} 한도 리셋 완료",
+            f"{window_label} 한도가 리셋되었습니다. (현재 {used:.0f}% 사용)",
+            QSystemTrayIcon.MessageIcon.Information,
+            7000,
+        )
+
     def _open_update(self):
         if self._update_url:
             self.update_requested.emit(self._update_url)

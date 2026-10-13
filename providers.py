@@ -8,6 +8,8 @@ from subscription_usage import (
     query_antigravity_subscription,
     query_claude_subscription,
     query_codex_subscription,
+    query_copilot_subscription,
+    query_grok_subscription,
 )
 
 
@@ -187,10 +189,82 @@ class ClaudeProvider(BaseAIProvider):
 
 
 # 배포 UI와 실제 사용량 어댑터가 항상 같은 목록을 사용하도록 한 곳에서 관리한다.
+
+
+# ==========================================
+# 4. GitHub Copilot Provider
+# ==========================================
+class CopilotProvider(BaseAIProvider):
+    def fetch_usage(self) -> ModelUsage:
+        cached = self.get_cached_usage()
+        if cached is not None:
+            return cached
+
+        try:
+            snapshot = query_copilot_subscription(self.config)
+            return self.remember_usage(ModelUsage(
+                provider_id=self.provider_id,
+                provider_name=self.name,
+                model_name=snapshot.model_name,
+                used=snapshot.used_percent,
+                limit=100.0,
+                unit="%",
+                status_text=snapshot.status_text,
+                windows=_usage_windows(snapshot),
+            ))
+        except SubscriptionUsageError as exc:
+            return ModelUsage(
+                provider_id=self.provider_id,
+                provider_name=self.name,
+                model_name="GitHub Copilot",
+                used=0.0,
+                limit=100.0,
+                unit="%",
+                error=str(exc),
+                fetched_at=datetime.now().astimezone(),
+            )
+
+
+# ==========================================
+# 5. xAI Grok Provider
+# ==========================================
+class GrokProvider(BaseAIProvider):
+    def fetch_usage(self) -> ModelUsage:
+        cached = self.get_cached_usage()
+        if cached is not None:
+            return cached
+
+        try:
+            snapshot = query_grok_subscription(self.config)
+            return self.remember_usage(ModelUsage(
+                provider_id=self.provider_id,
+                provider_name=self.name,
+                model_name=snapshot.model_name,
+                used=snapshot.used_percent,
+                limit=100.0,
+                unit="%",
+                status_text=snapshot.status_text,
+                windows=_usage_windows(snapshot),
+            ))
+        except SubscriptionUsageError as exc:
+            return ModelUsage(
+                provider_id=self.provider_id,
+                provider_name=self.name,
+                model_name="xAI Grok",
+                used=0.0,
+                limit=100.0,
+                unit="%",
+                error=str(exc),
+                fetched_at=datetime.now().astimezone(),
+            )
+
+
 PROVIDER_TYPE_OPTIONS = (
     ("OpenAI / GPT", "codex"),
     ("Google Gemini", "antigravity"),
     ("Anthropic Claude", "claude"),
+    ("GitHub Copilot", "copilot"),
+    ("xAI Grok", "grok"),
 )
 
 
@@ -198,6 +272,8 @@ PROVIDER_REGISTRY: dict[str, type[BaseAIProvider]] = {
     "codex": CodexProvider,
     "antigravity": AntigravityProvider,
     "claude": ClaudeProvider,
+    "copilot": CopilotProvider,
+    "grok": GrokProvider,
 }
 
 def load_providers_from_config(config_data: dict) -> list[BaseAIProvider]:

@@ -786,3 +786,203 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             for item in windows
         ),
     )
+
+
+# ==========================================
+# 4. GitHub Copilot Subscription
+# ==========================================
+def _run_copilot_probe_script(account: Optional[str], timeout_sec: float) -> dict[str, Any]:
+    """Run Copilot quota probe in a clean subprocess with hidden window."""
+    root = Path(__file__).resolve().parent
+    script = root / "scripts" / "probe_copilot_usage.py"
+    if not script.is_file():
+        raise SubscriptionUsageError("Copilot 프로브 스크립트를 찾을 수 없음")
+
+    cmd = [sys.executable, str(script)]
+    if account:
+        cmd.extend(["--account", str(account)])
+
+    process = None
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=_cli_environment(),
+            cwd=str(root),
+            **_hidden_process_kwargs(),
+        )
+        stdout, _ = process.communicate(timeout=timeout_sec)
+    except subprocess.TimeoutExpired as exc:
+        if process is not None:
+            _stop_process_tree(process)
+        raise SubscriptionUsageError("Copilot 사용량 조회 시간 초과") from exc
+    except OSError as exc:
+        raise SubscriptionUsageError("Copilot 프로브 실행 실패") from exc
+
+    output = (stdout or "").strip()
+    if not output:
+        raise SubscriptionUsageError("Copilot 응답 없음")
+
+    try:
+        data = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise SubscriptionUsageError("Copilot 응답 형식 오류") from exc
+
+    status = data.get("status")
+    if status == "github_login_required":
+        raise SubscriptionUsageError("GitHub CLI(gh) 로그인 필요")
+    if status != "ok":
+        msg = data.get("message") or "Copilot 사용량 조회 실패"
+        raise SubscriptionUsageError(f"Copilot 조회 실패: {msg}")
+
+    return data
+
+
+def query_copilot_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
+    account = config.get("account")
+    timeout_sec = float(config.get("timeout_sec", 25))
+    data = _run_copilot_probe_script(account, timeout_sec)
+
+    quotas = data.get("quotas", {})
+    if not quotas:
+        return SubscriptionSnapshot(
+            used_percent=0.0,
+            model_name="GitHub Copilot",
+            status_text="조회 가능한 한도 없음",
+            windows=(),
+        )
+
+    quota_labels = {
+        "chat": "채팅",
+        "completions": "코드완성",
+        "premium_interactions": "프리미엄",
+    }
+
+    display_windows: list[SubscriptionWindow] = []
+    for key, item in quotas.items():
+        if not isinstance(item, dict):
+            continue
+        label = quota_labels.get(key, key.capitalize())
+        included = item.get("included", 0)
+        used = item.get("used", 0)
+        remaining_pct = float(item.get("remaining_percent", 100.0))
+        used_pct = _clamp_percent(100.0 - remaining_pct)
+        reset_raw = item.get("reset_at", "")
+        reset_text = _format_iso_reset(reset_raw) if reset_raw else ""
+
+        # 프리미엄 한도가 0이고 사용량도 0이면 불필요하게 표시하지 않음
+        if key == "premium_interactions" and included == 0 and used == 0:
+            continue
+
+        display_windows.append(
+            SubscriptionWindow(
+                label=label,
+                used_percent=used_pct,
+                reset_text=reset_text,
+                remaining_percent=_clamp_percent(remaining_pct),
+            )
+        )
+
+    if not display_windows:
+        return SubscriptionSnapshot(
+            used_percent=0.0,
+            model_name="GitHub Copilot",
+            status_text="조회 가능한 한도 없음",
+            windows=(),
+        )
+
+    active = max(display_windows, key=lambda w: (w.used_percent, w.label == "채팅"))
+    reset_suffix = f" · {active.reset_text} 리셋" if active.reset_text else ""
+    return SubscriptionSnapshot(
+        used_percent=active.used_percent,
+        model_name="GitHub Copilot",
+        status_text=f"{active.label} {active.remaining_percent:.0f}% 남음{reset_suffix}",
+        windows=tuple(display_windows),
+    )
+
+
+# ==========================================
+# 5. xAI Grok Subscription
+# ==========================================
+def query_grok_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
+    api_key = config.get("api_key") or os.environ.get("XAI_API_KEY", "")
+    api_key = str(api_key).strip()
+    if not api_key:
+        raise SubscriptionUsageError("xAI API 키 설정 필요")
+
+    timeout_sec = float(config.get("timeout_sec", 15))
+    request = urllib.request.Request(
+        "https://api.x.ai/v1/api-key",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+            "User-Agent": "SynapCap/0.3.0",
+        },
+    )
+
+    try:
+        opener = urllib.request.build_opener(_NoUsageRedirect())
+        with opener.open(request, timeout=timeout_sec) as response:
+            headers = dict(response.headers)
+            body = json.load(response)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            raise SubscriptionUsageError("xAI API 키 인증 실패") from None
+        if exc.code == 429:
+            raise SubscriptionUsageError("xAI 요청 한도 초과 (429)") from None
+        raise SubscriptionUsageError(f"xAI 서버 응답 오류 ({exc.code})") from None
+    except (OSError, ValueError) as exc:
+        raise SubscriptionUsageError("xAI 서버 연결 실패") from exc
+
+    limit_req_str = headers.get("x-ratelimit-limit-requests")
+    remaining_req_str = headers.get("x-ratelimit-remaining-requests")
+    reset_req_str = headers.get("x-ratelimit-reset-requests")
+
+    windows: list[SubscriptionWindow] = []
+    if limit_req_str and remaining_req_str:
+        try:
+            limit_val = float(limit_req_str)
+            rem_val = float(remaining_req_str)
+            if limit_val > 0:
+                rem_pct = _clamp_percent((rem_val / limit_val) * 100.0)
+                used_pct = _clamp_percent(100.0 - rem_pct)
+                reset_text = f"{reset_req_str}s 후 리셋" if reset_req_str else ""
+                windows.append(
+                    SubscriptionWindow(
+                        label="요청",
+                        used_percent=used_pct,
+                        reset_text=reset_text,
+                        remaining_percent=rem_pct,
+                    )
+                )
+        except (ValueError, TypeError):
+            pass
+
+    key_name = str(body.get("name") or "Grok Key")
+    if not windows:
+        windows = [
+            SubscriptionWindow(
+                label="API 가용",
+                used_percent=0.0,
+                reset_text="정상",
+                remaining_percent=100.0,
+            )
+        ]
+        return SubscriptionSnapshot(
+            used_percent=0.0,
+            model_name=f"Grok ({key_name})",
+            status_text="API 키 정상 연결됨 · 가용 100%",
+            windows=tuple(windows),
+        )
+
+    active = max(windows, key=lambda w: w.used_percent)
+    return SubscriptionSnapshot(
+        used_percent=active.used_percent,
+        model_name=f"Grok ({key_name})",
+        status_text=f"{active.label} {active.remaining_percent:.0f}% 남음",
+        windows=tuple(windows),
+    )

@@ -24,7 +24,7 @@ class ProviderSelectionTests(unittest.TestCase):
         dialog = SettingsDialog(get_default_config())
         expected = [value for _, value in PROVIDER_TYPE_OPTIONS]
 
-        self.assertEqual(expected, ["codex", "antigravity", "claude"])
+        self.assertEqual(expected, ["codex", "antigravity", "claude", "copilot", "grok"])
         for item in dialog.provider_widgets:
             combo = item["type_combo"]
             self.assertEqual(
@@ -43,7 +43,7 @@ class ProviderSelectionTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(set(PROVIDER_REGISTRY), {"codex", "antigravity", "claude"})
+        self.assertEqual(set(PROVIDER_REGISTRY), {"codex", "antigravity", "claude", "copilot", "grok"})
         self.assertEqual(len(providers), 1)
         self.assertIsInstance(providers[0], CodexProvider)
 
