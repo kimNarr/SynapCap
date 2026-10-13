@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import posixpath
 import queue
@@ -11,6 +12,8 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -611,6 +614,88 @@ def _format_claude_reset(value: str) -> str:
     return f"{month}/{int(match.group(2))} {hour:02d}:{minute:02d}"
 
 
+def _read_claude_oauth_token() -> str:
+    """Reuse Claude Code's login without logging or copying credentials."""
+    config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR", str(Path.home() / ".claude"))).expanduser()
+    try:
+        if sys.platform == "darwin" and not (config_dir / ".credentials.json").is_file():
+            result = subprocess.run(
+                ["/usr/bin/security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+                capture_output=True, text=True, timeout=5, check=False,
+            )
+            if result.returncode:
+                raise SubscriptionUsageError("Claude Code 로그인 정보 접근 실패")
+            credentials = json.loads(result.stdout)
+        else:
+            credentials = json.loads((config_dir / ".credentials.json").read_text(encoding="utf-8"))
+        oauth = credentials.get("claudeAiOauth", {})
+        token = oauth.get("accessToken")
+        if not isinstance(token, str) or not token:
+            raise SubscriptionUsageError("Claude Code 구독 로그인 필요")
+        return token
+    except (OSError, ValueError, AttributeError, subprocess.TimeoutExpired) as exc:
+        raise SubscriptionUsageError("Claude Code 로그인 정보 접근 실패") from exc
+
+
+class _NoUsageRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Never forward the bearer credential to a redirect destination.
+        return None
+
+
+def _query_claude_oauth_usage(timeout_sec: float) -> SubscriptionSnapshot:
+    request = urllib.request.Request(
+        "https://api.anthropic.com/api/oauth/usage",
+        headers={
+            "Authorization": "Bearer " + _read_claude_oauth_token(),
+            "anthropic-beta": "oauth-2025-04-20",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        opener = urllib.request.build_opener(_NoUsageRedirect())
+        with opener.open(request, timeout=timeout_sec) as response:
+            data = json.load(response)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            message = "Claude Code 로그인 갱신 필요 · Claude Code에서 다시 로그인하세요"
+        elif exc.code == 429:
+            message = "Claude 사용량 조회 제한 · 잠시 후 다시 시도하세요"
+        else:
+            message = f"Claude 사용량 서버 오류 ({exc.code})"
+        raise SubscriptionUsageError(message) from None
+    except (OSError, ValueError) as exc:
+        raise SubscriptionUsageError("Claude 사용량 서버 응답 오류") from exc
+
+    windows = []
+    if not isinstance(data, dict):
+        raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
+    for key, label in (("five_hour", "5시간"), ("seven_day", "주간")):
+        window = data.get(key)
+        if not isinstance(window, dict):
+            continue
+        value = window.get("utilization")
+        if (
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            or not math.isfinite(value) or not 0 <= value <= 100
+        ):
+            raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
+        used = _clamp_percent(value)
+        reset = window.get("resets_at")
+        if reset is not None and not isinstance(reset, str):
+            raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
+        windows.append(SubscriptionWindow(
+            label, used, _format_iso_reset(reset) if reset else "", 100.0 - used,
+        ))
+    if not windows:
+        raise SubscriptionUsageError("Claude 구독 사용량 한도 없음")
+    active = max(windows, key=lambda window: window.used_percent)
+    return SubscriptionSnapshot(
+        active.used_percent, "Claude Code", f"{active.label} · {active.reset_text} 리셋",
+        tuple(windows),
+    )
+
+
 def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
     home = Path.home()
     app_data = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
@@ -678,6 +763,10 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             )
 
     if not windows:
+        if "Total cost:" in output and "Total duration" in output:
+            # New CLI versions expose cost-only stats in print mode. The
+            # subscription endpoint supplies the actual five-hour/week limits.
+            return _query_claude_oauth_usage(float(config.get("timeout_sec", 25)))
         if "subscription" in output.lower():
             raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
         raise SubscriptionUsageError("Claude Code 로그인 필요")

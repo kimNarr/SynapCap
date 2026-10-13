@@ -171,6 +171,8 @@ claude
 
 Windows에서 일반 CLI 콘솔은 숨김 처리합니다. Claude는 공식 엄격 MCP 설정으로 실행하며 Antigravity는 macOS Keychain을 포함한 기존 사용자 인증을 그대로 사용합니다. SynapCap의 짧은 Antigravity 조회에서는 별도 자동 업데이터를 실행하지 않습니다. macOS에서는 CLI 탐색 중 Music 같은 보호 폴더나 네트워크·외장 볼륨도 조회하지 않습니다.
 
+최신 Claude Code가 `/usage`에 비용 통계만 반환하면 Claude Code의 기존 구독 로그인으로 Anthropic의 사용량 서버에서 5시간·주간 한도를 조회합니다. 별도 API 키는 필요하지 않으며 토큰을 SynapCap 설정이나 로그에 저장하지 않습니다. 이 조회 경로는 공개 API 계약이 없어 향후 변경될 수 있습니다. 로그인 갱신이 필요하면 `claude auth login`을 실행하세요. 서버가 조회를 제한하면 5분간 재요청을 기다립니다.
+
 ## 소스에서 실행
 
 Python 3.12를 권장합니다.

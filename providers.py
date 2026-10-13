@@ -150,6 +150,8 @@ class AntigravityProvider(BaseAIProvider):
 # ==========================================
 class ClaudeProvider(BaseAIProvider):
     def fetch_usage(self) -> ModelUsage:
+        if time.monotonic() < getattr(self, "_quota_retry_at", 0.0):
+            return self._quota_retry_error
         cached = self.get_cached_usage()
         if cached is not None:
             return cached
@@ -167,7 +169,7 @@ class ClaudeProvider(BaseAIProvider):
                 windows=_usage_windows(snapshot),
             ))
         except SubscriptionUsageError as exc:
-            return ModelUsage(
+            error = ModelUsage(
                 provider_id=self.provider_id,
                 provider_name=self.name,
                 model_name="Claude Code",
@@ -177,6 +179,11 @@ class ClaudeProvider(BaseAIProvider):
                 error=str(exc),
                 fetched_at=datetime.now().astimezone(),
             )
+            if str(exc).startswith("Claude 사용량 조회 제한"):
+                # Manual refresh must not bypass a server rate-limit cooldown.
+                self._quota_retry_at = time.monotonic() + 300
+                self._quota_retry_error = error
+            return error
 
 
 # 배포 UI와 실제 사용량 어댑터가 항상 같은 목록을 사용하도록 한 곳에서 관리한다.

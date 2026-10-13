@@ -1,7 +1,10 @@
 import os
+import io
+import json
 import subprocess
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,10 +17,54 @@ from subscription_usage import (
     query_antigravity_subscription,
     query_claude_subscription,
     query_codex_subscription,
+    SubscriptionUsageError,
+    _query_claude_oauth_usage,
 )
 
 
 class SubscriptionUsageTests(unittest.TestCase):
+    @patch("subscription_usage.urllib.request.build_opener")
+    @patch("subscription_usage._read_claude_oauth_token", return_value="test-token")
+    def test_claude_api_reports_rate_limit_without_login_error(self, token, opener):
+        opener.return_value.open.side_effect = urllib.error.HTTPError(
+            "https://api.anthropic.com/api/oauth/usage", 429, "limited", {}, None,
+        )
+        with self.assertRaisesRegex(SubscriptionUsageError, "조회 제한"):
+            _query_claude_oauth_usage(5)
+
+    @patch("subscription_usage._query_claude_oauth_usage")
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path")
+    def test_claude_cost_only_output_uses_subscription_endpoint(self, command, run, query):
+        command.return_value = "claude.exe"
+        run.return_value = "Total cost: $0.0000\nTotal duration (API): 0s\nUsage: 0 input"
+        expected = SubscriptionSnapshot(55, "Claude Code", "weekly")
+        query.return_value = expected
+        self.assertEqual(query_claude_subscription({}), expected)
+        query.assert_called_once_with(25.0)
+
+    @patch("subscription_usage.urllib.request.build_opener")
+    @patch("subscription_usage._read_claude_oauth_token", return_value="test-token")
+    def test_claude_api_preserves_zero_usage_and_window_order(self, token, opener):
+        payload = {
+            "five_hour": {"utilization": 0, "resets_at": None},
+            "seven_day": {"utilization": 55, "resets_at": "2026-10-08T00:00:00Z"},
+            "seven_day_sonnet": {"utilization": 99, "resets_at": None},
+        }
+        opener.return_value.open.return_value = io.StringIO(json.dumps(payload))
+        result = _query_claude_oauth_usage(5)
+        self.assertEqual(result.used_percent, 55)
+        self.assertEqual([w.label for w in result.windows], ["5시간", "주간"])
+        self.assertEqual(result.windows[0].used_percent, 0)
+        self.assertEqual(result.windows[0].reset_text, "")
+
+    @patch("subscription_usage.urllib.request.build_opener")
+    @patch("subscription_usage._read_claude_oauth_token", return_value="test-token")
+    def test_claude_api_does_not_treat_missing_limits_as_zero(self, token, opener):
+        opener.return_value.open.return_value = io.StringIO('{"five_hour":null,"seven_day":null}')
+        with self.assertRaisesRegex(SubscriptionUsageError, "한도 없음"):
+            _query_claude_oauth_usage(5)
+
     def test_macos_gui_finds_cli_in_user_local_bin(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             home = Path(temp_dir)
@@ -205,6 +252,21 @@ Current week (all models): 55% used · resets Aug 12, 4am (Asia/Seoul)
 
 
 class ProviderCacheTests(unittest.TestCase):
+    @patch("providers.query_claude_subscription")
+    def test_claude_rate_limit_cooldown_survives_manual_refresh(self, query):
+        from providers import ClaudeProvider
+
+        query.side_effect = SubscriptionUsageError("Claude 사용량 조회 제한 · 잠시 후 다시 시도하세요")
+        provider = ClaudeProvider({"id": "claude"})
+        with patch("providers.time.monotonic", return_value=100):
+            first = provider.fetch_usage()
+            provider.invalidate_cache()
+            self.assertIs(provider.fetch_usage(), first)
+        query.assert_called_once()
+        with patch("providers.time.monotonic", return_value=401):
+            provider.fetch_usage()
+        self.assertEqual(query.call_count, 2)
+
     @patch("providers.query_codex_subscription")
     def test_manual_invalidation_allows_a_fresh_read(self, query):
         from providers import CodexProvider
