@@ -279,14 +279,6 @@ def main():
             tray.show_tray_pin_guidance()
             current_settings["tray_pin_guidance_shown"] = True
         if persist:
-            set_startup_enabled(new_settings.get("launch_on_startup", False))
-            if new_settings.get("global_hotkey_enabled", True):
-                hotkey_manager.register_hotkey(
-                    new_settings.get("global_hotkey", "Ctrl+Alt+S"),
-                    widget.winId(),
-                )
-            else:
-                hotkey_manager.unregister_hotkey()
             save_config(config_data)
 
     def apply_active_theme() -> None:
@@ -504,6 +496,14 @@ def main():
 
             # synapcap.json 저장
             save_config(config_data)
+            set_startup_enabled(new_settings.get("launch_on_startup", False))
+            if new_settings.get("global_hotkey_enabled", True):
+                hotkey_manager.register_hotkey(
+                    new_settings.get("global_hotkey", "Ctrl+Alt+S"),
+                    widget.winId(),
+                )
+            else:
+                hotkey_manager.unregister_hotkey()
 
             if provider_layout_changed:
                 if provider_query_changed:
