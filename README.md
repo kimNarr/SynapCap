@@ -14,7 +14,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/kimNarr/SynapCap" alt="MIT License"></a>
 </p>
 
-SynapCap은 로컬에 로그인된 AI 도구의 구독 한도와 리셋 시각을 표시합니다. 개발자 API의 과금액을 계산하는 앱이 아니며 API 키도 요구하지 않습니다.
+SynapCap은 로컬에 로그인된 AI 도구의 구독 한도와 리셋 시각을 표시합니다. 개발자 API의 과금액을 계산하는 앱이 아닙니다. 기본 구독 조회에는 API 키가 필요 없으며, 선택적 xAI API 요청 제한 연동만 API 키를 사용합니다.
 
 ## 주요 기능
 
@@ -109,11 +109,13 @@ SynapCap은 웹 채팅 페이지를 읽지 않습니다. 각 서비스의 로컬
 | Gemini | Antigravity CLI (`agy`) | `agy --print /usage` |
 | Claude | Claude Code CLI (`claude`) | `claude -p /usage` 및 공식 usage API |
 | Copilot | GitHub CLI (`gh`) | `gh auth token` 및 Copilot SDK 쿼터 RPC |
-| Grok | xAI API 키 (`XAI_API_KEY`) | xAI 공식 API 엔드포인트 및 Rate Limit |
+| xAI API | xAI API 키 (`XAI_API_KEY` 또는 로컬 설정) | xAI API 요청 속도 제한. SuperGrok·Grok 구독 잔여량은 지원하지 않음 |
+
+Copilot 설치본에는 MIT 라이선스의 공식 `github-copilot-sdk==1.0.16` 프로브가 함께 포함됩니다. Copilot 런타임은 첫 조회 때 GitHub 공식 릴리스에서 내려받아 체크섬을 검증한 뒤 사용자 로컬 SynapCap 데이터 폴더에 저장합니다. 따라서 첫 Copilot 조회에는 네트워크 연결이 필요하며, 이후에는 같은 런타임을 재사용합니다.
 
 Claude 사용량은 Claude Code CLI가 반환한 값을 기준으로 표시합니다. 실행 중인 Claude 화면의 값이 먼저 갱신되고 새 CLI 조회에는 수분 뒤 반영되는 경우가 있으므로, 카드의 `CLI 기준` 배지나 사용량에 마우스를 올려 마지막 조회 시각을 확인하세요. SynapCap은 값을 임의로 보정하지 않습니다.
 
-웹 ChatGPT, Gemini, Claude만 사용하는 계정은 대상이 아닙니다. SynapCap이 사용량 조회를 위해 별도의 유료 API를 호출하지는 않지만, 각 서비스의 구독 정책과 로컬 CLI 동작은 해당 서비스에 따릅니다.
+웹 ChatGPT, Gemini, Claude만 사용하는 계정은 대상이 아닙니다. xAI 연동을 제외한 서비스는 사용량 조회를 위해 별도의 유료 API를 호출하지 않으며, 각 서비스의 구독 정책과 로컬 CLI 동작은 해당 서비스에 따릅니다. xAI 연동은 API 키 정보 엔드포인트가 반환하는 요청 속도 제한만 표시하며 SuperGrok·Grok 웹 구독 사용량으로 해석하지 않습니다. 설정에 입력한 xAI API 키는 로컬 설정 파일에 저장되고 외부 진단 보고서에는 포함되지 않습니다.
 
 ## 사용 방법
 

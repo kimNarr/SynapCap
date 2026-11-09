@@ -23,8 +23,58 @@ CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
+class StatusKind:
+    OK = "ok"
+    NOT_INSTALLED = "not_installed"
+    LOGIN_REQUIRED = "login_required"
+    TIMEOUT = "timeout"
+    RATE_LIMITED = "rate_limited"
+    SERVER_ERROR = "server_error"
+    FORMAT_ERROR = "format_error"
+    NO_QUOTA = "no_quota"
+
+
+STATUS_BADGE_LABELS: dict[str, str] = {
+    StatusKind.OK: "정상",
+    StatusKind.NOT_INSTALLED: "미설치",
+    StatusKind.LOGIN_REQUIRED: "로그인 필요",
+    StatusKind.TIMEOUT: "시간 초과",
+    StatusKind.RATE_LIMITED: "조회 제한",
+    StatusKind.SERVER_ERROR: "서버 오류",
+    StatusKind.FORMAT_ERROR: "형식 오류",
+    StatusKind.NO_QUOTA: "한도 없음",
+}
+
+
 class SubscriptionUsageError(RuntimeError):
     """A safe, user-facing error raised by a local subscription adapter."""
+
+    def __init__(
+        self,
+        message: str,
+        status_kind: Optional[str] = None,
+        retry_after_sec: Optional[int] = None,
+        action_hint: Optional[str] = None,
+    ):
+        super().__init__(message)
+        if status_kind is None:
+            if "조회 제한" in message or "429" in message:
+                status_kind = StatusKind.RATE_LIMITED
+            elif "로그인" in message or "인증 실패" in message:
+                status_kind = StatusKind.LOGIN_REQUIRED
+            elif "시간 초과" in message:
+                status_kind = StatusKind.TIMEOUT
+            elif "찾을 수 없" in message or "미설치" in message:
+                status_kind = StatusKind.NOT_INSTALLED
+            elif "한도 없음" in message:
+                status_kind = StatusKind.NO_QUOTA
+            elif "형식" in message:
+                status_kind = StatusKind.FORMAT_ERROR
+            else:
+                status_kind = StatusKind.SERVER_ERROR
+        self.status_kind = status_kind
+        self.retry_after_sec = retry_after_sec
+        self.action_hint = action_hint
 
 
 def _hidden_process_kwargs() -> dict[str, Any]:
@@ -47,6 +97,8 @@ class SubscriptionWindow:
     used_percent: float
     reset_text: str
     remaining_percent: Optional[float] = None
+    unlimited: bool = False
+    quota_group: str = ""
 
 
 @dataclass(frozen=True)
@@ -55,6 +107,9 @@ class SubscriptionSnapshot:
     model_name: str
     status_text: str
     windows: tuple[SubscriptionWindow, ...] = ()
+    status_kind: str = StatusKind.OK
+    retry_after_sec: Optional[int] = None
+    action_hint: Optional[str] = None
 
 
 def _clamp_percent(value: float) -> float:
@@ -166,7 +221,11 @@ def _command_path(
         except OSError:
             continue
 
-    raise SubscriptionUsageError(f"{executable_name} CLI를 찾을 수 없음")
+    raise SubscriptionUsageError(
+        f"{executable_name} CLI를 찾을 수 없음",
+        status_kind=StatusKind.NOT_INSTALLED,
+        action_hint=f"{executable_name} CLI 또는 관련 앱을 설치하세요.",
+    )
 
 
 def _run_text_command(
@@ -195,15 +254,31 @@ def _run_text_command(
     except subprocess.TimeoutExpired as exc:
         if process is not None:
             _stop_process_tree(process)
-        raise SubscriptionUsageError("사용량 조회 시간 초과") from exc
+        raise SubscriptionUsageError(
+            "사용량 조회 시간 초과",
+            status_kind=StatusKind.TIMEOUT,
+            action_hint="잠시 후 다시 조회하세요.",
+        ) from exc
     except OSError as exc:
-        raise SubscriptionUsageError("로컬 CLI 실행 실패") from exc
+        raise SubscriptionUsageError(
+            "로컬 CLI 실행 실패",
+            status_kind=StatusKind.SERVER_ERROR,
+            action_hint="실행 권한 및 설치 상태를 확인하세요.",
+        ) from exc
 
     output = ANSI_ESCAPE_RE.sub("", stdout or "").strip()
     if process.returncode != 0 and not output:
-        raise SubscriptionUsageError("로컬 CLI 로그인 필요")
+        raise SubscriptionUsageError(
+            "로컬 CLI 로그인 필요",
+            status_kind=StatusKind.LOGIN_REQUIRED,
+            action_hint="터미널에서 로그인 명령을 실행하세요.",
+        )
     if not output:
-        raise SubscriptionUsageError("사용량 응답 없음")
+        raise SubscriptionUsageError(
+            "사용량 응답 없음",
+            status_kind=StatusKind.FORMAT_ERROR,
+            action_hint="CLI 응답을 확인하세요.",
+        )
     return output
 
 
@@ -339,8 +414,16 @@ def _find_codex_command(configured: Optional[str]) -> Path:
                 pass
 
     if sys.platform == "win32":
-        raise SubscriptionUsageError("Codex 앱 또는 CLI를 찾을 수 없음")
-    raise SubscriptionUsageError("Codex CLI를 찾을 수 없음")
+        raise SubscriptionUsageError(
+            "Codex 앱 또는 CLI를 찾을 수 없음",
+            status_kind=StatusKind.NOT_INSTALLED,
+            action_hint="ChatGPT 데스크톱 앱 또는 Codex CLI를 설치하세요.",
+        )
+    raise SubscriptionUsageError(
+        "Codex CLI를 찾을 수 없음",
+        status_kind=StatusKind.NOT_INSTALLED,
+        action_hint="Codex CLI를 설치하세요.",
+    )
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
@@ -369,11 +452,18 @@ def _read_codex_app_server(executable: Path, timeout_sec: float) -> dict[str, An
             **_hidden_process_kwargs(),
         )
     except OSError as exc:
-        raise SubscriptionUsageError("Codex App Server 실행 실패") from exc
+        raise SubscriptionUsageError(
+            "Codex App Server 실행 실패",
+            status_kind=StatusKind.SERVER_ERROR,
+            action_hint="Codex 실행 권한을 확인하세요.",
+        ) from exc
 
     if process.stdin is None or process.stdout is None:
         _stop_process(process)
-        raise SubscriptionUsageError("Codex App Server 연결 실패")
+        raise SubscriptionUsageError(
+            "Codex App Server 연결 실패",
+            status_kind=StatusKind.SERVER_ERROR,
+        )
 
     stdout = process.stdout
     lines: queue.Queue[Optional[str]] = queue.Queue()
@@ -413,13 +503,24 @@ def _read_codex_app_server(executable: Path, timeout_sec: float) -> dict[str, An
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise SubscriptionUsageError("Codex 사용량 조회 시간 초과")
+                raise SubscriptionUsageError(
+                    "Codex 사용량 조회 시간 초과",
+                    status_kind=StatusKind.TIMEOUT,
+                    action_hint="잠시 후 다시 조회하세요.",
+                )
             try:
                 line = lines.get(timeout=remaining)
             except queue.Empty as exc:
-                raise SubscriptionUsageError("Codex 사용량 조회 시간 초과") from exc
+                raise SubscriptionUsageError(
+                    "Codex 사용량 조회 시간 초과",
+                    status_kind=StatusKind.TIMEOUT,
+                    action_hint="잠시 후 다시 조회하세요.",
+                ) from exc
             if line is None:
-                raise SubscriptionUsageError("Codex App Server 응답 종료")
+                raise SubscriptionUsageError(
+                    "Codex App Server 응답 종료",
+                    status_kind=StatusKind.SERVER_ERROR,
+                )
             try:
                 message = json.loads(line)
             except json.JSONDecodeError:
@@ -427,10 +528,17 @@ def _read_codex_app_server(executable: Path, timeout_sec: float) -> dict[str, An
             if message.get("id") != 1:
                 continue
             if message.get("error"):
-                raise SubscriptionUsageError("Codex 로그인 또는 사용량 조회 실패")
+                raise SubscriptionUsageError(
+                    "Codex 로그인 또는 사용량 조회 실패",
+                    status_kind=StatusKind.LOGIN_REQUIRED,
+                    action_hint="Codex를 실행해 ChatGPT 계정으로 로그인하세요.",
+                )
             result = message.get("result")
             if not isinstance(result, dict):
-                raise SubscriptionUsageError("Codex 사용량 형식 오류")
+                raise SubscriptionUsageError(
+                    "Codex 사용량 형식 오류",
+                    status_kind=StatusKind.FORMAT_ERROR,
+                )
             return result
     finally:
         try:
@@ -528,18 +636,37 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     )
 
     rows: list[dict[str, Any]] = []
+    unverified_groups: set[str] = set()
     for line in output.splitlines():
         parts = [part.strip() for part in line.split("\t")]
         if len(parts) != 4 or not parts[2].endswith("%"):
             continue
         try:
-            remaining = float(parts[2][:-1])
+            percent = float(parts[2][:-1])
         except ValueError:
+            continue
+        if not math.isfinite(percent) or not 0 <= percent <= 100:
+            continue
+        window_name = parts[1].casefold()
+        if "weekly" in window_name:
+            period = "주간"
+        elif "five hour" in window_name or "5 hour" in window_name:
+            period = "5시간"
+        else:
+            continue
+        # The desktop's Argon title does not say whether its percentage is
+        # remaining or used. Only accept a CLI row that states the semantics.
+        if "remaining" in window_name:
+            remaining = percent
+        elif "used" in window_name:
+            remaining = 100.0 - percent
+        else:
+            unverified_groups.add(parts[0])
             continue
         rows.append(
             {
                 "group": parts[0],
-                "window": parts[1],
+                "window": period,
                 "remaining": _clamp_percent(remaining),
                 "resets_at": parts[3],
             }
@@ -548,35 +675,60 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     if not rows:
         raise SubscriptionUsageError("Antigravity 사용량 형식 오류")
 
-    requested_group = str(config.get("quota_group", "Gemini Models")).lower()
-    group_rows = [row for row in rows if requested_group in row["group"].lower()]
+    requested_group = str(config.get("quota_group", "Gemini Models")).strip().casefold()
+    # The legacy default selects the Gemini family, including independently
+    # reported Argon limits. A custom selector remains an exact group match.
+    gemini_family = requested_group in {"gemini models", "gemini"}
+    group_rows = [
+        row for row in rows
+        if (
+            row["group"].casefold().startswith("gemini ")
+            if gemini_family else row["group"].casefold() == requested_group
+        )
+    ]
     if not group_rows:
-        group_rows = [row for row in rows if "gemini" in row["group"].lower()]
-    if not group_rows:
-        first_group = rows[0]["group"]
-        group_rows = [row for row in rows if row["group"] == first_group]
+        raise SubscriptionUsageError(
+            "Antigravity 요청 한도 그룹을 찾을 수 없습니다",
+            status_kind=StatusKind.FORMAT_ERROR,
+            action_hint="CLI /usage에 요청한 한도 그룹이 있는지 확인하세요.",
+        )
 
     active = min(group_rows, key=lambda item: item["remaining"])
     used = _clamp_percent(100.0 - active["remaining"])
-    window = "주간" if "weekly" in active["window"].lower() else "5시간"
+    window = active["window"]
     reset = _format_iso_reset(active["resets_at"])
     display_windows = tuple(
         SubscriptionWindow(
-            label=("주간" if "weekly" in row["window"].lower() else "5시간"),
+            label=row["window"],
             used_percent=_clamp_percent(100.0 - row["remaining"]),
             remaining_percent=row["remaining"],
             reset_text=_format_iso_reset(row["resets_at"]),
+            quota_group=row["group"],
         )
         for row in sorted(
             group_rows,
-            key=lambda value: 1 if "weekly" in value["window"].lower() else 0,
+            key=lambda value: (
+                value["group"].casefold() != requested_group,
+                value["group"].casefold(),
+                value["window"] != "5시간",
+            ),
         )
     )
+    argon_supported = any("argon" in row["group"].casefold() for row in group_rows)
+    hint = None
+    if gemini_family and not argon_supported:
+        reason = (
+            "CLI 응답에서 잔여량·사용량 기준을 확인할 수 없습니다."
+            if any("argon" in group.casefold() for group in unverified_groups)
+            else "CLI가 별도 한도를 제공하지 않습니다."
+        )
+        hint = f"Argon 조회 미지원: {reason}"
     return SubscriptionSnapshot(
         used_percent=used,
         model_name=active["group"],
-        status_text=f"{window} {active['remaining']:.0f}% 남음 · {reset}",
+        status_text=f"{active['group']} · {window} {active['remaining']:.0f}% 남음 · {reset}",
         windows=display_windows,
+        action_hint=hint,
     )
 
 
@@ -616,25 +768,48 @@ def _format_claude_reset(value: str) -> str:
 
 def _read_claude_oauth_token() -> str:
     """Reuse Claude Code's login without logging or copying credentials."""
-    config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR", str(Path.home() / ".claude"))).expanduser()
+    config_dir = Path(
+        os.environ.get("CLAUDE_CONFIG_DIR", str(Path.home() / ".claude"))
+    ).expanduser()
     try:
         if sys.platform == "darwin" and not (config_dir / ".credentials.json").is_file():
             result = subprocess.run(
-                ["/usr/bin/security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
-                capture_output=True, text=True, timeout=5, check=False,
+                [
+                    "/usr/bin/security",
+                    "find-generic-password",
+                    "-s",
+                    "Claude Code-credentials",
+                    "-w",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
             )
             if result.returncode:
-                raise SubscriptionUsageError("Claude Code 로그인 정보 접근 실패")
+                raise SubscriptionUsageError(
+                    "Claude Code 로그인 정보 접근 실패",
+                    status_kind=StatusKind.LOGIN_REQUIRED,
+                    action_hint="claude auth login을 실행해 로그인하세요.",
+                )
             credentials = json.loads(result.stdout)
         else:
             credentials = json.loads((config_dir / ".credentials.json").read_text(encoding="utf-8"))
         oauth = credentials.get("claudeAiOauth", {})
         token = oauth.get("accessToken")
         if not isinstance(token, str) or not token:
-            raise SubscriptionUsageError("Claude Code 구독 로그인 필요")
+            raise SubscriptionUsageError(
+                "Claude Code 구독 로그인 필요",
+                status_kind=StatusKind.LOGIN_REQUIRED,
+                action_hint="claude auth login을 실행해 Anthropic 계정으로 로그인하세요.",
+            )
         return token
     except (OSError, ValueError, AttributeError, subprocess.TimeoutExpired) as exc:
-        raise SubscriptionUsageError("Claude Code 로그인 정보 접근 실패") from exc
+        raise SubscriptionUsageError(
+            "Claude Code 로그인 정보 접근 실패",
+            status_kind=StatusKind.LOGIN_REQUIRED,
+            action_hint="claude auth login을 실행해 로그인하세요.",
+        ) from exc
 
 
 class _NoUsageRedirect(urllib.request.HTTPRedirectHandler):
@@ -659,39 +834,79 @@ def _query_claude_oauth_usage(timeout_sec: float) -> SubscriptionSnapshot:
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):
             message = "Claude Code 로그인 갱신 필요 · Claude Code에서 다시 로그인하세요"
+            raise SubscriptionUsageError(
+                message,
+                status_kind=StatusKind.LOGIN_REQUIRED,
+                action_hint="claude auth login으로 다시 로그인하세요.",
+            ) from None
         elif exc.code == 429:
             message = "Claude 사용량 조회 제한 · 잠시 후 다시 시도하세요"
+            raise SubscriptionUsageError(
+                message,
+                status_kind=StatusKind.RATE_LIMITED,
+                retry_after_sec=300,
+                action_hint="조회 제한이 해제될 때까지 잠시 대기하세요.",
+            ) from None
         else:
             message = f"Claude 사용량 서버 오류 ({exc.code})"
-        raise SubscriptionUsageError(message) from None
+            raise SubscriptionUsageError(
+                message,
+                status_kind=StatusKind.SERVER_ERROR,
+                action_hint="잠시 후 다시 시도하세요.",
+            ) from None
     except (OSError, ValueError) as exc:
-        raise SubscriptionUsageError("Claude 사용량 서버 응답 오류") from exc
+        raise SubscriptionUsageError(
+            "Claude 사용량 서버 응답 오류",
+            status_kind=StatusKind.SERVER_ERROR,
+        ) from exc
 
     windows = []
     if not isinstance(data, dict):
-        raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
+        raise SubscriptionUsageError(
+            "Claude 사용률 형식 변경됨",
+            status_kind=StatusKind.FORMAT_ERROR,
+        )
     for key, label in (("five_hour", "5시간"), ("seven_day", "주간")):
         window = data.get(key)
         if not isinstance(window, dict):
             continue
         value = window.get("utilization")
         if (
-            isinstance(value, bool) or not isinstance(value, (int, float))
-            or not math.isfinite(value) or not 0 <= value <= 100
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or not 0 <= value <= 100
         ):
-            raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
+            raise SubscriptionUsageError(
+                "Claude 사용률 형식 변경됨",
+                status_kind=StatusKind.FORMAT_ERROR,
+            )
         used = _clamp_percent(value)
         reset = window.get("resets_at")
         if reset is not None and not isinstance(reset, str):
-            raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
-        windows.append(SubscriptionWindow(
-            label, used, _format_iso_reset(reset) if reset else "", 100.0 - used,
-        ))
+            raise SubscriptionUsageError(
+                "Claude 사용률 형식 변경됨",
+                status_kind=StatusKind.FORMAT_ERROR,
+            )
+        windows.append(
+            SubscriptionWindow(
+                label,
+                used,
+                _format_iso_reset(reset) if reset else "",
+                100.0 - used,
+            )
+        )
     if not windows:
-        raise SubscriptionUsageError("Claude 구독 사용량 한도 없음")
+        raise SubscriptionUsageError(
+            "Claude 구독 사용량 한도 없음",
+            status_kind=StatusKind.NO_QUOTA,
+            action_hint="계정 구독 플랜을 확인하세요.",
+        )
     active = max(windows, key=lambda window: window.used_percent)
     return SubscriptionSnapshot(
-        active.used_percent, "Claude Code", f"{active.label} · {active.reset_text} 리셋",
+        active.used_percent,
+        "Claude Code",
+        f"{active.label} · {active.reset_text} 리셋",
         tuple(windows),
     )
 
@@ -720,7 +935,10 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
         if not mcp_config.is_file() or mcp_config.read_text(encoding="utf-8") != mcp_config_text:
             mcp_config.write_text(mcp_config_text, encoding="utf-8")
     except OSError as exc:
-        raise SubscriptionUsageError("Claude 임시 실행 환경 준비 실패") from exc
+        raise SubscriptionUsageError(
+            "Claude 임시 실행 환경 준비 실패",
+            status_kind=StatusKind.SERVER_ERROR,
+        ) from exc
 
     output = _run_text_command(
         [
@@ -768,8 +986,15 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             # subscription endpoint supplies the actual five-hour/week limits.
             return _query_claude_oauth_usage(float(config.get("timeout_sec", 25)))
         if "subscription" in output.lower():
-            raise SubscriptionUsageError("Claude 사용률 형식 변경됨")
-        raise SubscriptionUsageError("Claude Code 로그인 필요")
+            raise SubscriptionUsageError(
+                "Claude 사용률 형식 변경됨",
+                status_kind=StatusKind.FORMAT_ERROR,
+            )
+        raise SubscriptionUsageError(
+            "Claude Code 로그인 필요",
+            status_kind=StatusKind.LOGIN_REQUIRED,
+            action_hint="claude auth login을 실행하세요.",
+        )
 
     active = max(windows, key=lambda item: item["used"])
     return SubscriptionSnapshot(
@@ -794,11 +1019,39 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
 def _run_copilot_probe_script(account: Optional[str], timeout_sec: float) -> dict[str, Any]:
     """Run Copilot quota probe in a clean subprocess with hidden window."""
     root = Path(__file__).resolve().parent
-    script = root / "scripts" / "probe_copilot_usage.py"
-    if not script.is_file():
-        raise SubscriptionUsageError("Copilot 프로브 스크립트를 찾을 수 없음")
-
-    cmd = [sys.executable, str(script)]
+    if getattr(sys, "frozen", False):
+        executable_dir = Path(sys.executable).resolve().parent
+        helper_name = "SynapCapCopilotProbe.exe" if os.name == "nt" else "SynapCapCopilotProbe"
+        bundle_root = Path(getattr(sys, "_MEIPASS", executable_dir))
+        helper = next(
+            (
+                candidate
+                for candidate in (
+                    executable_dir / helper_name,
+                    bundle_root / helper_name,
+                )
+                if candidate.is_file()
+            ),
+            None,
+        )
+        if helper is None:
+            raise SubscriptionUsageError(
+                "Copilot 프로브 구성요소를 찾을 수 없음",
+                status_kind=StatusKind.NOT_INSTALLED,
+                action_hint="최신 SynapCap 설치본으로 다시 설치하세요.",
+            )
+        cmd = [str(helper)]
+        cwd = helper.parent
+    else:
+        script = root / "scripts" / "probe_copilot_usage.py"
+        if not script.is_file():
+            raise SubscriptionUsageError(
+                "Copilot 프로브 스크립트를 찾을 수 없음",
+                status_kind=StatusKind.NOT_INSTALLED,
+                action_hint="프로젝트 파일을 다시 확인하세요.",
+            )
+        cmd = [sys.executable, str(script)]
+        cwd = root
     if account:
         cmd.extend(["--account", str(account)])
 
@@ -812,32 +1065,69 @@ def _run_copilot_probe_script(account: Optional[str], timeout_sec: float) -> dic
             encoding="utf-8",
             errors="replace",
             env=_cli_environment(),
-            cwd=str(root),
+            cwd=str(cwd),
             **_hidden_process_kwargs(),
         )
         stdout, _ = process.communicate(timeout=timeout_sec)
     except subprocess.TimeoutExpired as exc:
         if process is not None:
             _stop_process_tree(process)
-        raise SubscriptionUsageError("Copilot 사용량 조회 시간 초과") from exc
+        raise SubscriptionUsageError(
+            "Copilot 사용량 조회 시간 초과",
+            status_kind=StatusKind.TIMEOUT,
+            action_hint="잠시 후 다시 조회하세요.",
+        ) from exc
     except OSError as exc:
-        raise SubscriptionUsageError("Copilot 프로브 실행 실패") from exc
+        raise SubscriptionUsageError(
+            "Copilot 프로브 실행 실패",
+            status_kind=StatusKind.SERVER_ERROR,
+            action_hint="Python 환경 및 프로브 권한을 확인하세요.",
+        ) from exc
 
     output = (stdout or "").strip()
     if not output:
-        raise SubscriptionUsageError("Copilot 응답 없음")
+        raise SubscriptionUsageError(
+            "Copilot 응답 없음",
+            status_kind=StatusKind.FORMAT_ERROR,
+        )
 
     try:
         data = json.loads(output)
     except json.JSONDecodeError as exc:
-        raise SubscriptionUsageError("Copilot 응답 형식 오류") from exc
+        raise SubscriptionUsageError(
+            "Copilot 응답 형식 오류",
+            status_kind=StatusKind.FORMAT_ERROR,
+        ) from exc
 
     status = data.get("status")
+    if status == "gh_not_installed":
+        raise SubscriptionUsageError(
+            "GitHub CLI(gh)를 찾을 수 없음",
+            status_kind=StatusKind.NOT_INSTALLED,
+            action_hint="GitHub CLI를 설치한 뒤 gh auth login을 실행하세요.",
+        )
+    if status == "dependency_missing":
+        raise SubscriptionUsageError(
+            "Copilot 프로브 의존성 누락",
+            status_kind=StatusKind.NOT_INSTALLED,
+            action_hint=(
+                "설치본은 최신 버전으로 다시 설치하세요. 소스 실행 환경은 "
+                "requirements-build.txt의 의존성을 설치하세요."
+            ),
+        )
     if status == "github_login_required":
-        raise SubscriptionUsageError("GitHub CLI(gh) 로그인 필요")
+        raise SubscriptionUsageError(
+            "GitHub CLI(gh) 로그인 필요",
+            status_kind=StatusKind.LOGIN_REQUIRED,
+            action_hint="gh auth login으로 GitHub 계정에 로그인하세요.",
+        )
     if status != "ok":
         msg = data.get("message") or "Copilot 사용량 조회 실패"
-        raise SubscriptionUsageError(f"Copilot 조회 실패: {msg}")
+        raise SubscriptionUsageError(
+            f"Copilot 조회 실패: {msg}",
+            status_kind=StatusKind.SERVER_ERROR,
+            action_hint="GitHub CLI 연동 및 계정 상태를 확인하세요.",
+        )
 
     return data
 
@@ -854,6 +1144,8 @@ def query_copilot_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             model_name="GitHub Copilot",
             status_text="조회 가능한 한도 없음",
             windows=(),
+            status_kind=StatusKind.NO_QUOTA,
+            action_hint="이 GitHub 계정에는 조회 가능한 Copilot 한도가 없습니다.",
         )
 
     quota_labels = {
@@ -869,8 +1161,12 @@ def query_copilot_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
         label = quota_labels.get(key, key.capitalize())
         included = item.get("included", 0)
         used = item.get("used", 0)
-        remaining_pct = float(item.get("remaining_percent", 100.0))
-        used_pct = _clamp_percent(100.0 - remaining_pct)
+        unlimited = bool(item.get("unlimited")) or included == -1
+        try:
+            remaining_pct = float(item.get("remaining_percent", 100.0))
+        except (TypeError, ValueError):
+            remaining_pct = 100.0
+        used_pct = 0.0 if unlimited else _clamp_percent(100.0 - remaining_pct)
         reset_raw = item.get("reset_at", "")
         reset_text = _format_iso_reset(reset_raw) if reset_raw else ""
 
@@ -883,7 +1179,8 @@ def query_copilot_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
                 label=label,
                 used_percent=used_pct,
                 reset_text=reset_text,
-                remaining_percent=_clamp_percent(remaining_pct),
+                remaining_percent=(None if unlimited else _clamp_percent(remaining_pct)),
+                unlimited=unlimited,
             )
         )
 
@@ -893,9 +1190,20 @@ def query_copilot_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             model_name="GitHub Copilot",
             status_text="조회 가능한 한도 없음",
             windows=(),
+            status_kind=StatusKind.NO_QUOTA,
+            action_hint="이 GitHub 계정에는 조회 가능한 Copilot 한도가 없습니다.",
         )
 
-    active = max(display_windows, key=lambda w: (w.used_percent, w.label == "채팅"))
+    finite_windows = [window for window in display_windows if not window.unlimited]
+    if not finite_windows:
+        return SubscriptionSnapshot(
+            used_percent=0.0,
+            model_name="GitHub Copilot",
+            status_text="모든 제공 한도 무제한",
+            windows=tuple(display_windows),
+        )
+
+    active = max(finite_windows, key=lambda w: (w.used_percent, w.label == "채팅"))
     reset_suffix = f" · {active.reset_text} 리셋" if active.reset_text else ""
     return SubscriptionSnapshot(
         used_percent=active.used_percent,
@@ -906,13 +1214,17 @@ def query_copilot_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
 
 
 # ==========================================
-# 5. xAI Grok Subscription
+# 5. xAI API Rate Limit (not a Grok/SuperGrok subscription quota)
 # ==========================================
 def query_grok_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
     api_key = config.get("api_key") or os.environ.get("XAI_API_KEY", "")
     api_key = str(api_key).strip()
     if not api_key:
-        raise SubscriptionUsageError("xAI API 키 설정 필요")
+        raise SubscriptionUsageError(
+            "xAI API 키 설정 필요",
+            status_kind=StatusKind.LOGIN_REQUIRED,
+            action_hint="설정에서 xAI API 키를 입력하거나 XAI_API_KEY 환경변수를 설정하세요.",
+        )
 
     timeout_sec = float(config.get("timeout_sec", 15))
     request = urllib.request.Request(
@@ -931,12 +1243,28 @@ def query_grok_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
             body = json.load(response)
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):
-            raise SubscriptionUsageError("xAI API 키 인증 실패") from None
+            raise SubscriptionUsageError(
+                "xAI API 키 인증 실패",
+                status_kind=StatusKind.LOGIN_REQUIRED,
+                action_hint="xAI API 키를 다시 확인하세요.",
+            ) from None
         if exc.code == 429:
-            raise SubscriptionUsageError("xAI 요청 한도 초과 (429)") from None
-        raise SubscriptionUsageError(f"xAI 서버 응답 오류 ({exc.code})") from None
+            raise SubscriptionUsageError(
+                "xAI 요청 한도 초과 (429)",
+                status_kind=StatusKind.RATE_LIMITED,
+                retry_after_sec=60,
+                action_hint="xAI 요청 한도가 초과되었습니다. 잠시 대기하세요.",
+            ) from None
+        raise SubscriptionUsageError(
+            f"xAI 서버 응답 오류 ({exc.code})",
+            status_kind=StatusKind.SERVER_ERROR,
+            action_hint="잠시 후 다시 시도하세요.",
+        ) from None
     except (OSError, ValueError) as exc:
-        raise SubscriptionUsageError("xAI 서버 연결 실패") from exc
+        raise SubscriptionUsageError(
+            "xAI 서버 연결 실패",
+            status_kind=StatusKind.SERVER_ERROR,
+        ) from exc
 
     limit_req_str = headers.get("x-ratelimit-limit-requests")
     remaining_req_str = headers.get("x-ratelimit-remaining-requests")
@@ -962,27 +1290,23 @@ def query_grok_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
         except (ValueError, TypeError):
             pass
 
-    key_name = str(body.get("name") or "Grok Key")
+    key_name = str(body.get("name") or "xAI API Key")
     if not windows:
-        windows = [
-            SubscriptionWindow(
-                label="API 가용",
-                used_percent=0.0,
-                reset_text="정상",
-                remaining_percent=100.0,
-            )
-        ]
+        # SC-005: 한도 정보가 없는 API 인증 성공은 가상 100% 잔여량을 생성하지 않고
+        # '연결됨 · 구독 사용량 미지원' 및 NO_QUOTA 상태로 명확히 표시한다.
         return SubscriptionSnapshot(
             used_percent=0.0,
-            model_name=f"Grok ({key_name})",
-            status_text="API 키 정상 연결됨 · 가용 100%",
-            windows=tuple(windows),
+            model_name=f"xAI API ({key_name})",
+            status_text="연결됨 · 구독 사용량 미지원",
+            windows=(),
+            status_kind=StatusKind.NO_QUOTA,
+            action_hint="xAI API는 현재 구독 잔여량 조회를 지원하지 않습니다.",
         )
 
     active = max(windows, key=lambda w: w.used_percent)
     return SubscriptionSnapshot(
         used_percent=active.used_percent,
-        model_name=f"Grok ({key_name})",
+        model_name=f"xAI API ({key_name})",
         status_text=f"{active.label} {active.remaining_percent:.0f}% 남음",
         windows=tuple(windows),
     )

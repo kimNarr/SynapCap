@@ -22,6 +22,14 @@ python scripts/generate_icons.py
 python -m PyInstaller \
   --noconfirm \
   --clean \
+  --onefile \
+  --console \
+  --name SynapCapCopilotProbe \
+  --collect-all copilot \
+  scripts/probe_copilot_usage.py
+python -m PyInstaller \
+  --noconfirm \
+  --clean \
   --windowed \
   --onedir \
   --name SynapCap \
@@ -29,6 +37,7 @@ python -m PyInstaller \
   --add-data "assets/logo.svg:assets" \
   --add-data "assets/logo-icon.svg:assets" \
   --add-data "assets/wordmark.svg:assets" \
+  --add-binary "dist/SynapCapCopilotProbe:." \
   --osx-bundle-identifier io.github.kimNarr.SynapCap \
   main.py
 
@@ -42,12 +51,30 @@ if ! /usr/libexec/PlistBuddy \
     "$APP_BUNDLE/Contents/Info.plist"
 fi
 
+# PyInstaller defaults the short version to 0.0.0 and may omit the build
+# version. Stamp both fields before signing and inspecting the final bundle.
+for version_key in CFBundleShortVersionString CFBundleVersion; do
+  if ! /usr/libexec/PlistBuddy \
+    -c "Set :$version_key $VERSION" \
+    "$APP_BUNDLE/Contents/Info.plist"; then
+    /usr/libexec/PlistBuddy \
+      -c "Add :$version_key string $VERSION" \
+      "$APP_BUNDLE/Contents/Info.plist"
+  fi
+done
+
 # PyInstaller ad-hoc signs the bundle during creation. Changing Info.plist
 # invalidates that signature, so sign and validate the final bundle before it
 # is copied into the disk image.
 plutil -lint "$APP_BUNDLE/Contents/Info.plist"
 codesign --force --deep --sign - "$APP_BUNDLE"
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+
+python scripts/verify_bundle.py \
+  "$APP_BUNDLE" \
+  --platform macos \
+  --expected-version "$VERSION" \
+  --report "$ARTIFACT_DIR/SynapCap-macOS-$ARCH_NAME-bundle-verification.json"
 
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR"

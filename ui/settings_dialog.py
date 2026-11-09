@@ -315,6 +315,7 @@ _PROVIDERS_SCROLL_QSS = """
     }
 """
 
+
 class NoWheelComboBox(QComboBox):
     """마우스 휠 스크롤 시 선택 항목이 실수로 변경되지 않도록 휠 이벤트를 무시하는 콤보박스"""
 
@@ -534,9 +535,7 @@ class SettingsDialog(QDialog):
                 provider_type = combo.itemData(index)
                 combo.setItemIcon(index, create_provider_icon(provider_type, 18))
             selected_type = combo.currentData() or "codex"
-            item["header_icon"].setPixmap(
-                create_provider_icon(selected_type, 22).pixmap(22, 22)
-            )
+            item["header_icon"].setPixmap(create_provider_icon(selected_type, 22).pixmap(22, 22))
 
     def init_ui(self):
         # Fusion avoids native Cocoa controls overriding the Windows-oriented
@@ -642,12 +641,9 @@ class SettingsDialog(QDialog):
         mode_index = self.window_mode_combo.findData(selected_mode)
         self.window_mode_combo.setCurrentIndex(max(mode_index, 0))
         self.window_mode_combo.setToolTip(
-            "펼침과 막대는 작업표시줄을 침범하지 않으며, "
-            "트레이만은 창을 숨깁니다."
+            "펼침과 막대는 작업표시줄을 침범하지 않으며, 트레이만은 창을 숨깁니다."
         )
-        self.window_mode_combo.currentIndexChanged.connect(
-            lambda _index: self.on_preview()
-        )
+        self.window_mode_combo.currentIndexChanged.connect(lambda _index: self.on_preview())
         form.addRow("표시 모드:", self.window_mode_combo)
 
         self.tray_metric_combo = NoWheelComboBox()
@@ -666,9 +662,7 @@ class SettingsDialog(QDialog):
             "트레이 아이콘에 표시할 수치입니다. 특정 서비스를 고르면 그 서비스의 "
             "최고 사용률만, '숫자 표시 안 함'이면 앱 아이콘만 보여 줍니다."
         )
-        self.tray_metric_combo.currentIndexChanged.connect(
-            lambda _index: self.on_preview()
-        )
+        self.tray_metric_combo.currentIndexChanged.connect(lambda _index: self.on_preview())
         form.addRow("트레이 표시:", self.tray_metric_combo)
 
         self.update_check = StyledCheckBox("자동으로 새 버전 확인")
@@ -697,29 +691,19 @@ class SettingsDialog(QDialog):
         self.theme_combo.setToolTip(
             "시스템 설정 따름 — OS의 라이트/다크 설정을 자동으로 따라갑니다."
         )
-        self.theme_combo.currentIndexChanged.connect(
-            lambda _index: self.on_preview()
-        )
+        self.theme_combo.currentIndexChanged.connect(lambda _index: self.on_preview())
         form.addRow("테마:", self.theme_combo)
 
         self.usage_alert_check = StyledCheckBox("설정한 사용량 이상에서 알림")
-        self.usage_alert_check.setChecked(
-            settings.get("usage_alerts_enabled", False)
-        )
+        self.usage_alert_check.setChecked(settings.get("usage_alerts_enabled", False))
         form.addRow("사용량 알림:", self.usage_alert_check)
 
         self.usage_alert_threshold_spin = VisibleSpinBox()
         self.usage_alert_threshold_spin.setRange(50, 100)
         self.usage_alert_threshold_spin.setSuffix(" %")
-        self.usage_alert_threshold_spin.setValue(
-            settings.get("usage_alert_threshold", 90)
-        )
-        self.usage_alert_threshold_spin.setEnabled(
-            self.usage_alert_check.isChecked()
-        )
-        self.usage_alert_check.toggled.connect(
-            self.usage_alert_threshold_spin.setEnabled
-        )
+        self.usage_alert_threshold_spin.setValue(settings.get("usage_alert_threshold", 90))
+        self.usage_alert_threshold_spin.setEnabled(self.usage_alert_check.isChecked())
+        self.usage_alert_check.toggled.connect(self.usage_alert_threshold_spin.setEnabled)
         form.addRow("알림 기준:", self.usage_alert_threshold_spin)
 
     def init_feedback_tab(self):
@@ -817,7 +801,6 @@ class SettingsDialog(QDialog):
         )
         layout.addWidget(privacy_note)
         layout.addStretch()
-
 
     def init_providers_tab(self):
         main_layout = QVBoxLayout(self.providers_tab)
@@ -956,6 +939,16 @@ class SettingsDialog(QDialog):
         )
         g_layout.addRow("연결 방식:", connection_label)
 
+        api_key_edit = QLineEdit(p_data.get("api_key", ""))
+        api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        api_key_edit.setPlaceholderText("XAI_API_KEY 사용 시 비워 두세요")
+        api_key_edit.setToolTip(
+            "로컬 설정 파일에 저장됩니다. SuperGrok 구독 잔여량이 아니라 "
+            "xAI API 속도 제한 조회에만 사용합니다."
+        )
+        g_layout.addRow("xAI API 키:", api_key_edit)
+        api_key_label = g_layout.labelForField(api_key_edit)
+
         window_options = QWidget()
         window_options_layout = QHBoxLayout(window_options)
         window_options_layout.setContentsMargins(0, 0, 0, 0)
@@ -996,9 +989,20 @@ class SettingsDialog(QDialog):
                 "grok": "xAI API 키",
             }.get(selected_type, "로컬 도구")
             if selected_type == "grok":
-                connection_label.setText("xAI API 키 필요 (XAI_API_KEY 환경변수 또는 설정)")
+                connection_label.setText(
+                    "xAI API 속도 제한만 표시 · SuperGrok 구독 잔여량 아님 · "
+                    "API 키 또는 XAI_API_KEY 필요"
+                )
             else:
                 connection_label.setText(f"{cli_name} 설치 및 로컬 로그인 필요 · API 키 불필요")
+            is_grok = selected_type == "grok"
+            api_key_edit.setVisible(is_grok)
+            if api_key_label is not None:
+                api_key_label.setVisible(is_grok)
+            window_options.setVisible(not is_grok)
+            window_options_label = g_layout.labelForField(window_options)
+            if window_options_label is not None:
+                window_options_label.setVisible(not is_grok)
             update_window_options()
 
         type_combo.currentIndexChanged.connect(update_connection_mode)
@@ -1020,6 +1024,7 @@ class SettingsDialog(QDialog):
             "name_edit": name_edit,
             "form_layout": g_layout,
             "connection_label": connection_label,
+            "api_key_edit": api_key_edit,
             "up_button": up_btn,
             "down_button": dn_btn,
             "five_hour_check": five_hour_check,
@@ -1071,13 +1076,8 @@ class SettingsDialog(QDialog):
         self.provider_widgets.append(item_info)
 
     def _available_provider_types(self) -> list[tuple[str, str]]:
-        used_types = {
-            item["type_combo"].currentData()
-            for item in self.provider_widgets
-        }
-        return [
-            option for option in PROVIDER_TYPE_OPTIONS if option[1] not in used_types
-        ]
+        used_types = {item["type_combo"].currentData() for item in self.provider_widgets}
+        return [option for option in PROVIDER_TYPE_OPTIONS if option[1] not in used_types]
 
     def _update_add_provider_state(self) -> None:
         if not hasattr(self, "add_btn"):
@@ -1112,7 +1112,7 @@ class SettingsDialog(QDialog):
             "antigravity": "Gemini",
             "claude": "Claude",
             "copilot": "Copilot",
-            "grok": "Grok",
+            "grok": "xAI API",
         }
         new_id = f"{provider_type}_{str(uuid.uuid4())[:6]}"
         default_data = {
@@ -1133,20 +1133,12 @@ class SettingsDialog(QDialog):
         settings = config_data.setdefault("settings", {})
         settings["refresh_interval_sec"] = self.interval_spin.value()
         settings["always_on_top"] = self.always_top_check.isChecked()
-        settings["window_mode"] = (
-            self.window_mode_combo.currentData() or "expanded"
-        )
-        settings["tray_metric"] = (
-            self.tray_metric_combo.currentData() or "highest"
-        )
+        settings["window_mode"] = self.window_mode_combo.currentData() or "expanded"
+        settings["tray_metric"] = self.tray_metric_combo.currentData() or "highest"
         settings["check_updates"] = self.update_check.isChecked()
         settings["theme"] = self.theme_combo.currentData() or "dark"
-        settings["usage_alerts_enabled"] = (
-            self.usage_alert_check.isChecked()
-        )
-        settings["usage_alert_threshold"] = (
-            self.usage_alert_threshold_spin.value()
-        )
+        settings["usage_alerts_enabled"] = self.usage_alert_check.isChecked()
+        settings["usage_alert_threshold"] = self.usage_alert_threshold_spin.value()
         settings["launch_on_startup"] = self.startup_check.isChecked()
         settings["reset_alerts_enabled"] = self.reset_alert_check.isChecked()
         settings["global_hotkey_enabled"] = self.hotkey_check.isChecked()
@@ -1199,9 +1191,17 @@ class SettingsDialog(QDialog):
             )
             for stale_key in ("auth_token", "endpoint"):
                 p_data.pop(stale_key, None)
-            if selected_type_val != "grok":
+            if selected_type_val == "grok":
+                api_key = pw["api_key_edit"].text().strip()
+                if api_key:
+                    p_data["api_key"] = api_key
+                else:
+                    p_data.pop("api_key", None)
+            else:
                 p_data.pop("api_key", None)
-            p_data["source"] = "local_subscription"
+            p_data["source"] = (
+                "api_rate_limit" if selected_type_val == "grok" else "local_subscription"
+            )
             p_data.setdefault(
                 "cache_ttl_sec",
                 120 if selected_type_val == "antigravity" else 60,

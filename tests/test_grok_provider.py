@@ -1,6 +1,6 @@
 import json
-import urllib.error
 import unittest
+import urllib.error
 from unittest.mock import MagicMock, patch
 
 from providers import GrokProvider
@@ -32,7 +32,7 @@ class GrokProviderTests(unittest.TestCase):
         snapshot = query_grok_subscription({"api_key": "xai-test-key"})
 
         self.assertEqual(snapshot.used_percent, 20.0)  # (1 - 800/1000) * 100
-        self.assertIn("Grok (My Grok Key)", snapshot.model_name)
+        self.assertIn("xAI API (My Grok Key)", snapshot.model_name)
         self.assertEqual(len(snapshot.windows), 1)
         self.assertEqual(snapshot.windows[0].label, "요청")
         self.assertEqual(snapshot.windows[0].used_percent, 20.0)
@@ -52,7 +52,9 @@ class GrokProviderTests(unittest.TestCase):
 
     @patch("providers.query_grok_subscription")
     def test_grok_provider_fetch_usage(self, mock_query):
-        provider = GrokProvider({"id": "grok", "name": "Grok", "type": "grok", "api_key": "valid-key"})
+        provider = GrokProvider(
+            {"id": "grok", "name": "Grok", "type": "grok", "api_key": "valid-key"}
+        )
         mock_query.side_effect = SubscriptionUsageError("xAI API 키 인증 실패")
 
         usage = provider.fetch_usage()

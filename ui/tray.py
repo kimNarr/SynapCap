@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from feedback import FEEDBACK_CHOOSER_URL
 from providers import ModelUsage
+from subscription_usage import STATUS_BADGE_LABELS, StatusKind
 from theme import palette, t
 from version import APP_VERSION
 
@@ -43,17 +44,27 @@ def _tray_window_label(label: str) -> str:
 
 
 def _usage_peak(usage: ModelUsage) -> tuple[float, str]:
-    if usage.error:
+    if usage.error and not usage.is_stale:
         return 0.0, "사용량"
-    windows = usage.windows or []
+    windows = [window for window in (usage.windows or []) if not window.unlimited]
     if not windows:
-        return usage.used, "사용량"
+        return usage.used or 0.0, "사용량"
     peak = max(windows, key=lambda window: window.used)
-    return peak.used, _tray_window_label(peak.label)
+    return peak.used, _tray_window_label(peak.display_label)
 
 
 def _usage_value(usage: ModelUsage) -> float:
     return _usage_peak(usage)[0]
+
+
+def _has_measurable_usage(usage: ModelUsage) -> bool:
+    if usage.status_kind == StatusKind.NO_QUOTA:
+        return False
+    if usage.error and not usage.is_stale:
+        return False
+    if usage.windows:
+        return any(not window.unlimited for window in usage.windows)
+    return usage.used is not None
 
 
 def _usage_color(value: float) -> str:
@@ -122,6 +133,7 @@ class SynapCapTray(QObject):
     update_requested = Signal(str)
     restart_requested = Signal()
     quit_requested = Signal()
+    activation_observed = Signal(str)
 
     def __init__(
         self,
@@ -216,6 +228,7 @@ class SynapCapTray(QObject):
         self._update_usage_icon()
 
     def _on_activated(self, reason):
+        self.activation_observed.emit(reason.name)
         if reason in (
             QSystemTrayIcon.ActivationReason.Trigger,
             QSystemTrayIcon.ActivationReason.DoubleClick,
@@ -242,16 +255,14 @@ class SynapCapTray(QObject):
         """The number the icon should show, per settings["tray_metric"]."""
         if self.tray_metric == "none":
             return None
-        valid = [u for u in self._latest_usage if not u.error]
+        valid = [u for u in self._latest_usage if _has_measurable_usage(u)]
         if self.tray_metric != "highest":
-            picked = next(
-                (u for u in valid if u.provider_id == self.tray_metric), None
-            )
+            picked = next((u for u in valid if u.provider_id == self.tray_metric), None)
             return _usage_value(picked) if picked is not None else None
         return max((_usage_value(u) for u in valid), default=None)
 
     def _update_usage_icon(self) -> None:
-        valid_usage = [usage for usage in self._latest_usage if not usage.error]
+        valid_usage = [usage for usage in self._latest_usage if _has_measurable_usage(usage)]
         headline = self._tray_metric_value()
         if headline is None:
             self.tray_icon.setIcon(create_app_icon(32))
@@ -264,18 +275,40 @@ class SynapCapTray(QObject):
 
         details = []
         for usage in self._latest_usage:
-            if usage.error:
-                details.append(f"{usage.provider_name} 조회 오류")
+            if (
+                usage.is_stale
+                and usage.windows
+                and all(window.unlimited for window in usage.windows)
+            ):
+                details.append(f"{usage.provider_name} 무제한 (갱신 실패)")
+            elif usage.is_stale:
+                value, window_label = _usage_peak(usage)
+                details.append(f"{usage.provider_name} {window_label} {value:.0f}% (갱신 실패)")
+            elif usage.error:
+                label = STATUS_BADGE_LABELS.get(usage.status_kind, "조회 오류")
+                details.append(
+                    f"{usage.provider_name} 조회 오류 ({label})"
+                    if label != "조회 오류"
+                    else f"{usage.provider_name} 조회 오류"
+                )
+            elif usage.status_kind == StatusKind.NO_QUOTA:
+                details.append(f"{usage.provider_name} 한도 없음")
+            elif usage.windows and all(window.unlimited for window in usage.windows):
+                details.append(f"{usage.provider_name} 무제한")
             else:
                 value, window_label = _usage_peak(usage)
-                details.append(
-                    f"{usage.provider_name} {window_label} {value:.0f}%"
-                )
-        fetched_times = [
-            usage.fetched_at
-            for usage in valid_usage
-            if usage.fetched_at is not None
-        ]
+                unlimited_labels = [
+                    _tray_window_label(window.display_label)
+                    for window in (usage.windows or [])
+                    if window.unlimited
+                ]
+                detail = f"{usage.provider_name} {window_label} {value:.0f}%"
+                if unlimited_labels:
+                    detail += f" · {', '.join(unlimited_labels)} 무제한"
+                if usage.action_hint:
+                    detail += f" · {usage.action_hint}"
+                details.append(detail)
+        fetched_times = [usage.fetched_at for usage in valid_usage if usage.fetched_at is not None]
         freshness = ""
         if fetched_times:
             latest = max(fetched_times).astimezone()
@@ -285,8 +318,7 @@ class SynapCapTray(QObject):
     def show_tray_pin_guidance(self) -> None:
         self.tray_icon.showMessage(
             "SynapCap 트레이 아이콘",
-            "아이콘을 항상 보려면 작업표시줄의 ^ 메뉴에서 SynapCap을 "
-            "표시 영역으로 옮겨 주세요.",
+            "아이콘을 항상 보려면 작업표시줄의 ^ 메뉴에서 SynapCap을 표시 영역으로 옮겨 주세요.",
             QSystemTrayIcon.MessageIcon.Information,
             7000,
         )
@@ -310,9 +342,7 @@ class SynapCapTray(QObject):
 
     def set_update_checking(self, checking: bool):
         self.check_update_action.setEnabled(not checking)
-        self.check_update_action.setText(
-            "업데이트 확인 중..." if checking else "업데이트 확인"
-        )
+        self.check_update_action.setText("업데이트 확인 중..." if checking else "업데이트 확인")
 
     def show_no_update_found(self):
         self.tray_icon.showMessage(
@@ -358,8 +388,7 @@ class SynapCapTray(QObject):
     ):
         self.tray_icon.showMessage(
             f"{provider_name} 사용량 알림",
-            f"{window_label} 사용량이 {used:.0f}%로 알림 기준 "
-            f"{threshold}%에 도달했습니다.",
+            f"{window_label} 사용량이 {used:.0f}%로 알림 기준 {threshold}%에 도달했습니다.",
             QSystemTrayIcon.MessageIcon.Warning,
             7000,
         )

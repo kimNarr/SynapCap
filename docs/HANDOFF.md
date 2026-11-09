@@ -1,20 +1,32 @@
-# SynapCap — 작업 현황 (최종본)
+# SynapCap — 이전 작업 인수인계
 
-> `dev` 기준. 테스트 **187개 통과**. 이번 라운드의 디자인/UX backlog **전부 완료**.
+> 아래 구현 이력은 이전 디자인/UX 라운드의 기록이다. 현재 남은 작업과 완료 기준은 [작업 목록](TASKS.md)을 따른다(2026-11-09 갱신).
 > push/tag/배포는 오너가 직접.
 
 ---
 
 ## 남은 일
 
-없음.
+[현재 작업 목록](TASKS.md) 참조. 오류 복구·사용량 신뢰성·프로바이더 검증을 우선한다.
+
+## 현재 검증 범위 (2026-11-09)
+
+- 사용자의 요청으로 앱 버전을 v0.3.1로 올리고 배포를 준비했다. 배포 직전 Windows 테스트 268개가 다시 통과했다. 최종 CI·공개 자산 결과는 [릴리스 인수인계](RELEASE-HANDOFF.md)를 따른다.
+
+- 개발 소스: SC-002, SC-005, SC-007, SC-008, SC-010~013, SC-015, SC-017을 v0.3.1 후보에 연결하고, 진단·충돌 기록 기반 구현을 포함해 자동 테스트 268개 통과.
+- SC-016: Gemini·Argon 그룹 보존·별도 카드·툴팁·알림 식별과 미지원 안내 구현 완료. 명시적 잔여/사용 의미가 있는 합성 CLI 응답과 라이트·다크 배치를 검증했지만 실제 Argon 응답 대조는 `확인 필요`다.
+- SC-017: 실제 Windows EXE의 버전 리소스를 읽어 `0.3.0` 파일의 `9.9.9` 기대 버전을 거부했다. macOS는 두 버전 필드를 서명 전에 기록하고 Info.plist와 대조하도록 구현·fixture 검증했다. macOS 실제 빌드는 미검증이다.
+- 재검수 수정: SC-015의 보이는 진단 상태 버튼부터 서비스별 보고서 대화상자까지, SC-012의 동일 객체 대기 시간 UI 갱신을 수정하고 다중 서비스·정상 복구까지 자동 검증했다. SC-001은 실계정 오류 경로 `검증 대기`다.
+- 로컬 Windows 번들: `dist/SynapCap/SynapCap.exe` 생성. 자동 번들 검증에서 앱·Copilot 프로브 해시 기록과 프로브 `--self-check` 통과.
+- 설치된 앱·공개 릴리스: 이번 변경 미배포, 실제 설치본·실계정 검증 전.
+- macOS 번들: 현재 Windows 환경에서는 빌드·실행 검증하지 않음.
 
 ---
 
 ## 프로젝트 컨텍스트 (참고)
 
-- **SynapCap**: PySide6(Qt6) Windows/macOS 데스크톱 위젯. Codex/Gemini/Claude 구독 사용량(%).
-  API 키 없음 — 각 CLI가 로컬에 남긴 값을 읽는다.
+- **SynapCap**: PySide6(Qt6) Windows/macOS 데스크톱 위젯. Codex/Gemini/Claude 구독 사용량과 추가 서비스 상태를 표시한다.
+  기본 프로바이더는 각 CLI의 로컬 로그인을 사용하며, xAI API 연동을 선택한 경우에만 로컬 설정의 API 키 또는 `XAI_API_KEY`를 사용한다.
 - **표시 모드 3단계** (`settings["window_mode"]`):
   - `expanded` — 384px 고정. 프로바이더 탭 + 선택 카드에 `5h`(SESSION)/`7d`(WEEKLY) 대형 듀얼 링.
   - `bar` — 컴팩트 막대. `아이콘 + 5h / 7d 값` 평면 그룹. `availableGeometry()` 도킹.
@@ -29,7 +41,7 @@
   - `ui/tray.py` — 트레이 메뉴 + `create_usage_tray_icon()` + `update_usage()` + `show_tray_pin_guidance()`.
   - `ui/settings_dialog.py` — `theme_combo`·`window_mode_combo`·provider 카드("사용" 체크박스).
   - `ui/icon.py` — 아이콘 런타임 생성. `_PROVIDER_BRANDS` + `create_provider_pixmap`(`path`/`markup`).
-  - `config.py` — schema v8. `window_mode`·`last_window_mode`·`window_pos_{expanded,bar}`·
+  - `config.py` — schema v9. `window_mode`·`last_window_mode`·`window_pos_{expanded,bar}`·
     `tray_pin_guidance_shown`·`theme`.
   - `main.py` — `apply_window_mode()`, hot-reload, `_setting_changed()`.
 - 문서: `docs/DESIGN.md` (Part 1 = 단일 출처 / Part 2 backlog).
@@ -37,7 +49,7 @@
 ## 공통 작업 규칙
 
 - 브랜치 `dev`만. 커밋 OK, **push/tag/배포 금지.**
-- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **187개 통과 유지.**
+- 테스트 `python -m unittest discover -s tests` (offscreen 자동). **255개 통과 유지.**
 - 린트 `python -m ruff check ui/ tests/`. **기존 에러(건드리지 말 것)**:
   `test_subscription_usage.py`(FLY002), `test_updates.py`(UP012 ×3), `config.py`(blind-except ×2).
 - QSS: 리터럴 `{}` 블록 → `%(name)s` 퍼센트 스타일, **모듈 레벨 named constant**로 올려

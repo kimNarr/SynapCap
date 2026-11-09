@@ -71,6 +71,16 @@ try {
     & $python -m PyInstaller `
         --noconfirm `
         --clean `
+        --onefile `
+        --console `
+        --name SynapCapCopilotProbe `
+        --collect-all copilot `
+        scripts\probe_copilot_usage.py
+    if ($LASTEXITCODE -ne 0) { throw "Copilot probe build failed." }
+
+    & $python -m PyInstaller `
+        --noconfirm `
+        --clean `
         --windowed `
         --onedir `
         --name SynapCap `
@@ -78,9 +88,18 @@ try {
         --add-data "assets\logo.svg;assets" `
         --add-data "assets\logo-icon.svg;assets" `
         --add-data "assets\wordmark.svg;assets" `
+        --add-binary "dist\SynapCapCopilotProbe.exe;." `
         --version-file $versionFile `
         main.py
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
+
+    $verificationReport = Join-Path $artifactDir "SynapCap-Windows-x64-bundle-verification.json"
+    & $python "scripts\verify_bundle.py" `
+        "dist\SynapCap" `
+        --platform windows `
+        --expected-version $Version `
+        --report $verificationReport
+    if ($LASTEXITCODE -ne 0) { throw "Windows bundle verification failed." }
 
     if ($SkipInstaller) {
         Write-Output "Created Windows application bundle at dist\SynapCap"

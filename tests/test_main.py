@@ -7,6 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from main import (
+    _changed_provider_query_ids,
     _launch_restart_process,
     _launch_windows_installer,
     _provider_query_settings_changed,
@@ -14,7 +15,10 @@ from main import (
     _setting_changed,
     _should_start_centered,
     confirm_quit,
+    show_provider_diagnostics,
 )
+from providers import CodexProvider, ModelUsage
+from ui.widget import SynapCapWidget
 
 
 class UpdateInstallerTests(unittest.TestCase):
@@ -93,6 +97,26 @@ class SettingsChangeTests(unittest.TestCase):
 
         self.assertTrue(_provider_settings_changed(previous, current))
         self.assertTrue(_provider_query_settings_changed(previous, current))
+        self.assertEqual(_changed_provider_query_ids(previous, current), {"codex"})
+
+    def test_query_change_identifies_only_the_affected_provider(self):
+        previous = {
+            "providers": [
+                {"id": "codex", "type": "codex"},
+                {"id": "copilot", "type": "copilot", "account": "first"},
+            ]
+        }
+        current = {
+            "providers": [
+                {"id": "codex", "type": "codex"},
+                {"id": "copilot", "type": "copilot", "account": "second"},
+            ]
+        }
+
+        self.assertEqual(
+            _changed_provider_query_ids(previous, current),
+            {"copilot"},
+        )
 
     def test_provider_name_and_order_do_not_require_query(self):
         previous = {
@@ -179,6 +203,64 @@ class QuitConfirmationTests(unittest.TestCase):
             dialog.button(QMessageBox.StandardButton.Yes).sizeHint().width(),
             90,
         )
+
+
+class ProviderDiagnosticsIntegrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    @patch("main.build_diagnostic_report", return_value="safe diagnostic report")
+    def test_visible_provider_status_opens_matching_diagnostic_dialog(self, build_report):
+        config = {
+            "settings": {"always_on_top": False},
+            "providers": [{"id": "codex", "name": "Codex", "type": "codex"}],
+        }
+        provider = CodexProvider(config["providers"][0])
+        usage = ModelUsage(
+            "codex",
+            "Codex",
+            "Codex",
+            0,
+            100,
+            "%",
+            error="Codex 로그인이 필요합니다",
+        )
+        widget = SynapCapWidget(config, [provider])
+        widget.show()
+        widget.update_data([usage])
+        self.app.processEvents()
+
+        dialog = MagicMock()
+        copy_button = object()
+        close_button = object()
+        dialog.addButton.side_effect = [copy_button, close_button]
+        dialog.clickedButton.return_value = close_button
+        dialog_factory = MagicMock(return_value=dialog)
+        widget.diagnostics_requested.connect(
+            lambda provider_id: show_provider_diagnostics(
+                widget,
+                config,
+                widget.latest_usage,
+                provider_id,
+                dialog_factory,
+            )
+        )
+
+        try:
+            status = widget.provider_ui_map["codex"]["status"]
+            self.assertTrue(status.isVisibleTo(widget))
+            status.click()
+
+            dialog_factory.assert_called_once_with(widget)
+            build_report.assert_called_once_with(config["providers"][0], usage)
+            dialog.setWindowTitle.assert_called_once_with("Codex 진단")
+            dialog.setDetailedText.assert_called_once_with("safe diagnostic report")
+            dialog.exec.assert_called_once_with()
+        finally:
+            widget.close()
+            widget.deleteLater()
+            self.app.processEvents()
 
 
 if __name__ == "__main__":

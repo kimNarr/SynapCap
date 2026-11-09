@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from feedback import FEEDBACK_CHOOSER_URL
 from providers import ModelUsage, UsageWindow
+from subscription_usage import StatusKind
 from ui.tray import SynapCapTray, create_usage_tray_icon
 
 
@@ -85,11 +86,14 @@ class TrayTests(unittest.TestCase):
     def test_left_click_requests_the_last_visible_window(self):
         tray = SynapCapTray(window_mode="none")
         restores = []
+        activations = []
         tray.restore_window_requested.connect(lambda: restores.append(True))
+        tray.activation_observed.connect(activations.append)
 
         tray._on_activated(QSystemTrayIcon.ActivationReason.Trigger)
 
         self.assertEqual(restores, [True])
+        self.assertEqual(activations, ["Trigger"])
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()
 
@@ -125,7 +129,12 @@ class TrayTests(unittest.TestCase):
         tray = SynapCapTray(tray_metric="codex")
         usages = [
             ModelUsage(
-                "codex", "Codex", "Codex", 40, 100, "%",
+                "codex",
+                "Codex",
+                "Codex",
+                40,
+                100,
+                "%",
                 windows=[UsageWindow("5h", 40, "1h"), UsageWindow("7d", 55, "4d")],
             ),
             ModelUsage("claude", "Claude", "Claude", 92, 100, "%"),
@@ -153,8 +162,10 @@ class TrayTests(unittest.TestCase):
             ModelUsage("codex", "Codex", "Codex", 0, 100, "%", error="codex CLI를 찾을 수 없음"),
             ModelUsage("claude", "Claude", "Claude", 70, 100, "%"),
         ]
-        with patch("ui.tray.create_usage_tray_icon") as create_icon, \
-                patch("ui.tray.create_app_icon") as app_icon:
+        with (
+            patch("ui.tray.create_usage_tray_icon") as create_icon,
+            patch("ui.tray.create_app_icon") as app_icon,
+        ):
             create_icon.return_value = QIcon()
             app_icon.return_value = QIcon()
             tray.update_usage(usages)
@@ -167,8 +178,10 @@ class TrayTests(unittest.TestCase):
     def test_tray_metric_none_keeps_the_plain_app_icon(self):
         tray = SynapCapTray(tray_metric="none")
         usages = [ModelUsage("claude", "Claude", "Claude", 88, 100, "%")]
-        with patch("ui.tray.create_usage_tray_icon") as create_icon, \
-                patch("ui.tray.create_app_icon") as app_icon:
+        with (
+            patch("ui.tray.create_usage_tray_icon") as create_icon,
+            patch("ui.tray.create_app_icon") as app_icon,
+        ):
             create_icon.return_value = QIcon()
             app_icon.return_value = QIcon()
             tray.update_usage(usages)
@@ -219,6 +232,87 @@ class TrayTests(unittest.TestCase):
 
     def test_three_digit_usage_tray_icon_is_rendered(self):
         self.assertFalse(create_usage_tray_icon(100).isNull())
+
+    def test_tray_peak_identifies_quota_group_and_unavailable_argon(self):
+        tray = SynapCapTray()
+        usage = ModelUsage("gemini", "Gemini", "Gemini Models", 95, 100, "%", windows=[
+            UsageWindow("주간", 35, "", quota_group="Gemini Models"),
+            UsageWindow("주간", 95, "", quota_group="Gemini 4 Argon"),
+        ])
+        try:
+            tray.update_usage([usage])
+            self.assertIn("Gemini 4 Argon · 주간 95%", tray.tray_icon.toolTip())
+            usage.windows.pop()
+            usage.action_hint = "Argon 조회 미지원: CLI가 별도 한도를 제공하지 않습니다."
+            tray.update_usage([usage])
+            self.assertIn("Gemini Models · 주간 35%", tray.tray_icon.toolTip())
+            self.assertIn("Argon 조회 미지원", tray.tray_icon.toolTip())
+        finally:
+            tray.tray_icon.hide()
+            tray.tray_icon.deleteLater()
+
+    def test_no_quota_and_unlimited_are_excluded_from_tray_number(self):
+        no_quota = ModelUsage(
+            "grok",
+            "Grok",
+            "Grok API",
+            0,
+            100,
+            "%",
+            status_kind=StatusKind.NO_QUOTA,
+        )
+        unlimited = ModelUsage(
+            "copilot",
+            "Copilot",
+            "Copilot",
+            0,
+            100,
+            "%",
+            windows=[UsageWindow("채팅", 0, "", None, unlimited=True)],
+        )
+        tray = SynapCapTray(tray_metric="highest")
+        with (
+            patch("ui.tray.create_usage_tray_icon") as create_icon,
+            patch("ui.tray.create_app_icon") as app_icon,
+        ):
+            app_icon.return_value = QIcon()
+            tray.update_usage([no_quota, unlimited])
+
+        create_icon.assert_not_called()
+        app_icon.assert_called()
+        self.assertIn("Grok 한도 없음", tray.tray_icon.toolTip())
+        self.assertIn("Copilot 무제한", tray.tray_icon.toolTip())
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
+    def test_stale_unlimited_usage_keeps_unlimited_tooltip(self):
+        usage = ModelUsage(
+            "copilot",
+            "Copilot",
+            "Copilot",
+            0,
+            100,
+            "%",
+            windows=[UsageWindow("채팅", 0, "", None, unlimited=True)],
+            is_stale=True,
+            error="temporary failure",
+        )
+        tray = SynapCapTray(tray_metric="highest")
+        tray.update_usage([usage])
+        self.assertIn("Copilot 무제한 (갱신 실패)", tray.tray_icon.toolTip())
+        self.assertNotIn("0%", tray.tray_icon.toolTip())
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
+
+    def test_zero_percent_remains_a_measurable_tray_value(self):
+        tray = SynapCapTray(tray_metric="codex")
+        usage = ModelUsage("codex", "Codex", "Codex", 0, 100, "%")
+        with patch("ui.tray.create_usage_tray_icon") as create_icon:
+            create_icon.return_value = QIcon()
+            tray.update_usage([usage])
+        create_icon.assert_called_once_with(0)
+        tray.tray_icon.hide()
+        tray.tray_icon.deleteLater()
 
 
 if __name__ == "__main__":

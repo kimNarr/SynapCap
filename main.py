@@ -8,14 +8,15 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from config import load_config, save_config
+from crash_reporting import install_exception_logging, record_runtime_event
 from diagnostics import build_diagnostic_report
+from global_hotkey import GlobalHotkeyManager
 from providers import load_providers_from_config
 from release_notes import consume_whats_new, release_url
 from single_instance import SingleInstanceGuard
+from startup import set_startup_enabled
 from theme import apply_theme_setting, current_setting, palette
 from ui import SettingsDialog, SynapCapTray, SynapCapWidget, create_app_icon
-from global_hotkey import GlobalHotkeyManager
-from startup import set_startup_enabled
 from updates import UpdateCheckWorker, UpdateDownloadWorker, UpdateInfo
 from usage_alerts import update_reset_alert_state, update_usage_alert_state
 from version import APP_VERSION
@@ -60,13 +61,11 @@ def _provider_settings_changed(previous: dict, current: dict) -> bool:
 def _should_start_centered(settings: dict, updated: bool) -> bool:
     """Centre on the first ever launch or right after an update; otherwise
     reuse the last-used position."""
-    never_positioned = not any(
-        settings.get(f"window_pos_{mode}") for mode in ("expanded", "bar")
-    )
+    never_positioned = not any(settings.get(f"window_pos_{mode}") for mode in ("expanded", "bar"))
     return bool(updated or never_positioned)
 
 
-def _provider_query_signature(config: dict) -> tuple:
+def _provider_query_settings_by_id(config: dict) -> dict[str, tuple]:
     ignored_keys = {
         "name",
         "limit",
@@ -75,13 +74,27 @@ def _provider_query_signature(config: dict) -> tuple:
         "show_five_hour",
         "show_weekly",
     }
-    rows = []
+    rows = {}
     for provider in config.get("providers", []):
         query_settings = tuple(
             sorted((key, repr(value)) for key, value in provider.items() if key not in ignored_keys)
         )
-        rows.append((provider.get("id", ""), query_settings))
-    return tuple(sorted(rows))
+        rows[provider.get("id", "")] = query_settings
+    return rows
+
+
+def _provider_query_signature(config: dict) -> tuple:
+    return tuple(sorted(_provider_query_settings_by_id(config).items()))
+
+
+def _changed_provider_query_ids(previous: dict, current: dict) -> set[str]:
+    previous_rows = _provider_query_settings_by_id(previous)
+    current_rows = _provider_query_settings_by_id(current)
+    return {
+        provider_id
+        for provider_id in previous_rows.keys() | current_rows.keys()
+        if previous_rows.get(provider_id) != current_rows.get(provider_id)
+    }
 
 
 def _provider_query_settings_changed(previous: dict, current: dict) -> bool:
@@ -131,6 +144,48 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
     return dialog.exec() == QMessageBox.StandardButton.Yes
 
 
+def show_provider_diagnostics(
+    parent,
+    config_data: dict,
+    usage_list: list,
+    provider_id: str,
+    dialog_factory=None,
+) -> str:
+    """Build and display the diagnostic report for exactly one provider."""
+    provider_config = next(
+        (
+            provider
+            for provider in config_data.get("providers", [])
+            if provider.get("id") == provider_id
+        ),
+        {"id": provider_id, "name": provider_id, "type": provider_id},
+    )
+    usage = next(
+        (item for item in usage_list if item.provider_id == provider_id),
+        None,
+    )
+    report = build_diagnostic_report(provider_config, usage)
+    factory = dialog_factory or QMessageBox
+    dialog = factory(parent)
+    dialog.setWindowTitle(f"{provider_config.get('name', provider_id)} 진단")
+    dialog.setIcon(QMessageBox.Icon.Information)
+    dialog.setText("로컬 사용량 조회 진단 정보")
+    dialog.setInformativeText(
+        "CLI 설치·로그인 상태를 확인할 수 있습니다. "
+        "아래 보고서에는 계정 토큰이나 API 키가 포함되지 않습니다."
+    )
+    dialog.setDetailedText(report)
+    copy_button = dialog.addButton(
+        "진단 정보 복사",
+        QMessageBox.ButtonRole.ActionRole,
+    )
+    dialog.addButton("닫기", QMessageBox.ButtonRole.RejectRole)
+    dialog.exec()
+    if dialog.clickedButton() is copy_button:
+        QApplication.clipboard().setText(report)
+    return report
+
+
 def _launch_windows_installer(path: str) -> None:
     parameters = subprocess.list2cmdline(
         [
@@ -171,13 +226,16 @@ def _launch_restart_process() -> None:
 
 
 def main():
+    runtime_log_dir = install_exception_logging()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("SynapCap")
     app.setApplicationVersion(APP_VERSION)
+    force_start = "--force" in sys.argv
     single_instance = SingleInstanceGuard(parent=app)
-    if not single_instance.acquire():
+    if not force_start and not single_instance.acquire():
         return
+    record_runtime_event("app_start", log_dir=runtime_log_dir)
 
     # 1. Config 로드
     config_data = load_config()
@@ -235,9 +293,10 @@ def main():
         selected_mode = mode or widget.window_mode()
         if selected_mode not in {"expanded", "bar"} or not widget.isVisible():
             return
-        config_data.setdefault("settings", {})[
-            f"window_pos_{selected_mode}"
-        ] = [widget.x(), widget.y()]
+        config_data.setdefault("settings", {})[f"window_pos_{selected_mode}"] = [
+            widget.x(),
+            widget.y(),
+        ]
 
     def apply_window_mode(
         mode: str,
@@ -296,15 +355,24 @@ def main():
     app.styleHints().colorSchemeChanged.connect(on_system_scheme_changed)
 
     def show_widget():
+        record_runtime_event("window_restore_requested", log_dir=runtime_log_dir)
         mode = config_data.get("settings", {}).get(
             "last_window_mode",
             "expanded",
         )
+        if mode == "none":
+            mode = "expanded"
         apply_window_mode(mode)
         if widget.isMinimized():
             widget.showNormal()
+        widget.show()
         widget.raise_()
         widget.activateWindow()
+        if sys.platform == "win32":
+            try:
+                ctypes.windll.user32.SetForegroundWindow(int(widget.winId()))
+            except Exception:
+                pass
 
     single_instance.activation_requested.connect(show_widget)
     apply_window_mode(
@@ -313,6 +381,7 @@ def main():
         persist=False,
     )
     if start_centered and initial_window_mode in {"expanded", "bar"}:
+
         def _place_centered() -> None:
             # Deferred so the expanded layout has settled to its real size.
             widget.center_on_screen()
@@ -374,9 +443,7 @@ def main():
     def handle_usage_updated(usage_list):
         widget.update_data(usage_list)
         tray.update_usage(usage_list)
-        threshold = int(
-            config_data.get("settings", {}).get("usage_alert_threshold", 90)
-        )
+        threshold = int(config_data.get("settings", {}).get("usage_alert_threshold", 90))
         for alert in update_usage_alert_state(
             usage_list,
             config_data,
@@ -409,9 +476,7 @@ def main():
         config_before_dialog = deepcopy(config_data)
         dialog = SettingsDialog(config_data, parent=widget)
         active_settings_dialog = dialog
-        dialog.feedback_requested.connect(
-            lambda url: QDesktopServices.openUrl(QUrl(url))
-        )
+        dialog.feedback_requested.connect(lambda url: QDesktopServices.openUrl(QUrl(url)))
 
         def apply_preview(preview_config: dict):
             # Preview is deliberately visual-only. Provider edits still require
@@ -424,9 +489,7 @@ def main():
                 "expanded",
             )
             widget.set_window_mode(preview_mode)
-            preview_position = config_data.get("settings", {}).get(
-                f"window_pos_{preview_mode}"
-            )
+            preview_position = config_data.get("settings", {}).get(f"window_pos_{preview_mode}")
             if (
                 preview_mode in {"expanded", "bar"}
                 and isinstance(preview_position, list)
@@ -434,9 +497,7 @@ def main():
             ):
                 widget.restore_position(*preview_position)
             tray.set_window_mode(preview_mode)
-            tray.set_tray_metric(
-                preview_config.get("settings", {}).get("tray_metric", "highest")
-            )
+            tray.set_tray_metric(preview_config.get("settings", {}).get("tray_metric", "highest"))
             apply_active_theme()
 
         def revert_preview():
@@ -448,18 +509,11 @@ def main():
                 "expanded",
             )
             widget.set_window_mode(saved_mode)
-            saved_position = config_data.get("settings", {}).get(
-                f"window_pos_{saved_mode}"
-            )
-            if (
-                isinstance(saved_position, list)
-                and len(saved_position) == 2
-            ):
+            saved_position = config_data.get("settings", {}).get(f"window_pos_{saved_mode}")
+            if isinstance(saved_position, list) and len(saved_position) == 2:
                 widget.restore_position(*saved_position)
             tray.set_window_mode(saved_mode)
-            tray.set_tray_metric(
-                config_data.get("settings", {}).get("tray_metric", "highest")
-            )
+            tray.set_tray_metric(config_data.get("settings", {}).get("tray_metric", "highest"))
             apply_active_theme()
 
         def handle_config_saved(new_config: dict):
@@ -467,6 +521,7 @@ def main():
             previous_config = config_before_dialog
             provider_layout_changed = _provider_settings_changed(previous_config, new_config)
             provider_query_changed = _provider_query_settings_changed(previous_config, new_config)
+            changed_provider_ids = _changed_provider_query_ids(previous_config, new_config)
             interval_changed = _setting_changed(previous_config, new_config, "refresh_interval_sec")
             update_setting_changed = _setting_changed(
                 previous_config,
@@ -534,9 +589,7 @@ def main():
                 )
                 tray.set_window_mode(widget.window_mode())
             if theme_changed:
-                apply_theme_setting(
-                    config_data.get("settings", {}).get("theme", "auto")
-                )
+                apply_theme_setting(config_data.get("settings", {}).get("theme", "auto"))
                 apply_active_theme()
 
             if interval_changed:
@@ -548,11 +601,16 @@ def main():
                 else:
                     update_timer.stop()
             if provider_query_changed:
+                changed_alert_keys = {
+                    key for key in active_usage_alerts if key[0] in changed_provider_ids
+                }
+                active_usage_alerts.difference_update(changed_alert_keys)
+                for key in list(active_reset_watch):
+                    if key[0] in changed_provider_ids:
+                        del active_reset_watch[key]
                 worker.trigger_manual_refresh()
             if _setting_changed(previous_config, new_config, "tray_metric"):
-                tray.set_tray_metric(
-                    config_data.get("settings", {}).get("tray_metric", "highest")
-                )
+                tray.set_tray_metric(config_data.get("settings", {}).get("tray_metric", "highest"))
 
             # Tray Always-on-top 체크박스 동기화
             new_always_top = config_data.get("settings", {}).get("always_on_top", True)
@@ -567,40 +625,12 @@ def main():
             active_settings_dialog = None
 
     def open_provider_diagnostics(provider_id: str):
-        provider_config = next(
-            (
-                provider
-                for provider in config_data.get("providers", [])
-                if provider.get("id") == provider_id
-            ),
-            {"id": provider_id, "name": provider_id, "type": provider_id},
+        show_provider_diagnostics(
+            widget,
+            config_data,
+            widget.latest_usage,
+            provider_id,
         )
-        usage = next(
-            (
-                item
-                for item in widget.latest_usage
-                if item.provider_id == provider_id
-            ),
-            None,
-        )
-        report = build_diagnostic_report(provider_config, usage)
-        dialog = QMessageBox(widget)
-        dialog.setWindowTitle(f"{provider_config.get('name', provider_id)} 진단")
-        dialog.setIcon(QMessageBox.Icon.Information)
-        dialog.setText("로컬 사용량 조회 진단 정보")
-        dialog.setInformativeText(
-            "CLI 설치·로그인 상태를 확인할 수 있습니다. "
-            "아래 보고서에는 계정 토큰이나 API 키가 포함되지 않습니다."
-        )
-        dialog.setDetailedText(report)
-        copy_button = dialog.addButton(
-            "진단 정보 복사",
-            QMessageBox.ButtonRole.ActionRole,
-        )
-        dialog.addButton("닫기", QMessageBox.ButtonRole.RejectRole)
-        dialog.exec()
-        if dialog.clickedButton() is copy_button:
-            QApplication.clipboard().setText(report)
 
     # 7. Signal/Slot 연결
     def handle_always_on_top(checked: bool):
@@ -609,9 +639,7 @@ def main():
         widget.set_always_on_top(checked)
 
     def handle_position_changed(mode: str, x: int, y: int) -> None:
-        config_data.setdefault("settings", {})[
-            f"window_pos_{mode}"
-        ] = [x, y]
+        config_data.setdefault("settings", {})[f"window_pos_{mode}"] = [x, y]
         save_config(config_data)
 
     quit_in_progress = False
@@ -621,6 +649,7 @@ def main():
         if quit_in_progress:
             return
         quit_in_progress = True
+        record_runtime_event("shutdown_requested", log_dir=runtime_log_dir)
         widget.begin_shutdown()
         worker.stop()
         if download_worker is not None and download_worker.isRunning():
@@ -630,6 +659,7 @@ def main():
             update_worker.requestInterruption()
             update_worker.wait(6000)
         single_instance.close()
+        record_runtime_event("clean_shutdown", log_dir=runtime_log_dir)
         app.quit()
 
     def request_quit():
@@ -724,14 +754,19 @@ def main():
         current_download.start()
 
     tray.window_mode_requested.connect(apply_window_mode)
+    tray.activation_observed.connect(
+        lambda reason: record_runtime_event(
+            "tray_activated",
+            f"reason={reason}",
+            log_dir=runtime_log_dir,
+        )
+    )
     tray.restore_window_requested.connect(show_widget)
     tray.refresh_requested.connect(worker.trigger_manual_refresh)
     tray.update_check_requested.connect(lambda: request_update_check(True))
     tray.always_on_top_toggled.connect(handle_always_on_top)
     tray.settings_requested.connect(open_settings_dialog)
-    tray.feedback_requested.connect(
-        lambda url: QDesktopServices.openUrl(QUrl(url))
-    )
+    tray.feedback_requested.connect(lambda url: QDesktopServices.openUrl(QUrl(url)))
     tray.update_requested.connect(start_one_click_update)
     tray.restart_requested.connect(handle_restart)
     tray.quit_requested.connect(request_quit)

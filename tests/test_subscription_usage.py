@@ -1,6 +1,6 @@
-import os
 import io
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -9,25 +9,56 @@ from pathlib import Path
 from unittest.mock import patch
 
 from subscription_usage import (
+    StatusKind,
     SubscriptionSnapshot,
+    SubscriptionUsageError,
     SubscriptionWindow,
     _cli_environment,
     _command_path,
     _hidden_process_kwargs,
+    _query_claude_oauth_usage,
+    _run_copilot_probe_script,
     query_antigravity_subscription,
     query_claude_subscription,
     query_codex_subscription,
-    SubscriptionUsageError,
-    _query_claude_oauth_usage,
+    query_copilot_subscription,
+    query_grok_subscription,
 )
 
 
 class SubscriptionUsageTests(unittest.TestCase):
+    @patch("subscription_usage.subprocess.Popen")
+    def test_frozen_copilot_probe_uses_bundled_helper_not_app_executable(self, popen):
+        popen.return_value.communicate.return_value = (
+            json.dumps({"status": "ok", "quotas": {}}),
+            "",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            helper_name = "SynapCapCopilotProbe.exe" if os.name == "nt" else "SynapCapCopilotProbe"
+            helper = Path(temp_dir) / helper_name
+            helper.write_bytes(b"probe")
+            app = Path(temp_dir) / "SynapCap.exe"
+            with (
+                patch("subscription_usage.sys.frozen", True, create=True),
+                patch("subscription_usage.sys.executable", str(app)),
+                patch("subscription_usage.sys._MEIPASS", temp_dir, create=True),
+            ):
+                result = _run_copilot_probe_script(None, 10)
+
+        command = popen.call_args.args[0]
+        self.assertEqual(command, [str(helper)])
+        self.assertNotIn(str(app), command)
+        self.assertEqual(result["status"], "ok")
+
     @patch("subscription_usage.urllib.request.build_opener")
     @patch("subscription_usage._read_claude_oauth_token", return_value="test-token")
     def test_claude_api_reports_rate_limit_without_login_error(self, token, opener):
         opener.return_value.open.side_effect = urllib.error.HTTPError(
-            "https://api.anthropic.com/api/oauth/usage", 429, "limited", {}, None,
+            "https://api.anthropic.com/api/oauth/usage",
+            429,
+            "limited",
+            {},
+            None,
         )
         with self.assertRaisesRegex(SubscriptionUsageError, "조회 제한"):
             _query_claude_oauth_usage(5)
@@ -200,6 +231,85 @@ class SubscriptionUsageTests(unittest.TestCase):
             self.assertNotIn(variable, environment)
 
     @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="agy.exe")
+    def test_antigravity_preserves_gemini_and_argon_groups(self, command_path, run_command):
+        # Synthetic CLI rows, not a captured Argon response. The percentage
+        # meaning is explicit; a screenshot's bare Weekly Limit is not enough.
+        run_command.return_value = (
+            "Gemini 4 Argon\tWeekly Limit Remaining\t98%\t2026-10-25T09:00:00Z\n"
+            "Gemini Models\tWeekly Limit Remaining\t65%\t2026-10-24T00:00:00Z\n"
+            "Gemini Models\tFive Hour Limit Remaining\t72%\t2026-10-19T11:00:00Z\n"
+            "Claude and GPT models\tWeekly Limit Remaining\t0%\t2026-10-24T00:00:00Z"
+        )
+        result = query_antigravity_subscription({"quota_group": "Gemini Models"})
+        self.assertEqual(
+            [(w.quota_group, w.label, w.used_percent) for w in result.windows],
+            [("Gemini Models", "5시간", 28), ("Gemini Models", "주간", 35),
+             ("Gemini 4 Argon", "주간", 2)],
+        )
+        self.assertEqual(result.used_percent, 35)
+        self.assertIsNone(result.action_hint)
+        self.assertNotEqual(result.windows[1].reset_text, result.windows[2].reset_text)
+
+        from providers import AntigravityProvider
+        usage = AntigravityProvider({"id": "antigravity", "name": "Gemini"}).fetch_usage()
+        self.assertEqual(usage.windows[2].display_label, "Gemini 4 Argon · 주간")
+
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="agy.exe")
+    def test_antigravity_missing_or_ambiguous_argon_does_not_invent_values(self, command_path, run_command):
+        base = "Gemini Models\tWeekly Limit Remaining\t65%\t2026-10-24T00:00:00Z"
+        for extra in ("", "\nGemini 4 Argon\tGemini 4 Argon Weekly Limit\t98%\t2026-10-25T09:00:00Z"):
+            with self.subTest(extra=extra):
+                run_command.return_value = base + extra
+                result = query_antigravity_subscription({})
+                self.assertEqual(len(result.windows), 1)
+                self.assertEqual(result.windows[0].used_percent, 35)
+                self.assertIn("Argon 조회 미지원", result.action_hint)
+
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="agy.exe")
+    def test_antigravity_exact_custom_group_and_no_arbitrary_fallback(self, command_path, run_command):
+        run_command.return_value = (
+            "Gemini Models\tWeekly Limit Remaining\t65%\t2026-10-24T00:00:00Z\n"
+            "Gemini 4 Argon\tWeekly Limit Used\t42%\t2026-10-25T09:00:00Z\n"
+            "Gemini 4 Argon Plus\tWeekly Limit Remaining\t0%\t2026-10-25T09:00:00Z"
+        )
+        result = query_antigravity_subscription({"quota_group": "gemini 4 argon"})
+        self.assertEqual([(w.quota_group, w.used_percent) for w in result.windows], [("Gemini 4 Argon", 42)])
+        with self.assertRaises(SubscriptionUsageError) as raised:
+            query_antigravity_subscription({"quota_group": "missing group"})
+        self.assertEqual(raised.exception.status_kind, StatusKind.FORMAT_ERROR)
+
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="agy.exe")
+    def test_antigravity_group_changes_keep_period_identity(self, command_path, run_command):
+        for groups in (("Gemini Flash", "Gemini Argon"), ("Gemini Argon",)):
+            with self.subTest(groups=groups):
+                run_command.return_value = "\n".join(
+                    f"{group}\tFive Hour Limit Remaining\t80%\t2026-10-19T11:00:00Z"
+                    for group in groups
+                )
+                result = query_antigravity_subscription({})
+                self.assertEqual({w.quota_group for w in result.windows}, set(groups))
+                self.assertTrue(all(w.label == "5시간" for w in result.windows))
+
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="agy.exe")
+    def test_antigravity_ignores_invalid_percentages_and_unknown_periods(self, command_path, run_command):
+        for period, percent in (("Weekly Limit Remaining", "nan"), ("Weekly Limit Remaining", "inf"),
+                                ("Weekly Limit Remaining", "101"), ("Weekly Limit Remaining", "-1"),
+                                ("Monthly Limit Remaining", "20")):
+            with self.subTest(period=period, percent=percent):
+                run_command.return_value = (
+                    "Gemini Models\tWeekly Limit Remaining\t65%\t2026-10-24T00:00:00Z\n"
+                    f"Gemini 4 Argon\t{period}\t{percent}%\t2026-10-25T09:00:00Z"
+                )
+                result = query_antigravity_subscription({})
+                self.assertEqual(len(result.windows), 1)
+                self.assertIn("조회 미지원", result.action_hint)
+
+    @patch("subscription_usage._run_text_command")
     @patch("subscription_usage._command_path")
     def test_claude_parses_subscription_windows(self, command_path, run_command):
         command_path.return_value = "claude.exe"
@@ -250,13 +360,79 @@ Current week (all models): 55% used · resets Aug 12, 4am (Asia/Seoul)
         self.assertEqual([window.used_percent for window in result.windows], [0.0, 55.0])
         self.assertEqual(result.windows[0].reset_text, "")
 
+    @patch("subscription_usage.urllib.request.build_opener")
+    def test_grok_no_quota_headers_returns_no_quota(self, build_opener):
+        mock_response = io.StringIO('{"name": "test-key"}')
+        mock_response.headers = {}
+        build_opener.return_value.open.return_value.__enter__.return_value = mock_response
+
+        result = query_grok_subscription({"api_key": "xai-mock-key"})
+
+        self.assertEqual(result.status_kind, StatusKind.NO_QUOTA)
+        self.assertEqual(result.status_text, "연결됨 · 구독 사용량 미지원")
+        self.assertEqual(result.windows, ())
+        self.assertEqual(result.used_percent, 0.0)
+
+    @patch("subscription_usage.urllib.request.build_opener")
+    def test_grok_with_quota_headers_returns_ok_snapshot(self, build_opener):
+        mock_response = io.StringIO('{"name": "test-key"}')
+        mock_response.headers = {
+            "x-ratelimit-remaining-requests": "20",
+            "x-ratelimit-limit-requests": "100",
+            "x-ratelimit-reset-requests": "1800",
+        }
+        build_opener.return_value.open.return_value.__enter__.return_value = mock_response
+
+        result = query_grok_subscription({"api_key": "xai-mock-key"})
+
+        self.assertEqual(result.status_kind, StatusKind.OK)
+        self.assertEqual(result.used_percent, 80.0)
+        self.assertEqual(len(result.windows), 1)
+        self.assertEqual(result.windows[0].label, "요청")
+        self.assertEqual(result.windows[0].used_percent, 80.0)
+
+    @patch("subscription_usage._run_copilot_probe_script")
+    def test_copilot_empty_quotas_returns_no_quota(self, run_probe):
+        run_probe.return_value = {"quotas": {}}
+
+        result = query_copilot_subscription({})
+
+        self.assertEqual(result.status_kind, StatusKind.NO_QUOTA)
+        self.assertEqual(result.status_text, "조회 가능한 한도 없음")
+        self.assertEqual(result.windows, ())
+        self.assertEqual(result.used_percent, 0.0)
+
+    def test_subscription_usage_error_status_kind_inference(self):
+        err_login = SubscriptionUsageError("로그인이 필요합니다")
+        self.assertEqual(err_login.status_kind, StatusKind.LOGIN_REQUIRED)
+
+        err_rate = SubscriptionUsageError("사용량 조회 제한 (429)")
+        self.assertEqual(err_rate.status_kind, StatusKind.RATE_LIMITED)
+
+        err_timeout = SubscriptionUsageError("연결 시간 초과")
+        self.assertEqual(err_timeout.status_kind, StatusKind.TIMEOUT)
+
+        err_missing = SubscriptionUsageError("CLI 명령을 찾을 수 없습니다")
+        self.assertEqual(err_missing.status_kind, StatusKind.NOT_INSTALLED)
+
+        err_server = SubscriptionUsageError("서버 응답 오류 (500)")
+        self.assertEqual(err_server.status_kind, StatusKind.SERVER_ERROR)
+
+        err_format = SubscriptionUsageError("응답 형식 오류")
+        self.assertEqual(err_format.status_kind, StatusKind.FORMAT_ERROR)
+
+        err_no_quota = SubscriptionUsageError("구독 한도 없음")
+        self.assertEqual(err_no_quota.status_kind, StatusKind.NO_QUOTA)
+
 
 class ProviderCacheTests(unittest.TestCase):
     @patch("providers.query_claude_subscription")
     def test_claude_rate_limit_cooldown_survives_manual_refresh(self, query):
         from providers import ClaudeProvider
 
-        query.side_effect = SubscriptionUsageError("Claude 사용량 조회 제한 · 잠시 후 다시 시도하세요")
+        query.side_effect = SubscriptionUsageError(
+            "Claude 사용량 조회 제한 · 잠시 후 다시 시도하세요"
+        )
         provider = ClaudeProvider({"id": "claude"})
         with patch("providers.time.monotonic", return_value=100):
             first = provider.fetch_usage()

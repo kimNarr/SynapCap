@@ -5,7 +5,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import QApplication, QDialog, QFormLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QApplication, QDialog, QFormLayout, QLabel, QLineEdit, QPushButton
 
 from config import get_default_config
 from ui.settings_dialog import SettingsDialog, StyledCheckBox
@@ -123,9 +123,7 @@ class SettingsDialogTests(unittest.TestCase):
         previewed = []
         self.dialog.preview_requested.connect(previewed.append)
 
-        self.dialog.theme_combo.setCurrentIndex(
-            self.dialog.theme_combo.findData("light")
-        )
+        self.dialog.theme_combo.setCurrentIndex(self.dialog.theme_combo.findData("light"))
 
         self.assertEqual(previewed[-1]["settings"]["theme"], "light")
         saved = []
@@ -155,9 +153,7 @@ class SettingsDialogTests(unittest.TestCase):
         combo = self.dialog.tray_metric_combo
         self.assertEqual(combo.itemData(0), "highest")
         options = {combo.itemData(i) for i in range(combo.count())}
-        self.assertEqual(
-            options, {"highest", "codex", "antigravity", "claude", "none"}
-        )
+        self.assertEqual(options, {"highest", "codex", "antigravity", "claude", "none"})
 
         combo.setCurrentIndex(combo.findData("claude"))
         saved = []
@@ -221,6 +217,34 @@ class SettingsDialogTests(unittest.TestCase):
         self.assertEqual(item["group"].title(), "")
         self.assertEqual(item["header_title"].text(), "Codex")
         self.assertFalse(item["header_icon"].pixmap().isNull())
+
+    def test_grok_is_labeled_as_api_rate_limit_and_saves_key_locally(self):
+        config = get_default_config()
+        config["providers"] = [
+            {
+                "id": "grok",
+                "name": "xAI API",
+                "type": "grok",
+                "enabled": True,
+            }
+        ]
+        dialog = SettingsDialog(config)
+        self.addCleanup(dialog.deleteLater)
+        item = dialog.provider_widgets[0]
+
+        self.assertIn("SuperGrok 구독 잔여량 아님", item["connection_label"].text())
+        self.assertTrue(item["api_key_edit"].isVisibleTo(item["group"]))
+        self.assertEqual(item["api_key_edit"].echoMode(), QLineEdit.EchoMode.Password)
+        self.assertFalse(item["five_hour_check"].parentWidget().isVisibleTo(item["group"]))
+
+        item["api_key_edit"].setText("xai-local-test")
+        saved = []
+        dialog.config_saved.connect(saved.append)
+        dialog.on_save()
+
+        provider = saved[0]["providers"][0]
+        self.assertEqual(provider["api_key"], "xai-local-test")
+        self.assertEqual(provider["source"], "api_rate_limit")
 
     def test_footer_is_just_cancel_and_save_without_a_separate_apply(self):
         self.assertFalse(hasattr(self.dialog, "preview_btn"))

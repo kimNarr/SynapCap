@@ -7,7 +7,7 @@ from typing import Any
 
 from version import APP_NAME
 
-CONFIG_SCHEMA_VERSION = 8
+CONFIG_SCHEMA_VERSION = 9
 
 
 def _default_config_path() -> Path:
@@ -17,17 +17,11 @@ def _default_config_path() -> Path:
 
     if getattr(sys, "frozen", False):
         if sys.platform == "win32":
-            base = Path(
-                os.environ.get("APPDATA")
-                or Path.home() / "AppData" / "Roaming"
-            )
+            base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
         elif sys.platform == "darwin":
             base = Path.home() / "Library" / "Application Support"
         else:
-            base = Path(
-                os.environ.get("XDG_CONFIG_HOME")
-                or Path.home() / ".config"
-            )
+            base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
         return base / APP_NAME / "synapcap.json"
 
     return Path(__file__).resolve().parent / "synapcap.json"
@@ -67,7 +61,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "show_five_hour": True,
             "show_weekly": True,
             "limit": 100.0,
-            "unit": "%"
+            "unit": "%",
         },
         {
             "id": "antigravity",
@@ -80,7 +74,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "show_five_hour": True,
             "show_weekly": True,
             "limit": 100.0,
-            "unit": "%"
+            "unit": "%",
         },
         {
             "id": "claude",
@@ -92,10 +86,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "show_five_hour": True,
             "show_weekly": True,
             "limit": 100.0,
-            "unit": "%"
-        }
-    ]
+            "unit": "%",
+        },
+    ],
 }
+
 
 def get_default_config() -> dict[str, Any]:
     return deepcopy(DEFAULT_CONFIG)
@@ -119,7 +114,7 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
             defaults = get_default_config()
             save_config(defaults, str(requested_path))
             return defaults
-    
+
     try:
         with source_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
@@ -192,7 +187,9 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 settings["reset_alerts_enabled"] = True
             if not isinstance(settings.get("global_hotkey_enabled"), bool):
                 settings["global_hotkey_enabled"] = True
-            if not isinstance(settings.get("global_hotkey"), str) or not settings.get("global_hotkey"):
+            if not isinstance(settings.get("global_hotkey"), str) or not settings.get(
+                "global_hotkey"
+            ):
                 settings["global_hotkey"] = "Ctrl+Alt+S"
             data["settings"] = settings
             if "providers" not in data or not data["providers"]:
@@ -204,6 +201,14 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                     # exposed the weekly window. Enable the newly available
                     # five-hour window once, then preserve the user's choice.
                     provider["show_five_hour"] = True
+                if (
+                    provider_type == "grok"
+                    and source_schema_version < 9
+                    and provider.get("name") in {"Grok", "xAI Grok"}
+                ):
+                    provider["name"] = "xAI API"
+                if provider_type == "grok":
+                    provider["source"] = "api_rate_limit"
                 show_five_hour = provider.get("show_five_hour", True)
                 show_weekly = provider.get("show_weekly", True)
                 provider["show_five_hour"] = bool(show_five_hour)

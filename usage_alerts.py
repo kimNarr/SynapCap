@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from providers import ModelUsage, UsageWindow
+from subscription_usage import StatusKind
 
 
 @dataclass(frozen=True)
@@ -21,9 +22,8 @@ class ResetAlert:
 
 
 def _visible_windows(usage: ModelUsage, provider_config: dict) -> list[UsageWindow]:
-    windows = usage.windows or [
-        UsageWindow("사용량", usage.used, "", max(0.0, 100.0 - usage.used))
-    ]
+    used = usage.used or 0.0
+    windows = usage.windows or [UsageWindow("사용량", used, "", max(0.0, 100.0 - used))]
     visible: list[UsageWindow] = []
     for window in windows:
         normalized = window.label.replace(" ", "")
@@ -52,16 +52,29 @@ def update_usage_alert_state(
     provider_configs = {
         provider.get("id", ""): provider
         for provider in config_data.get("providers", [])
+        if provider.get("enabled", True)
     }
+    configured_provider_ids = set(provider_configs)
+    configured_active = {key for key in active_alerts if key[0] in configured_provider_ids}
+    active_alerts.intersection_update(configured_active)
     current_above: set[tuple[str, str]] = set()
     new_alerts: list[UsageAlert] = []
 
     for usage in usage_list:
-        if usage.error:
+        if usage.provider_id not in configured_provider_ids:
+            continue
+        if (
+            usage.error
+            or getattr(usage, "is_stale", False)
+            or usage.status_kind == StatusKind.NO_QUOTA
+        ):
+            current_above.update(key for key in active_alerts if key[0] == usage.provider_id)
             continue
         provider_config = provider_configs.get(usage.provider_id, {})
         for window in _visible_windows(usage, provider_config):
-            key = (usage.provider_id, window.label)
+            key = (usage.provider_id, window.display_label)
+            if window.unlimited:
+                continue
             if window.used < threshold:
                 continue
             current_above.add(key)
@@ -69,7 +82,7 @@ def update_usage_alert_state(
                 new_alerts.append(
                     UsageAlert(
                         usage.provider_name,
-                        window.label,
+                        window.display_label,
                         window.used,
                     )
                 )
@@ -93,37 +106,54 @@ def update_reset_alert_state(
     provider_configs = {
         provider.get("id", ""): provider
         for provider in config_data.get("providers", [])
+        if provider.get("enabled", True)
     }
+    configured_provider_ids = set(provider_configs)
+    for key in list(active_watch):
+        if key[0] not in configured_provider_ids:
+            del active_watch[key]
     new_alerts: list[ResetAlert] = []
     high_threshold = 80.0
 
     for usage in usage_list:
-        if usage.error:
+        if usage.provider_id not in configured_provider_ids:
+            continue
+        if (
+            usage.error
+            or getattr(usage, "is_stale", False)
+            or usage.status_kind == StatusKind.NO_QUOTA
+        ):
             continue
         provider_config = provider_configs.get(usage.provider_id, {})
         for window in _visible_windows(usage, provider_config):
-            key = (usage.provider_id, window.label)
+            key = (usage.provider_id, window.display_label)
+            if window.unlimited:
+                active_watch.pop(key, None)
+                continue
             previous_used = active_watch.get(key)
 
             # If it was previously high (>= 80%) and now dropped significantly (<= 40%),
             # or dropped by at least 40%, it indicates a limit reset.
-            if previous_used is not None and previous_used >= high_threshold:
-                if window.used <= 40.0 or (previous_used - window.used >= 40.0):
-                    new_alerts.append(
-                        ResetAlert(
-                            provider_name=usage.provider_name,
-                            window_label=window.label,
-                            used=window.used,
-                            message=f"{usage.provider_name} {window.label} 한도가 리셋되었습니다. (현재 {window.used:.0f}% 사용)",
-                        )
+            if (
+                previous_used is not None
+                and previous_used >= high_threshold
+                and (window.used <= 40.0 or previous_used - window.used >= 40.0)
+            ):
+                new_alerts.append(
+                    ResetAlert(
+                        provider_name=usage.provider_name,
+                        window_label=window.display_label,
+                        used=window.used,
+                        message=f"{usage.provider_name} {window.display_label} 한도가 리셋되었습니다. (현재 {window.used:.0f}% 사용)",
                     )
-                    active_watch[key] = window.used
-                    continue
+                )
+                active_watch[key] = window.used
+                continue
 
             # Update watch state: if >= high_threshold, start tracking
-            if window.used >= high_threshold:
-                active_watch[key] = window.used
-            elif key in active_watch and window.used < high_threshold:
+            if window.used >= high_threshold or (
+                key in active_watch and window.used < high_threshold
+            ):
                 active_watch[key] = window.used
 
     return new_alerts

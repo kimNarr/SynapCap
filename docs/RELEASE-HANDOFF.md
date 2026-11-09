@@ -1,10 +1,19 @@
 # 릴리스 절차 & 현황
 
-> 마지막 갱신: 2026-09-04. **v0.3.0은 배포 완료됨.** 아래 1번은 현황, 2번은 다음 릴리스용 절차.
+> 마지막 갱신: 2026-11-09. **v0.3.1 배포 진행 중.** 아래 0번이 현재 상태이며 1번은 v0.3.0 당시 기록이다.
+
+## 0. 현재 릴리스 — v0.3.1
+
+- 앱 버전·태그 목표: `0.3.1` / `v0.3.1`. 변경 내용과 알려진 제약은 `CHANGELOG.md`의 해당 버전 섹션을 따른다.
+- 로컬 Windows 소스 테스트: 268개 통과. Ruff는 기존 경고 6건 외 추가 없음.
+- 릴리스 CI가 Windows 설치 파일과 macOS arm64·x64 DMG, 플랫폼별 번들 검증 JSON, 체크섬·provenance를 생성한다.
+- Claude·Copilot 실계정 대조, 실제 Argon 응답 확인, macOS 메뉴바 클릭 종료 재현은 미완료다. 빌드 성공만으로 해결 완료로 바꾸지 않는다.
+- 개발 기록(`journal/`)과 로컬 실행용 배치 파일은 릴리스 커밋에서 제외한다.
+- 태그 푸시·CI·공개 자산 확인 후 이 절의 배포 결과와 `docs/TASKS.md`를 갱신한다.
 
 ---
 
-## 1. 현재 상태 — v0.3.0 배포 끝
+## 1. 이전 기록 — v0.3.0 배포 끝 (2026-09-04 당시)
 
 | 항목 | 상태 |
 | --- | --- |
@@ -45,13 +54,14 @@ python scripts/manage_version.py bump minor        # 또는 patch / major / 1.2.
 git commit -am "chore: release vX.Y.Z"
 
 # main으로 fast-forward 머지
-git checkout main && git reset --hard origin/main
+git switch main
+git merge --ff-only origin/main
 git merge --ff-only dev
 
 # 태그 + push  (dev도 같이 올려 origin/dev 동기화)
 python scripts/manage_version.py check vX.Y.Z      # 태그 == APP_VERSION 확인
 git tag vX.Y.Z
-git push origin main dev --tags
+git push --atomic origin main dev refs/tags/vX.Y.Z
 ```
 
 ### 2-2. CI가 자동으로 하는 것 (`.github/workflows/`)
@@ -73,5 +83,5 @@ gh release view vX.Y.Z --json assets --jq '.assets[].name'
 ### 주의
 - 릴리스 노트는 `CHANGELOG.md`의 해당 `## [X.Y.Z]` 섹션에서 뽑힌다. 범프 후 그 섹션을 꼭 다듬을 것.
 - `--verify-tag` 때문에 태그가 remote에 있어야 릴리스가 만들어진다 (`git push --tags` 먼저).
-- 로컬 `main`은 자주 stale해진다. 항상 `reset --hard origin/main` 후 머지.
+- 로컬 `main`이 뒤처져 있으면 `merge --ff-only origin/main`으로 갱신한다. fast-forward가 불가능하면 중단하고 차이를 확인하며, 기존 변경을 강제로 초기화하지 않는다.
 - Claude Code 세션은 `dev` 커밋까지만 (push/tag/배포 금지). 이 절차는 오너/Codex가 실행.

@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import argparse
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "version.py"
 CHANGELOG_FILE = ROOT / "CHANGELOG.md"
 SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 VERSION_LINE_RE = re.compile(r'^APP_VERSION = "(\d+\.\d+\.\d+)"$', re.MULTILINE)
+UNRELEASED_SECTION_RE = re.compile(
+    r"^## \[Unreleased\]\s*\n(.*?)(?=^## \[|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+TARGET_VERSION_RE = re.compile(r"^대상 버전:\s*`?(\d+\.\d+\.\d+)`?\s*$", re.MULTILINE)
+TASK_IDS_RE = re.compile(r"^연결 태스크:\s*(.+?)\s*$", re.MULTILINE)
+TASK_ID_RE = re.compile(r"SC-\d{3}")
 
 
 def normalize_version(value: str) -> str:
@@ -38,6 +44,29 @@ def next_version(current: str, change: str) -> str:
     return normalize_version(change)
 
 
+def unreleased_plan(changelog_path: Path = CHANGELOG_FILE) -> tuple[str, tuple[str, ...]]:
+    changelog = changelog_path.read_text(encoding="utf-8")
+    section_match = UNRELEASED_SECTION_RE.search(changelog)
+    if section_match is None:
+        raise ValueError("CHANGELOG에서 [Unreleased] 섹션을 찾을 수 없습니다.")
+
+    section = section_match.group(1)
+    version_match = TARGET_VERSION_RE.search(section)
+    if version_match is None:
+        raise ValueError("[Unreleased] 섹션에 '대상 버전'이 없습니다.")
+    target_version = normalize_version(version_match.group(1))
+
+    task_match = TASK_IDS_RE.search(section)
+    if task_match is None:
+        raise ValueError("[Unreleased] 섹션에 '연결 태스크'가 없습니다.")
+    task_ids = tuple(TASK_ID_RE.findall(task_match.group(1)))
+    if not task_ids:
+        raise ValueError("[Unreleased] 섹션에 유효한 SC 태스크 ID가 없습니다.")
+    if len(task_ids) != len(set(task_ids)):
+        raise ValueError("[Unreleased] 연결 태스크에 중복 ID가 있습니다.")
+    return target_version, task_ids
+
+
 def write_version(
     new_version: str,
     version_path: Path = VERSION_FILE,
@@ -48,6 +77,12 @@ def write_version(
     current = read_version(version_path)
     if normalized == current:
         raise ValueError(f"이미 현재 버전입니다: {normalized}")
+
+    planned_version, _task_ids = unreleased_plan(changelog_path)
+    if normalized != planned_version:
+        raise ValueError(
+            f"CHANGELOG 대상 버전({planned_version})과 요청 버전({normalized})이 다릅니다."
+        )
 
     version_text = version_path.read_text(encoding="utf-8")
     version_text = VERSION_LINE_RE.sub(
@@ -61,7 +96,7 @@ def write_version(
     marker = "## [Unreleased]"
     if marker not in changelog:
         raise ValueError("CHANGELOG에서 [Unreleased] 섹션을 찾을 수 없습니다.")
-    released_on = release_date or date.today()
+    released_on = release_date or datetime.now().astimezone().date()
     changelog = changelog.replace(
         marker,
         f"{marker}\n\n{heading} - {released_on.isoformat()}",
@@ -99,6 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     notes = subparsers.add_parser("notes", help="CHANGELOG 릴리스 노트 출력")
     notes.add_argument("version")
+    subparsers.add_parser("plan", help="CHANGELOG의 예정 버전과 연결 태스크 확인")
     return parser
 
 
@@ -127,6 +163,11 @@ def main() -> int:
         return 0
     if args.command == "notes":
         print(release_notes(args.version))
+        return 0
+    if args.command == "plan":
+        target, task_ids = unreleased_plan()
+        print(f"대상 버전: {target}")
+        print(f"연결 태스크: {', '.join(task_ids)}")
         return 0
     return 1
 

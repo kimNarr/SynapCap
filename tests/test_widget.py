@@ -7,7 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QPoint, QRect, Qt
 from PySide6.QtGui import QFont, QFontInfo, QFontMetrics, QPalette
-from PySide6.QtWidgets import QApplication, QLabel, QToolTip, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QScrollArea, QToolTip, QWidget
 
 from providers import (
     AntigravityProvider,
@@ -74,6 +74,54 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(relative, "1일 16시간 후")
         self.assertEqual(tooltip, "8/12 09:49 초기화")
+
+    def test_provider_defined_window_context_preserves_meaning(self):
+        self.assertEqual(self.widget._usage_window_context("5시간"), "SESSION")
+        self.assertEqual(self.widget._usage_window_context("주간"), "WEEKLY")
+        self.assertEqual(self.widget._usage_window_context("Premium requests"), "PREMIUM REQUESTS")
+        self.assertEqual(
+            self.widget._usage_window_context("Very long provider-defined quota window"),
+            "VERY LONG PROVIDE…",
+        )
+
+    def test_grouped_quotas_keep_identity_in_cards_tabs_and_compact_tooltips(self):
+        self.usage.windows = [
+            UsageWindow("5시간", 28, "", 72, quota_group="Gemini Models"),
+            UsageWindow("주간", 35, "", 65, quota_group="Gemini Models"),
+            UsageWindow("주간", 2, "", 98, quota_group="Gemini 4 Argon"),
+        ]
+        self.widget.update_data([self.usage])
+        self.app.processEvents()
+        rows = self.widget.provider_ui_map["codex"]["window_rows"]
+        headings = [row.findChild(QLabel, "windowBadge").text() for row in rows]
+        self.assertEqual(headings, ["GEMINI MODELS\nSESSION", "GEMINI MODELS\nWEEKLY", "GEMINI 4 ARGON\nWEEKLY"])
+        self.assertIn("Gemini 4 Argon · 주간", rows[2].findChild(UsageRing).toolTip())
+        self.assertIn("Gemini Models · 주간 35%", self.widget.focus_provider_buttons["codex"].toolTip())
+        self.assertIn("Gemini 4 Argon · 주간 2%", self.widget.focus_provider_buttons["codex"].toolTip())
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        compact = self.widget.compact_ui_map["codex"]
+        self.assertEqual(compact["value"].property("compactPlainText"), "최대 35%")
+        self.assertIn("Gemini 4 Argon · 주간 2%", compact["item"].toolTip())
+
+    def test_group_rename_triggers_redraw_and_period_visibility_still_applies(self):
+        self.usage.windows = [UsageWindow("주간", 35, "", quota_group="Gemini Models")]
+        self.widget.update_data([self.usage])
+        self.usage.windows[0].quota_group = "Gemini 4 Argon"
+        self.widget.update_data([self.usage])
+        ui = self.widget.provider_ui_map["codex"]
+        self.assertEqual(ui["window_rows"][0].findChild(QLabel, "windowBadge").toolTip(), "Gemini 4 Argon · 주간")
+        ui["show_weekly"] = False
+        self.assertEqual(self.widget._visible_usage_windows(ui, self.usage.windows), [])
+
+    def test_argon_unsupported_hint_is_available_without_fabricated_ring(self):
+        self.usage.windows = [UsageWindow("주간", 35, "", quota_group="Gemini Models")]
+        self.usage.action_hint = "Argon 조회 미지원: CLI가 별도 한도를 제공하지 않습니다."
+        self.widget.update_data([self.usage])
+        self.assertIn("Argon 조회 미지원", self.widget.focus_provider_buttons["codex"].toolTip())
+        self.assertEqual(len(self.widget.provider_ui_map["codex"]["window_rows"]), 1)
+        self.widget.enter_compact_mode()
+        self.assertIn("Argon 조회 미지원", self.widget.compact_ui_map["codex"]["item"].toolTip())
 
     def test_expanded_header_uses_horizontal_wordmark(self):
         self.assertTrue(hasattr(self.widget, "header_logo"))
@@ -281,7 +329,12 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data(
             [
                 ModelUsage(
-                    "codex", "Codex", "Codex", 0, 100, "%",
+                    "codex",
+                    "Codex",
+                    "Codex",
+                    0,
+                    100,
+                    "%",
                     error="codex 로그인이 필요합니다",
                 )
             ]
@@ -354,9 +407,7 @@ class WidgetTests(unittest.TestCase):
         compact_tooltip = compact_item.toolTip()
         self.assertIn("마지막 조회: 8/14 13:20:30", compact_tooltip)
         self.assertTrue(compact_item.property("instantTooltip"))
-        self.assertFalse(
-            self.widget.compact_ui_map["claude"]["value"].property("instantTooltip")
-        )
+        self.assertFalse(self.widget.compact_ui_map["claude"]["value"].property("instantTooltip"))
 
     def test_old_usage_tooltip_recommends_refresh(self):
         text = self.widget._data_freshness_text(
@@ -416,17 +467,25 @@ class WidgetTests(unittest.TestCase):
             CodexProvider({"id": "codex", "name": "Codex"}),
             AntigravityProvider({"id": "gemini", "name": "Gemini"}),
         ]
-        self.widget.rebuild_ui(
-            self.widget.config_data, providers, preserve_usage=False
-        )
+        self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
         self.widget.update_data(
             [
                 ModelUsage(
-                    "codex", "Codex", "Codex", 49, 100, "%",
+                    "codex",
+                    "Codex",
+                    "Codex",
+                    49,
+                    100,
+                    "%",
                     windows=[UsageWindow("주간", 49, "8/12 09:49", 51)],
                 ),
                 ModelUsage(
-                    "gemini", "Gemini", "Gemini", 20, 100, "%",
+                    "gemini",
+                    "Gemini",
+                    "Gemini",
+                    20,
+                    100,
+                    "%",
                     windows=[UsageWindow("주간", 20, "", 80)],
                 ),
             ],
@@ -437,9 +496,7 @@ class WidgetTests(unittest.TestCase):
         self.assertTrue(self.widget._horizontal_ring_active)
         self.assertEqual(self.widget.focus_provider_buttons.keys(), {"codex", "gemini"})
         self.assertEqual(
-            self.widget.provider_ui_map["codex"]["card"].findChildren(
-                QLabel, "usageColumnHeader"
-            ),
+            self.widget.provider_ui_map["codex"]["card"].findChildren(QLabel, "usageColumnHeader"),
             [],
         )
 
@@ -460,6 +517,113 @@ class WidgetTests(unittest.TestCase):
         self.widget.provider_ui_map["codex"]["status"].click()
 
         self.assertEqual(requested, ["codex"])
+
+    def test_focus_error_exposes_visible_diagnostics_action(self):
+        usage = ModelUsage(
+            "codex",
+            "Codex",
+            "Codex",
+            0,
+            100,
+            "%",
+            error="codex 로그인이 필요합니다",
+        )
+        requested = []
+        self.widget.diagnostics_requested.connect(requested.append)
+
+        self.widget.update_data([usage])
+        self.app.processEvents()
+
+        ui = self.widget.provider_ui_map["codex"]
+        tab = self.widget.focus_provider_buttons["codex"]
+        self.assertTrue(ui["status"].isVisibleTo(self.widget))
+        self.assertEqual(tab.property("statusState"), "error")
+        self.assertIn("상태 버튼 클릭", tab.toolTip())
+
+        ui["status"].click()
+        self.assertEqual(requested, ["codex"])
+
+    def test_mutated_rate_limit_result_refreshes_countdown_tooltips(self):
+        usage = ModelUsage(
+            "codex",
+            "Codex",
+            "Codex",
+            0,
+            100,
+            "%",
+            error="Codex 사용량 조회 제한",
+            retry_after_sec=300,
+            action_hint="약 300초 후 다시 조회하세요.",
+        )
+        self.widget.update_data([usage])
+        self.assertIn("300초", self.widget.provider_ui_map["codex"]["status"].toolTip())
+
+        usage.retry_after_sec = 180
+        usage.action_hint = "약 180초 후 다시 조회하세요."
+        self.widget.update_data([usage])
+
+        status_tooltip = self.widget.provider_ui_map["codex"]["status"].toolTip()
+        tab_tooltip = self.widget.focus_provider_buttons["codex"].toolTip()
+        self.assertIn("180초", status_tooltip)
+        self.assertNotIn("300초", status_tooltip)
+        self.assertIn("180초", tab_tooltip)
+
+    def test_focus_diagnostics_targets_selected_error_provider_and_recovers(self):
+        providers = [
+            CodexProvider({"id": "codex", "name": "Codex"}),
+            AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+        ]
+        self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
+        codex_usage = ModelUsage(
+            "codex",
+            "Codex",
+            "Codex",
+            20,
+            100,
+            "%",
+            windows=[UsageWindow("주간", 20, "", 80)],
+        )
+        gemini_error = ModelUsage(
+            "gemini",
+            "Gemini",
+            "Gemini",
+            0,
+            100,
+            "%",
+            error="Gemini 로그인이 필요합니다",
+        )
+        requested = []
+        self.widget.diagnostics_requested.connect(requested.append)
+        self.widget.update_data([codex_usage, gemini_error])
+
+        self.widget.focus_provider_buttons["gemini"].click()
+        self.app.processEvents()
+        gemini_ui = self.widget.provider_ui_map["gemini"]
+        self.assertTrue(gemini_ui["card"].isVisibleTo(self.widget))
+        self.assertTrue(gemini_ui["status"].isVisibleTo(self.widget))
+
+        gemini_ui["status"].click()
+        self.assertEqual(requested, ["gemini"])
+
+        gemini_recovered = ModelUsage(
+            "gemini",
+            "Gemini",
+            "Gemini",
+            15,
+            100,
+            "%",
+            windows=[UsageWindow("주간", 15, "", 85)],
+        )
+        self.widget.update_data([codex_usage, gemini_recovered])
+        self.app.processEvents()
+
+        self.assertFalse(gemini_ui["status"].isVisibleTo(self.widget))
+        self.assertFalse(gemini_ui["title_container"].isVisibleTo(self.widget))
+        self.assertEqual(
+            self.widget.focus_provider_buttons["gemini"].property("statusState"),
+            "normal",
+        )
+        self.assertEqual(len(gemini_ui["window_rows"]), 1)
 
     def test_instant_tooltip_is_anchored_near_hovered_widget(self):
         expected_position = self.widget.version_btn.mapToGlobal(
@@ -488,12 +652,9 @@ class WidgetTests(unittest.TestCase):
 
         self.assertLess(position.y(), watched.mapToGlobal(QPoint(0, 0)).y())
         tooltip_lines = 3
-        tooltip_height = (
-            QFontMetrics(QToolTip.font()).lineSpacing() * tooltip_lines
-        ) + 16
+        tooltip_height = (QFontMetrics(QToolTip.font()).lineSpacing() * tooltip_lines) + 16
         self.assertGreaterEqual(
-            watched.mapToGlobal(QPoint(0, 0)).y()
-            - (position.y() + tooltip_height),
+            watched.mapToGlobal(QPoint(0, 0)).y() - (position.y() + tooltip_height),
             TOOLTIP_CONTROL_GAP,
         )
 
@@ -596,15 +757,11 @@ class WidgetTests(unittest.TestCase):
                 [provider],
             )
 
-        self.assertTrue(
-            widget.testAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
-        )
+        self.assertTrue(widget.testAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow))
         self.assertTrue(widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
 
         widget.set_always_on_top(False)
-        self.assertTrue(
-            widget.testAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
-        )
+        self.assertTrue(widget.testAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow))
         self.assertFalse(widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         widget.close()
         widget.deleteLater()
@@ -630,9 +787,7 @@ class WidgetTests(unittest.TestCase):
     def test_header_controls_request_the_visible_window_modes(self):
         requested = []
         self.widget.window_mode_requested.connect(
-            lambda mode, restore_position: requested.append(
-                (mode, restore_position)
-            )
+            lambda mode, restore_position: requested.append((mode, restore_position))
         )
 
         self.widget.minimize_btn.click()
@@ -645,9 +800,7 @@ class WidgetTests(unittest.TestCase):
 
     def test_compact_bar_can_collapse_to_tray_only(self):
         requested = []
-        self.widget.window_mode_requested.connect(
-            lambda mode, _restore: requested.append(mode)
-        )
+        self.widget.window_mode_requested.connect(lambda mode, _restore: requested.append(mode))
         self.widget.enter_compact_mode()
         self.app.processEvents()
 
@@ -665,18 +818,12 @@ class WidgetTests(unittest.TestCase):
 
         available = self.widget._available_geometry()
         frame = self.widget.frameGeometry()
-        self.assertAlmostEqual(
-            frame.center().x(), available.center().x(), delta=4
-        )
-        self.assertAlmostEqual(
-            frame.center().y(), available.center().y(), delta=4
-        )
+        self.assertAlmostEqual(frame.center().x(), available.center().x(), delta=4)
+        self.assertAlmostEqual(frame.center().y(), available.center().y(), delta=4)
 
     def test_expanded_header_can_go_straight_to_tray(self):
         requested = []
-        self.widget.window_mode_requested.connect(
-            lambda mode, _restore: requested.append(mode)
-        )
+        self.widget.window_mode_requested.connect(lambda mode, _restore: requested.append(mode))
 
         self.widget.header_tray_btn.click()
 
@@ -739,9 +886,7 @@ class WidgetTests(unittest.TestCase):
             AntigravityProvider({"id": "gemini", "name": "Gemini"}),
             ClaudeProvider({"id": "claude", "name": "Claude"}),
         ]
-        self.widget.rebuild_ui(
-            self.widget.config_data, providers, preserve_usage=False
-        )
+        self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
         self.widget.enter_compact_mode()
         self.app.processEvents()
 
@@ -752,16 +897,10 @@ class WidgetTests(unittest.TestCase):
             if layout.itemAt(index).widget() is not None
         ]
         self.assertEqual(len(items), 3)
-        self.assertTrue(
-            all(item.objectName() == "compactProviderGroup" for item in items)
-        )
+        self.assertTrue(all(item.objectName() == "compactProviderGroup" for item in items))
         self.assertIn("QWidget#compactProviderGroup", self.widget.frame.styleSheet())
-        self.assertTrue(
-            all(item.layout().contentsMargins().left() >= 4 for item in items)
-        )
-        self.assertTrue(
-            all(item.layout().contentsMargins().top() >= 3 for item in items)
-        )
+        self.assertTrue(all(item.layout().contentsMargins().left() >= 4 for item in items))
+        self.assertTrue(all(item.layout().contentsMargins().top() >= 3 for item in items))
 
     def test_light_theme_tooltip_palette_has_readable_text_and_background(self):
         apply_theme_setting("light")
@@ -786,9 +925,7 @@ class WidgetTests(unittest.TestCase):
                 "show_weekly": True,
             }
         )
-        self.widget.rebuild_ui(
-            self.widget.config_data, [provider], preserve_usage=False
-        )
+        self.widget.rebuild_ui(self.widget.config_data, [provider], preserve_usage=False)
         self.widget.update_data(
             [
                 ModelUsage(
@@ -894,6 +1031,49 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(resets[0].width(), resets[1].width())
         self.assertTrue(all(tile.findChild(UsageRing) for tile in (first, second)))
 
+    def test_three_provider_defined_windows_wrap_to_a_second_row(self):
+        self.usage.windows = [
+            UsageWindow("Premium requests", 41, "8/12 09:49", 59),
+            UsageWindow("Chat", 12, "8/18 09:49", 88),
+            UsageWindow("Completions", 7, "8/19 09:49", 93),
+        ]
+        self.widget.update_data([self.usage], force=True)
+        self.app.processEvents()
+
+        first, second, third = self.widget.provider_ui_map["codex"]["window_rows"]
+        self.assertEqual(first.geometry().top(), second.geometry().top())
+        self.assertGreater(third.geometry().top(), first.geometry().top())
+        labels = [tile.findChild(QLabel, "windowBadge").text() for tile in (first, second, third)]
+        self.assertEqual(labels, ["PREMIUM REQUESTS", "CHAT", "COMPLETIONS"])
+
+    def test_five_provider_tabs_scroll_without_shrinking(self):
+        providers = [
+            CodexProvider({"id": f"provider-{index}", "name": f"Provider {index}"})
+            for index in range(5)
+        ]
+        self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
+        self.app.processEvents()
+
+        scroll = self.widget.findChild(QScrollArea, "focusProviderScroll")
+        self.assertIsNotNone(scroll)
+        self.assertEqual(len(self.widget.focus_provider_buttons), 5)
+        self.assertTrue(
+            all(
+                button.minimumWidth() >= 104
+                for button in self.widget.focus_provider_buttons.values()
+            )
+        )
+        self.assertGreater(scroll.horizontalScrollBar().maximum(), 0)
+        self.assertFalse(scroll.horizontalScrollBar().isVisible())
+        self.assertTrue(self.widget.focus_provider_previous_button.isVisibleTo(self.widget))
+        self.assertTrue(self.widget.focus_provider_next_button.isVisibleTo(self.widget))
+        self.widget.focus_provider_next_button.click()
+        self.assertGreater(scroll.horizontalScrollBar().value(), 0)
+        last_button = self.widget.focus_provider_buttons["provider-4"]
+        last_button.click()
+        self.app.processEvents()
+        self.assertGreater(scroll.horizontalScrollBar().value(), 0)
+
     def test_horizontal_ring_layout_focuses_one_provider_with_two_large_rings(self):
         providers: list[BaseAIProvider] = [
             CodexProvider({"id": "codex", "name": "Codex"}),
@@ -959,9 +1139,7 @@ class WidgetTests(unittest.TestCase):
             self.app.processEvents()
 
         self.assertTrue(self.widget._horizontal_ring_active)
-        self.assertEqual(set(self.widget.focus_provider_buttons), {
-            "codex", "gemini", "claude"
-        })
+        self.assertEqual(set(self.widget.focus_provider_buttons), {"codex", "gemini", "claude"})
         self.assertTrue(
             all(
                 isinstance(button, FocusProviderButton)
@@ -986,9 +1164,7 @@ class WidgetTests(unittest.TestCase):
                 available_summary_width,
                 required_summary_width,
             )
-        self.assertIn(
-            "34 / 26%", self.widget.focus_provider_buttons["codex"].text()
-        )
+        self.assertIn("34 / 26%", self.widget.focus_provider_buttons["codex"].text())
         self.assertTrue(self.widget.provider_ui_map["codex"]["name"].isHidden())
         title_container = self.widget.provider_ui_map["codex"]["title_container"]
         self.assertTrue(title_container.isHidden())
@@ -999,9 +1175,7 @@ class WidgetTests(unittest.TestCase):
         self.assertFalse(self.widget.provider_ui_map["codex"]["card"].isHidden())
         self.assertTrue(self.widget.provider_ui_map["gemini"]["card"].isHidden())
         self.assertTrue(self.widget.provider_ui_map["claude"]["card"].isHidden())
-        rings = self.widget.provider_ui_map["codex"]["card"].findChildren(
-            UsageRing
-        )
+        rings = self.widget.provider_ui_map["codex"]["card"].findChildren(UsageRing)
         self.assertEqual(len(rings), 2)
         self.assertTrue(all(ring.emphasized for ring in rings))
         self.assertTrue(all(ring.ring_size >= 96 for ring in rings))
@@ -1056,8 +1230,7 @@ class WidgetTests(unittest.TestCase):
             self.app.processEvents()
 
         cards = [
-            self.widget.provider_ui_map[provider.provider_id]["card"]
-            for provider in providers
+            self.widget.provider_ui_map[provider.provider_id]["card"] for provider in providers
         ]
         self.assertTrue(self.widget._horizontal_ring_active)
         self.assertEqual(set(self.widget.focus_provider_buttons), {"codex", "gemini", "claude"})
@@ -1088,9 +1261,7 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(metrics["provider_spacing"], 10)
         self.assertGreaterEqual(metrics["vertical_margin"], 2)
         self.assertEqual(self.widget.compact_layout.spacing(), metrics["logo_spacing"])
-        self.assertEqual(
-            self.widget.compact_items_layout.spacing(), metrics["provider_spacing"]
-        )
+        self.assertEqual(self.widget.compact_items_layout.spacing(), metrics["provider_spacing"])
 
     def test_header_logo_recolours_on_theme_switch(self):
         apply_theme_setting("dark")
@@ -1313,6 +1484,24 @@ class WidgetTests(unittest.TestCase):
         self.assertLess(widths[0], widths[1])
         self.assertLess(widths[1], widths[2])
         self.assertEqual(self.widget.width(), FIXED_WIDGET_WIDTH)
+
+    def test_compact_many_providers_stay_within_screen_and_scroll(self):
+        providers = [
+            CodexProvider({"id": f"provider-{index}", "name": f"Provider {index}"})
+            for index in range(6)
+        ]
+        with patch.object(
+            self.widget,
+            "_available_geometry",
+            return_value=QRect(0, 0, 480, 900),
+        ):
+            self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
+            self.widget.enter_compact_mode()
+            self.widget._fit_to_content()
+            self.app.processEvents()
+
+        self.assertLessEqual(self.widget.width(), 480)
+        self.assertGreater(self.widget.compact_items_scroll.horizontalScrollBar().maximum(), 0)
 
     def test_compact_toggle_expands_downward_near_top_edge(self):
         available = self.widget.screen().availableGeometry()
@@ -1682,6 +1871,28 @@ class WidgetTests(unittest.TestCase):
 
         self.assertEqual(self.widget.height(), expanded_height)
         self.assertEqual(self.widget.cards_layout.count(), 3)
+
+    def test_unlimited_window_is_labeled_in_expanded_and_compact_modes(self):
+        usage = ModelUsage(
+            "codex",
+            "Codex",
+            "Codex",
+            0,
+            100,
+            "%",
+            status_text="모든 제공 한도 무제한",
+            windows=[UsageWindow("채팅", 0, "", None, unlimited=True)],
+        )
+
+        self.widget.update_data([usage], force=True)
+        self.app.processEvents()
+
+        self.assertIn("무제한", self.widget.focus_provider_buttons["codex"].text())
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        compact_value = self.widget.compact_ui_map["codex"]["value"]
+        self.assertEqual(compact_value.text(), "무제한")
+        self.assertIn("채팅 무제한", self.widget.compact_ui_map["codex"]["item"].toolTip())
 
 
 if __name__ == "__main__":

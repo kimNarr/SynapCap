@@ -6,9 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ReleaseScriptTests(unittest.TestCase):
     def test_brand_assets_are_packaged_for_both_desktop_builds(self):
-        windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(
-            encoding="utf-8"
-        )
+        windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(encoding="utf-8")
         macos_script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
 
         for name in ("logo.svg", "logo-icon.svg", "wordmark.svg"):
@@ -17,24 +15,41 @@ class ReleaseScriptTests(unittest.TestCase):
             self.assertIn(f'--add-data "assets/{name}:assets"', macos_script)
 
     def test_icon_generation_runs_before_pyinstaller_in_both_builds(self):
-        windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(
-            encoding="utf-8"
-        )
+        windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(encoding="utf-8")
         macos_script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
 
         for script in (windows_script, macos_script):
             self.assertIn("generate_icons.py", script)
-            self.assertLess(
-                script.index("generate_icons.py"), script.index("PyInstaller")
-            )
+            self.assertLess(script.index("generate_icons.py"), script.index("PyInstaller"))
 
-    def test_windows_shortcuts_use_a_versioned_icon_path(self):
-        script = (ROOT / "packaging" / "windows" / "SynapCap.iss").read_text(
+    def test_copilot_probe_is_built_and_bundled_for_desktop_releases(self):
+        windows_script = (ROOT / "scripts" / "build_windows.ps1").read_text(encoding="utf-8")
+        macos_script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
+        build_requirements = (ROOT / "requirements-build.txt").read_text(encoding="utf-8")
+
+        self.assertIn("github-copilot-sdk==1.0.16", build_requirements)
+        for script in (windows_script, macos_script):
+            self.assertIn("--name SynapCapCopilotProbe", script)
+            self.assertIn("--collect-all copilot", script)
+            self.assertIn("--add-binary", script)
+            self.assertIn("verify_bundle.py", script)
+
+    def test_release_uploads_bundle_verification_reports(self):
+        workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
             encoding="utf-8"
         )
 
+        self.assertIn("SynapCap-Windows-x64-bundle-verification.json", workflow)
+        self.assertIn(
+            "SynapCap-macOS-${{ matrix.architecture }}-bundle-verification.json",
+            workflow,
+        )
+
+    def test_windows_shortcuts_use_a_versioned_icon_path(self):
+        script = (ROOT / "packaging" / "windows" / "SynapCap.iss").read_text(encoding="utf-8")
+
         versioned_icon = r"SynapCap-v{#MyAppVersion}.ico"
-        self.assertIn('ChangesAssociations=yes', script)
+        self.assertIn("ChangesAssociations=yes", script)
         self.assertIn(f'DestName: "{versioned_icon}"', script)
         self.assertIn(r'Name: "{app}\SynapCap-v*.ico"', script)
         self.assertEqual(script.count(f'IconFilename: "{{app}}\\{versioned_icon}"'), 3)
@@ -42,7 +57,7 @@ class ReleaseScriptTests(unittest.TestCase):
     def test_macos_bundle_is_resigned_before_disk_image_creation(self):
         script = (ROOT / "scripts" / "build_macos.sh").read_text(encoding="utf-8")
 
-        plist_update = script.index('if ! /usr/libexec/PlistBuddy')
+        plist_update = script.index("if ! /usr/libexec/PlistBuddy")
         plist_validation = script.index('plutil -lint "$APP_BUNDLE/Contents/Info.plist"')
         bundle_signing = script.index('codesign --force --deep --sign - "$APP_BUNDLE"')
         signature_validation = script.index(
@@ -56,6 +71,10 @@ class ReleaseScriptTests(unittest.TestCase):
         self.assertLess(bundle_signing, signature_validation)
         self.assertLess(signature_validation, bundle_staging)
         self.assertLess(bundle_staging, disk_image_creation)
+        self.assertIn("for version_key in CFBundleShortVersionString CFBundleVersion", script)
+        self.assertLess(script.index("for version_key"), bundle_signing)
+        self.assertIn('Set :$version_key $VERSION', script)
+        self.assertIn('Add :$version_key string $VERSION', script)
 
 
 if __name__ == "__main__":

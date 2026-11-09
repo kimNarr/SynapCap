@@ -132,11 +132,13 @@ class ConfigTests(unittest.TestCase):
             path = Path(temp_dir) / "synapcap.json"
             path.write_text(
                 json.dumps(
-                    {"settings": {
-                        "ring_layout": "diagonal",
-                        "widget_scale": "large",
-                        "dock_above_taskbar": True,
-                    }}
+                    {
+                        "settings": {
+                            "ring_layout": "diagonal",
+                            "widget_scale": "large",
+                            "dock_above_taskbar": True,
+                        }
+                    }
                 ),
                 encoding="utf-8",
             )
@@ -279,9 +281,34 @@ class ConfigTests(unittest.TestCase):
 
             loaded = load_config(str(path))
 
-            self.assertEqual(loaded["schema_version"], 8)
+            self.assertEqual(loaded["schema_version"], 9)
             self.assertFalse(loaded["providers"][0]["show_five_hour"])
             self.assertTrue(loaded["providers"][0]["show_weekly"])
+
+    def test_grok_provider_migrates_to_explicit_api_rate_limit_label(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 8,
+                        "providers": [
+                            {
+                                "id": "grok",
+                                "name": "Grok",
+                                "type": "grok",
+                                "source": "local_subscription",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            provider = load_config(str(path))["providers"][0]
+
+            self.assertEqual(provider["name"], "xAI API")
+            self.assertEqual(provider["source"], "api_rate_limit")
 
 
 if __name__ == "__main__":
