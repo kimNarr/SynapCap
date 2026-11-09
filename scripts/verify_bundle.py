@@ -44,11 +44,14 @@ def _bundle_files(bundle: Path, platform_name: str) -> tuple[Path, Path]:
     if platform_name != "macos":
         raise ValueError(f"지원하지 않는 플랫폼입니다: {platform_name}")
     app_path = _required_file(bundle / "Contents" / "MacOS" / "SynapCap", "앱 실행")
-    helpers = [
-        path
+    # PyInstaller exposes the same helper through multiple bundle symlinks.
+    helpers = sorted({
+        path.resolve()
         for path in bundle.rglob("SynapCapCopilotProbe")
         if path.is_file() and path != app_path
-    ]
+    })
+    if any(not path.is_relative_to(bundle) for path in helpers):
+        raise ValueError("macOS Copilot 프로브가 번들 밖을 가리킵니다.")
     if len(helpers) != 1:
         raise ValueError(
             "macOS 번들에서 Copilot 프로브를 정확히 하나 찾지 못했습니다: "

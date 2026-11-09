@@ -10,6 +10,59 @@ from scripts.verify_bundle import _windows_version_fields, verify_bundle
 
 
 class BundleVerificationTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "macOS bundle symlink layout")
+    def test_macos_symlink_aliases_refer_to_one_packaged_helper(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle = (Path(temp_dir) / "SynapCap.app").resolve()
+            app = bundle / "Contents" / "MacOS" / "SynapCap"
+            helper = bundle / "Contents" / "Frameworks" / "SynapCapCopilotProbe"
+            app.parent.mkdir(parents=True)
+            helper.parent.mkdir(parents=True)
+            app.write_bytes(b"app")
+            helper.write_bytes(b"probe")
+            (app.parent / helper.name).symlink_to(helper)
+            (bundle / "Contents" / "Info.plist").write_bytes(plistlib.dumps({
+                "CFBundleShortVersionString": "0.3.1", "CFBundleVersion": "0.3.1",
+            }))
+            with patch("scripts.verify_bundle._probe_self_check", return_value={"status": "ready"}) as probe:
+                report = verify_bundle(bundle, "macos", "0.3.1")
+            probe.assert_called_once_with(helper)
+            self.assertEqual(report["copilot_probe"]["path"], "Contents/Frameworks/SynapCapCopilotProbe")
+
+    def test_macos_rejects_multiple_distinct_helpers(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle = (Path(temp_dir) / "SynapCap.app").resolve()
+            app = bundle / "Contents" / "MacOS" / "SynapCap"
+            app.parent.mkdir(parents=True)
+            app.write_bytes(b"app")
+            for folder in ("Frameworks", "Resources"):
+                helper = bundle / "Contents" / folder / "SynapCapCopilotProbe"
+                helper.parent.mkdir()
+                helper.write_bytes(b"probe")
+            with (
+                patch("scripts.verify_bundle._probe_self_check") as probe,
+                self.assertRaisesRegex(ValueError, "2개"),
+            ):
+                verify_bundle(bundle, "macos", "0.3.1")
+            probe.assert_not_called()
+
+    @unittest.skipIf(os.name == "nt", "macOS bundle symlink layout")
+    def test_macos_rejects_helper_link_outside_bundle(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle = (Path(temp_dir) / "SynapCap.app").resolve()
+            app = bundle / "Contents" / "MacOS" / "SynapCap"
+            app.parent.mkdir(parents=True)
+            app.write_bytes(b"app")
+            external_helper = Path(temp_dir) / "outside-probe"
+            external_helper.write_bytes(b"outside")
+            (app.parent / "SynapCapCopilotProbe").symlink_to(external_helper)
+            with (
+                patch("scripts.verify_bundle._probe_self_check") as probe,
+                self.assertRaisesRegex(ValueError, "번들 밖"),
+            ):
+                verify_bundle(bundle, "macos", "0.3.1")
+            probe.assert_not_called()
+
     def test_windows_bundle_records_relative_paths_hashes_and_probe_status(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle = Path(temp_dir)
