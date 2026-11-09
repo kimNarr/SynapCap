@@ -1,15 +1,17 @@
 # 릴리스 절차 & 현황
 
-> 마지막 갱신: 2026-11-09. **v0.3.1 배포 진행 중.** 아래 0번이 현재 상태이며 1번은 v0.3.0 당시 기록이다.
+> 마지막 갱신: 2026-11-09. **v0.3.1 배포 완료.** 아래 0번이 현재 상태이며 1번은 v0.3.0 당시 기록이다.
 
 ## 0. 현재 릴리스 — v0.3.1
 
-- 앱 버전·태그 목표: `0.3.1` / `v0.3.1`. 변경 내용과 알려진 제약은 `CHANGELOG.md`의 해당 버전 섹션을 따른다.
-- 로컬 Windows 소스 테스트: 268개 통과. Ruff는 기존 경고 6건 외 추가 없음.
-- 릴리스 CI가 Windows 설치 파일과 macOS arm64·x64 DMG, 플랫폼별 번들 검증 JSON, 체크섬·provenance를 생성한다.
+- 앱 버전·태그: `0.3.1` / `v0.3.1` → `f108f2c6f0c4fa5cd518fc418e90442f6df592f1`.
+- [공개 릴리스](https://github.com/kimNarr/SynapCap/releases/tag/v0.3.1)와 [릴리스 CI](https://github.com/kimNarr/SynapCap/actions/runs/42543053890) 성공을 확인했다. Windows Setup.exe, macOS arm64·x64 DMG, 검증 JSON 3개, SHA256SUMS.txt 등 자산 7개를 공개했고 provenance 생성도 성공했다.
+- [Windows·macOS·Linux CI](https://github.com/kimNarr/SynapCap/actions/runs/42543054097)가 성공했다. 테스트는 플랫폼별 271개이며 플랫폼 전용 건너뛰기를 포함한다. 로컬 Windows는 269개 통과·macOS 링크 테스트 2개 건너뛰기다. Ruff는 기존 경고 6건 외 추가 없음.
+- 각 공개 번들 보고서에서 실제 앱 버전 `0.3.1`과 Copilot 프로브 `ready`를 확인했다. 보고서 다운로드 SHA-256 및 공개 설치 파일의 GitHub digest를 체크섬 목록과 대조했다.
+- 기존 버전 `0.3.0`을 전달한 실제 앱 업데이트 조회가 `0.3.1` Windows 설치 파일과 원클릭 업데이트 가능 상태를 반환했다. 사용자 PC에 설치하거나 실행 중인 앱을 교체하지는 않았다.
 - Claude·Copilot 실계정 대조, 실제 Argon 응답 확인, macOS 메뉴바 클릭 종료 재현은 미완료다. 빌드 성공만으로 해결 완료로 바꾸지 않는다.
 - 개발 기록(`journal/`)과 로컬 실행용 배치 파일은 릴리스 커밋에서 제외한다.
-- 태그 푸시·CI·공개 자산 확인 후 이 절의 배포 결과와 `docs/TASKS.md`를 갱신한다.
+- 첫 시도는 경로·운영체제 가정을 보완한 `eb622c5`, 두 번째는 macOS 헬퍼 링크 중복을 보완한 `f108f2c`로 재시도했다. 공개 릴리스가 없는 상태에서만 기존 SHA를 명시한 lease로 태그를 갱신했다. 게시된 v0.3.1 태그는 더 이상 이동하지 않는다.
 
 ---
 
