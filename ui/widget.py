@@ -3,7 +3,7 @@ import sys
 from datetime import datetime, timedelta
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPalette, QPen
+from PySide6.QtGui import QColor, QFont, QFontInfo, QFontMetrics, QIcon, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -40,6 +40,7 @@ from .icon import (
 EDGE_SNAP_DISTANCE = 48
 COMPACT_BOTTOM_SAFE_GAP = 6
 TOOLTIP_CONTROL_GAP = 12
+TOOLTIP_DELAY_MS = 350
 
 # The expanded widget has one visual language: rings. ``usage_view`` remains
 # in persisted configs only as a migration bridge for older installations.
@@ -463,6 +464,12 @@ class SynapCapWidget(QWidget):
         self._focused_provider_id = self.providers[0].provider_id if self.providers else ""
         self.focus_provider_buttons: dict[str, QPushButton] = {}
         self._horizontal_ring_active = False
+        self._settings_dialog_open = False
+        self._tooltip_target: QWidget | None = None
+        self._tooltip_timer = QTimer(self)
+        self._tooltip_timer.setSingleShot(True)
+        self._tooltip_timer.setInterval(TOOLTIP_DELAY_MS)
+        self._tooltip_timer.timeout.connect(self._show_hover_tooltip)
         self._fit_timer = QTimer(self)
         self._fit_timer.setSingleShot(True)
         self._fit_timer.timeout.connect(self._fit_to_content)
@@ -1068,6 +1075,7 @@ class SynapCapWidget(QWidget):
             self.set_window_mode(mode)
 
     def set_window_mode(self, mode: str) -> None:
+        self._cancel_tooltip()
         if mode not in {"expanded", "bar", "none"}:
             mode = "expanded"
         if mode == "none":
@@ -1373,7 +1381,10 @@ class SynapCapWidget(QWidget):
             summary_font.setPixelSize(button.summary_size)
             summary_font.setWeight(QFont.Weight.DemiBold)
             # Fallback fonts can be wider than Segoe UI on macOS/Linux.
-            summary_width = QFontMetrics(summary_font).horizontalAdvance("100 / 100%")
+            summary_width = (
+                QFontMetrics(summary_font).horizontalAdvance("100 / 100%")
+                if QFontInfo(summary_font).family() else 55
+            )
             button.setMinimumWidth(max(104, 9 + 22 + 8 + summary_width + 7))
             button.setChecked(provider.provider_id == self._focused_provider_id)
             button.clicked.connect(
@@ -1389,7 +1400,7 @@ class SynapCapWidget(QWidget):
         scroll = HorizontalScrollArea()
         scroll.setObjectName("focusProviderScroll")
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidgetResizable(False)
+        scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -1420,6 +1431,12 @@ class SynapCapWidget(QWidget):
         next_button.setVisible(show_navigation)
         previous_button.clicked.connect(lambda: self._scroll_provider_tabs(scroll, -1))
         next_button.clicked.connect(lambda: self._scroll_provider_tabs(scroll, 1))
+        scroll.horizontalScrollBar().rangeChanged.connect(
+            lambda _minimum, maximum: (
+                previous_button.setVisible(maximum > 0),
+                next_button.setVisible(maximum > 0),
+            )
+        )
         wrapper_layout.addWidget(previous_button)
         wrapper_layout.addWidget(scroll, 1)
         wrapper_layout.addWidget(next_button)
@@ -1667,17 +1684,6 @@ class SynapCapWidget(QWidget):
 
     @staticmethod
     def _set_status_badge(label: QWidget, state: str, preset: dict) -> None:
-        if state == "source":
-            # "CLI 기준" is metadata, not an alert — an outline chip that steps
-            # back from the provider name.
-            label.setStyleSheet(
-                f"color: {t('cli_badge_fg')}; background-color: transparent; "
-                f"border: 1px solid {t('cli_badge_edge')}; border-radius: 5px; "
-                "padding: 2px 6px; "
-                f"font-size: {max(8, preset['val_size'] - 2)}px; font-weight: 600;"
-            )
-            return
-
         colors = {
             "waiting": (t("warn_soft"), t("badge_waiting_bg")),
             "error": (t("danger"), t("badge_error_bg")),
@@ -1698,6 +1704,7 @@ class SynapCapWidget(QWidget):
         providers: list[BaseAIProvider],
         preserve_usage: bool = True,
     ):
+        self._cancel_tooltip()
         resize_anchor = self._capture_resize_anchor() if self.is_compact else None
         preserved_usage = list(self.latest_usage) if preserve_usage else []
         self.config_data = config_data
@@ -1756,6 +1763,7 @@ class SynapCapWidget(QWidget):
         self.refresh_btn.setEnabled(True)
 
     def _clear_usage_rows(self, ui: dict):
+        self._cancel_tooltip()
         layout = ui["windows_layout"]
         while layout.count():
             item = layout.takeAt(0)
@@ -1880,19 +1888,29 @@ class SynapCapWidget(QWidget):
         widget.setProperty("instantTooltip", True)
         widget.installEventFilter(self)
 
+    def _cancel_tooltip(self) -> None:
+        self._tooltip_timer.stop()
+        self._tooltip_target = None
+        QToolTip.hideText()
+
+    def _show_hover_tooltip(self) -> None:
+        self._tooltip_timer.stop()
+        target = self._tooltip_target
+        if target is None or not target.isVisible() or QApplication.activeModalWidget() is not None:
+            self._cancel_tooltip()
+            return
+        self._apply_tooltip_palette()
+        QToolTip.showText(self._instant_tooltip_position(target, target.toolTip()), target.toolTip(), target)
+
     @staticmethod
     def _instant_tooltip_position(watched: QWidget, text: str) -> QPoint:
-        # Native tooltips add their own cursor clearance after ``showText``.
-        # Anchor slightly inside the hovered control so the rendered popup sits
-        # close to its lower edge instead of receiving two visible gaps.
-        anchor_inset = 10
         edge_gap = TOOLTIP_CONTROL_GAP
         lines = text.splitlines() or [""]
         metrics = QFontMetrics(QToolTip.font())
         tooltip_width = max(metrics.horizontalAdvance(line) for line in lines) + 24
         tooltip_height = (metrics.lineSpacing() * len(lines)) + 16
         global_top_left = watched.mapToGlobal(QPoint(0, 0))
-        position = watched.mapToGlobal(QPoint(0, max(0, watched.height() - anchor_inset)))
+        position = watched.mapToGlobal(QPoint(0, watched.height() + edge_gap))
         screen = (
             QApplication.screenAt(watched.mapToGlobal(watched.rect().center()))
             or QApplication.primaryScreen()
@@ -1913,17 +1931,11 @@ class SynapCapWidget(QWidget):
     def eventFilter(self, watched, event):
         if watched.property("instantTooltip"):
             if event.type() == QEvent.Type.Enter:
-                tooltip_position = self._instant_tooltip_position(
-                    watched,
-                    watched.toolTip(),
-                )
-                QToolTip.showText(
-                    tooltip_position,
-                    watched.toolTip(),
-                    watched,
-                )
-            elif event.type() == QEvent.Type.Leave:
-                QToolTip.hideText()
+                self._cancel_tooltip()
+                self._tooltip_target = watched
+                self._tooltip_timer.start()
+            elif event.type() in (QEvent.Type.Leave, QEvent.Type.Hide, QEvent.Type.MouseButtonPress):
+                self._cancel_tooltip()
             elif event.type() == QEvent.Type.ToolTip:
                 return True
         return super().eventFilter(watched, event)
@@ -2240,6 +2252,10 @@ class SynapCapWidget(QWidget):
         usage_value_bold = True
         ring_size = max(96, min(132, round(preset["val_size"] * 8.6)))
         visible_count = max(1, len(windows))
+        groups = {window.quota_group for window in windows}
+        show_groups = len(groups) > 1 or any(
+            group and group.casefold() != "gemini models" for group in groups
+        )
 
         for index, window in enumerate(windows):
             remaining = (
@@ -2284,7 +2300,7 @@ class SynapCapWidget(QWidget):
             layout.setContentsMargins(pad, pad, pad, pad)
             layout.setSpacing(max(7, preset["window_spacing"]))
 
-            context = self._usage_window_context(window.display_label)
+            context = self._usage_window_context(window.display_label if show_groups else window.label)
             period_label = QLabel(context)
             period_label.setObjectName("windowBadge")
             period_label.setToolTip(window.display_label)
@@ -2540,13 +2556,8 @@ class SynapCapWidget(QWidget):
                     success_tooltip += f"\n{source_tooltip}"
                 ui["badge"].setToolTip(success_tooltip)
                 ui["name"].setToolTip(success_tooltip)
-                if provider_type == "claude":
-                    ui["status"].setText("CLI 기준")
-                    ui["status"].setToolTip(f"{source_tooltip}\n클릭하여 진단 정보 보기")
-                    self._set_status_badge(ui["status"], "source", preset)
-                    self._set_provider_status_visible(ui, True)
-                else:
-                    self._set_provider_status_visible(ui, False)
+                ui["status"].setText("")
+                self._set_provider_status_visible(ui, False)
                 windows = usage.windows or [
                     UsageWindow(
                         label="사용량",
@@ -2619,6 +2630,7 @@ class SynapCapWidget(QWidget):
         self.resize(self.width(), height)
 
     def set_always_on_top(self, always_on_top: bool):
+        always_on_top = bool(always_on_top) and not self._settings_dialog_open
         flags = self.windowFlags()
         currently_enabled = bool(flags & Qt.WindowType.WindowStaysOnTopHint)
         if currently_enabled == always_on_top:
@@ -2628,10 +2640,16 @@ class SynapCapWidget(QWidget):
         else:
             flags &= ~Qt.WindowType.WindowStaysOnTopHint
 
+        was_visible = self.isVisible()
         self.setWindowFlags(flags)
         self._apply_platform_window_attributes()
-        if self._window_mode != "none":
+        if was_visible and self._window_mode != "none":
             self.show()
+
+    def set_settings_dialog_open(self, opened: bool) -> None:
+        self._settings_dialog_open = opened
+        self._cancel_tooltip()
+        self.set_always_on_top(self.config_data.get("settings", {}).get("always_on_top", True))
 
     def _apply_platform_window_attributes(self) -> None:
         if sys.platform == "darwin":
@@ -2645,6 +2663,7 @@ class SynapCapWidget(QWidget):
 
     def closeEvent(self, event):
         """Taskbar/OS close requests follow the header × exit behavior."""
+        self._cancel_tooltip()
         if self._shutdown_in_progress:
             event.accept()
             return

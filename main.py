@@ -269,8 +269,13 @@ def main():
 
     # Global Hotkey Manager
     hotkey_manager = GlobalHotkeyManager(parent=app)
+    active_settings_dialog: SettingsDialog | None = None
 
     def toggle_widget_visibility():
+        if active_settings_dialog is not None:
+            active_settings_dialog.raise_()
+            active_settings_dialog.activateWindow()
+            return
         current_mode = widget.window_mode()
         if current_mode == "none" or not widget.isVisible():
             last_mode = config_data.get("settings", {}).get("last_window_mode", "expanded")
@@ -287,7 +292,6 @@ def main():
             settings.get("global_hotkey", "Ctrl+Alt+S"),
             widget.winId(),
         )
-    active_settings_dialog: SettingsDialog | None = None
 
     def remember_widget_position(mode: str | None = None) -> None:
         selected_mode = mode or widget.window_mode()
@@ -346,6 +350,8 @@ def main():
         app.setWindowIcon(create_app_icon(64))
         if active_settings_dialog is not None:
             active_settings_dialog.restyle()
+            active_settings_dialog.raise_()
+            active_settings_dialog.activateWindow()
 
     def on_system_scheme_changed(_scheme=None) -> None:
         if current_setting() == "auto":
@@ -355,6 +361,10 @@ def main():
     app.styleHints().colorSchemeChanged.connect(on_system_scheme_changed)
 
     def show_widget():
+        if active_settings_dialog is not None:
+            active_settings_dialog.raise_()
+            active_settings_dialog.activateWindow()
+            return
         record_runtime_event("window_restore_requested", log_dir=runtime_log_dir)
         mode = config_data.get("settings", {}).get(
             "last_window_mode",
@@ -472,6 +482,10 @@ def main():
     # 6. GUI Settings Dialog 오픈 및 Hot-Reload 연결
     def open_settings_dialog():
         nonlocal active_settings_dialog
+        if active_settings_dialog is not None:
+            active_settings_dialog.raise_()
+            active_settings_dialog.activateWindow()
+            return
         remember_widget_position()
         config_before_dialog = deepcopy(config_data)
         dialog = SettingsDialog(config_data, parent=widget)
@@ -620,9 +634,18 @@ def main():
         dialog.preview_requested.connect(apply_preview)
         dialog.preview_reverted.connect(revert_preview)
         try:
+            widget.set_settings_dialog_open(True)
             dialog.exec()
         finally:
             active_settings_dialog = None
+            widget.set_settings_dialog_open(False)
+            # Changing window flags may recreate the native hotkey target.
+            hotkey_manager.unregister_hotkey()
+            if config_data.get("settings", {}).get("global_hotkey_enabled", True):
+                hotkey_manager.register_hotkey(
+                    config_data.get("settings", {}).get("global_hotkey", "Ctrl+Alt+S"),
+                    widget.winId(),
+                )
 
     def open_provider_diagnostics(provider_id: str):
         show_provider_diagnostics(

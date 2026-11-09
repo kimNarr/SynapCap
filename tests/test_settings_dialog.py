@@ -4,11 +4,13 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import QApplication, QDialog, QFormLayout, QLabel, QLineEdit, QPushButton
 
 from config import get_default_config
+from providers import CodexProvider
 from ui.settings_dialog import SettingsDialog, StyledCheckBox
+from ui.widget import SynapCapWidget
 
 
 class SettingsDialogTests(unittest.TestCase):
@@ -67,6 +69,60 @@ class SettingsDialogTests(unittest.TestCase):
         self.dialog.title_bar.close_button.click()
 
         self.assertEqual(self.dialog.result(), QDialog.DialogCode.Rejected)
+
+    def test_modal_settings_stay_above_owner_during_live_preview(self):
+        config = get_default_config()
+        provider = CodexProvider({"id": "codex", "name": "Codex"})
+        widget = SynapCapWidget(config, [provider])
+        dialog = SettingsDialog(config, parent=widget)
+        observed = []
+
+        def apply_preview(preview_config):
+            widget.rebuild_ui(preview_config, [provider])
+            widget.set_window_mode(preview_config["settings"]["window_mode"])
+            dialog.raise_()
+
+        dialog.preview_requested.connect(apply_preview)
+
+        def preview_and_close():
+            try:
+                observed.append(QApplication.activeModalWidget() is dialog)
+                dialog.window_mode_combo.setCurrentIndex(dialog.window_mode_combo.findData("bar"))
+                dialog.theme_combo.setCurrentIndex(dialog.theme_combo.findData("dark"))
+                observed.extend([
+                    not bool(widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint),
+                    bool(dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint),
+                    dialog.isVisible(),
+                    widget.window_mode() == "bar",
+                ])
+            finally:
+                dialog.reject()
+
+        try:
+            widget.show()
+            widget.set_settings_dialog_open(True)
+            QTimer.singleShot(0, preview_and_close)
+            dialog.exec()
+            widget.rebuild_ui(config, [provider])
+            widget.set_settings_dialog_open(False)
+            self.assertEqual(observed, [True] * 5)
+            self.assertTrue(widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+            self.assertTrue(config["settings"]["always_on_top"])
+        finally:
+            dialog.deleteLater()
+            widget.begin_shutdown()
+            widget.close()
+            widget.deleteLater()
+            self.app.processEvents()
+
+    def test_settings_do_not_force_topmost_when_disabled(self):
+        config = get_default_config()
+        config["settings"]["always_on_top"] = False
+        dialog = SettingsDialog(config)
+        try:
+            self.assertFalse(dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        finally:
+            dialog.deleteLater()
 
     def test_settings_window_uses_cross_platform_fusion_controls(self):
         app = QApplication.instance()

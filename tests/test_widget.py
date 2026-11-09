@@ -22,11 +22,11 @@ from ui.widget import (
     COMPACT_BOTTOM_SAFE_GAP,
     FIXED_WIDGET_WIDTH,
     TOOLTIP_CONTROL_GAP,
+    TOOLTIP_DELAY_MS,
     FocusProviderButton,
     SynapCapWidget,
     UsageRing,
 )
-from version import APP_VERSION
 
 
 class WidgetTests(unittest.TestCase):
@@ -344,8 +344,9 @@ class WidgetTests(unittest.TestCase):
         self.assertIn(t("danger"), ui["status"].styleSheet())
         self.assertIn(t("ink"), ui["name"].styleSheet())
 
-    def test_ring_tooltip_is_shown_on_enter(self):
+    def test_ring_tooltip_waits_before_showing(self):
         self.widget.update_data([self.usage])
+        self.app.processEvents()
         row = self.widget.provider_ui_map["codex"]["window_rows"][0]
         usage_ring = row.findChild(UsageRing)
         self.assertIsNotNone(usage_ring)
@@ -355,6 +356,10 @@ class WidgetTests(unittest.TestCase):
         self.assertIn("Codex CLI가 로컬에 기록한 구독 사용량", usage_ring.toolTip())
         with patch("ui.widget.QToolTip.showText") as show_text:
             self.widget.eventFilter(usage_ring, QEvent(QEvent.Type.Enter))
+            show_text.assert_not_called()
+            self.assertTrue(self.widget._tooltip_timer.isActive())
+            self.assertEqual(self.widget._tooltip_timer.interval(), TOOLTIP_DELAY_MS)
+            self.widget._show_hover_tooltip()
 
         show_text.assert_called_once()
 
@@ -387,11 +392,9 @@ class WidgetTests(unittest.TestCase):
         self.widget.update_data([usage])
 
         ui = self.widget.provider_ui_map["claude"]
-        self.assertEqual(ui["status"].text(), "CLI 기준")
-        self.assertFalse(ui["status"].isHidden())
-        self.assertTrue(ui["status"].property("instantTooltip"))
-        self.assertIn("마지막 조회: 8/14 13:20:30", ui["status"].toolTip())
-        self.assertIn("일시적으로 차이가 날 수 있습니다", ui["status"].toolTip())
+        self.assertEqual(ui["status"].text(), "")
+        self.assertTrue(ui["status"].isHidden())
+        self.assertTrue(ui["title_container"].isHidden())
         usage_ring = ui["window_rows"][0].findChild(UsageRing)
         self.assertIsNotNone(usage_ring)
         assert usage_ring is not None
@@ -626,15 +629,103 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(len(gemini_ui["window_rows"]), 1)
 
     def test_instant_tooltip_is_anchored_near_hovered_widget(self):
-        expected_position = self.widget.version_btn.mapToGlobal(
-            QPoint(0, max(0, self.widget.version_btn.height() - 10))
+        expected_position = self.widget.settings_btn.mapToGlobal(
+            QPoint(0, self.widget.settings_btn.height() + TOOLTIP_CONTROL_GAP)
         )
 
         with patch("ui.widget.QToolTip.showText") as show_text:
-            self.widget.eventFilter(self.widget.version_btn, QEvent(QEvent.Type.Enter))
+            self.widget.eventFilter(self.widget.settings_btn, QEvent(QEvent.Type.Enter))
+            self.widget._show_hover_tooltip()
 
         self.assertEqual(show_text.call_args.args[0], expected_position)
-        self.assertEqual(show_text.call_args.args[1], f"현재 버전 v{APP_VERSION}")
+        self.assertEqual(show_text.call_args.args[1], "설정")
+
+    def test_tooltip_leave_click_and_rebuild_cancel_pending_popup(self):
+        for event_type in (QEvent.Type.Leave, QEvent.Type.MouseButtonPress, QEvent.Type.Hide):
+            with self.subTest(event_type=event_type), patch("ui.widget.QToolTip.showText") as show_text:
+                self.widget.eventFilter(self.widget.settings_btn, QEvent(QEvent.Type.Enter))
+                self.widget.eventFilter(self.widget.settings_btn, QEvent(event_type))
+                self.assertFalse(self.widget._tooltip_timer.isActive())
+                self.widget._show_hover_tooltip()
+                show_text.assert_not_called()
+        self.widget.eventFilter(self.widget.settings_btn, QEvent(QEvent.Type.Enter))
+        self.widget.rebuild_ui(self.widget.config_data, self.widget.providers)
+        self.assertFalse(self.widget._tooltip_timer.isActive())
+        self.assertIsNone(self.widget._tooltip_target)
+
+    def test_quick_hover_switch_never_shows_previous_controls_text(self):
+        with patch("ui.widget.QToolTip.showText") as show_text:
+            self.widget.eventFilter(self.widget.settings_btn, QEvent(QEvent.Type.Enter))
+            self.widget.eventFilter(self.widget.refresh_btn, QEvent(QEvent.Type.Enter))
+            self.widget._show_hover_tooltip()
+        self.assertEqual(show_text.call_args.args[1], self.widget.refresh_btn.toolTip())
+
+    def test_owner_tooltip_is_suppressed_while_a_modal_dialog_is_open(self):
+        with (
+            patch("ui.widget.QToolTip.showText") as show_text,
+            patch("ui.widget.QApplication.activeModalWidget", return_value=object()),
+        ):
+            self.widget.eventFilter(self.widget.settings_btn, QEvent(QEvent.Type.Enter))
+            self.widget._show_hover_tooltip()
+            show_text.assert_not_called()
+        self.assertIsNone(self.widget._tooltip_target)
+
+    def test_settings_suspend_topmost_through_rebuild_and_restore_latest_setting(self):
+        config = {"settings": {"always_on_top": True}}
+        self.widget.rebuild_ui(config, self.widget.providers)
+        self.widget.move(120, 120)
+        original_position = self.widget.pos()
+        self.widget.set_settings_dialog_open(True)
+        self.assertTrue(config["settings"]["always_on_top"])
+        self.assertFalse(self.widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        self.widget.rebuild_ui(config, self.widget.providers)
+        self.widget.set_window_mode("bar")
+        self.assertFalse(self.widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        self.widget.set_settings_dialog_open(False)
+        self.assertTrue(self.widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        self.assertEqual(self.widget.pos(), original_position)
+        self.widget.set_settings_dialog_open(True)
+        self.widget.rebuild_ui({"settings": {"always_on_top": False}}, self.widget.providers)
+        self.widget.set_settings_dialog_open(False)
+        self.assertFalse(self.widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+
+    def test_settings_close_does_not_reveal_tray_only_widget(self):
+        self.widget.rebuild_ui({"settings": {"always_on_top": True}}, self.widget.providers)
+        self.widget.set_window_mode("none")
+        self.widget.set_settings_dialog_open(True)
+        self.widget.set_settings_dialog_open(False)
+        self.assertEqual(self.widget.window_mode(), "none")
+        self.assertFalse(self.widget.isVisible())
+
+    def test_single_gemini_group_has_only_period_headings(self):
+        self.usage.windows = [
+            UsageWindow("5시간", 0, "", quota_group="Gemini Models"),
+            UsageWindow("주간", 0, "", quota_group="Gemini Models"),
+        ]
+        self.widget.update_data([self.usage])
+        rows = self.widget.provider_ui_map["codex"]["window_rows"]
+        self.assertEqual([row.findChild(QLabel, "windowBadge").text() for row in rows], ["SESSION", "WEEKLY"])
+        self.assertIn("Gemini Models", rows[0].findChild(QLabel, "windowBadge").toolTip())
+
+    def test_three_tabs_fill_selector_without_unused_right_space(self):
+        providers = [CodexProvider({"id": str(index), "name": "Codex"}) for index in range(3)]
+        self.widget.rebuild_ui(self.widget.config_data, providers)
+        self.app.processEvents()
+        scroll = self.widget.focus_provider_scroll
+        tabs = list(self.widget.focus_provider_buttons.values())
+        self.assertLessEqual(max(tab.width() for tab in tabs) - min(tab.width() for tab in tabs), 1)
+        if scroll.widget().minimumSizeHint().width() > scroll.parentWidget().width():
+            self.assertGreater(scroll.horizontalScrollBar().maximum(), 0)
+            self.assertTrue(self.widget.focus_provider_next_button.isVisibleTo(self.widget))
+        else:
+            self.assertEqual(scroll.widget().width(), scroll.viewport().width())
+            self.assertLessEqual(scroll.widget().width() - (tabs[-1].x() + tabs[-1].width()), 1)
+
+    def test_argon_only_quota_keeps_its_model_heading(self):
+        self.usage.windows = [UsageWindow("주간", 2, "", quota_group="Gemini 4 Argon")]
+        self.widget.update_data([self.usage])
+        row = self.widget.provider_ui_map["codex"]["window_rows"][0]
+        self.assertEqual(row.findChild(QLabel, "windowBadge").text(), "GEMINI 4 ARGON\nWEEKLY")
 
     def test_instant_tooltip_moves_above_widgets_near_screen_bottom(self):
         screen = QApplication.primaryScreen()
@@ -909,11 +1000,11 @@ class WidgetTests(unittest.TestCase):
         tooltip_palette = QToolTip.palette()
         self.assertEqual(
             tooltip_palette.color(QPalette.ColorRole.ToolTipBase).name(),
-            "#171a21",
+            "#ffffff",
         )
         self.assertEqual(
             tooltip_palette.color(QPalette.ColorRole.ToolTipText).name(),
-            "#f8fafc",
+            "#1e293b",
         )
 
     def test_compact_bar_uses_one_percent_suffix_for_two_windows(self):

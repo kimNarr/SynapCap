@@ -168,8 +168,8 @@ LIGHT: dict[str, str] = {
     "badge_error_bg": "#F4DDE5",
     "badge_ok_bg": "#DDECDD",
     "spinner_track": "#C8CEDA",
-    "tooltip_bg": "#171A21",
-    "tooltip_fg": "#F8FAFC",
+    "tooltip_bg": "#FFFFFF",
+    "tooltip_fg": "#1E293B",
     # ── provider brand chips ─────────────────────────────────────────
     "provider_codex_fg": "#4C4F69",
     "provider_codex_bg": "#E4E8F5",

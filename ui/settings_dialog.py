@@ -547,7 +547,10 @@ class SettingsDialog(QDialog):
                 app.setStyle(fusion_style)
         self.setWindowTitle(f"SynapCap {APP_VERSION} Settings")
         self.setWindowIcon(create_app_icon(32))
-        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        flags = Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint
+        if self.config_data.get("settings", {}).get("always_on_top", True):
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMinimumSize(560, 600)
         self.setStyleSheet(_DIALOG_QSS % palette())
