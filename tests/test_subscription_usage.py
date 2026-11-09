@@ -37,6 +37,7 @@ class SubscriptionUsageTests(unittest.TestCase):
             helper_name = "SynapCapCopilotProbe.exe" if os.name == "nt" else "SynapCapCopilotProbe"
             helper = Path(temp_dir) / helper_name
             helper.write_bytes(b"probe")
+            helper = helper.resolve()
             app = Path(temp_dir) / "SynapCap.exe"
             with (
                 patch("subscription_usage.sys.frozen", True, create=True),

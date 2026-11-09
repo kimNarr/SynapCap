@@ -26,7 +26,9 @@ class CrashReportingTests(unittest.TestCase):
             self.assertEqual(path, log_dir / "crash.log")
             report = path.read_text(encoding="utf-8")
             self.assertIn("RuntimeError", report)
-            self.assertIn("<LOCALAPPDATA>", report)
+            expected_alias = "<LOCALAPPDATA>" if os.environ.get("LOCALAPPDATA") else "<HOME>"
+            self.assertIn(expected_alias, report)
+            self.assertNotIn(str(private_path), report)
             self.assertIn("<REDACTED>", report)
             self.assertNotIn("github_pat_", report)
 

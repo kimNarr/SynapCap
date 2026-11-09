@@ -16,8 +16,9 @@ class StartupTests(unittest.TestCase):
         self.assertFalse(is_startup_enabled())
         self.assertFalse(set_startup_enabled(True))
 
+    @patch("startup._launch_command", return_value='"C:\\app.exe"')
     @patch("os.name", "nt")
-    def test_windows_registry_toggle_mock(self):
+    def test_windows_registry_toggle_mock(self, launch_command):
         import sys
         mock_winreg = MagicMock()
         with patch.dict(sys.modules, {"winreg": mock_winreg}):
@@ -34,7 +35,10 @@ class StartupTests(unittest.TestCase):
 
             # Set enabled
             self.assertTrue(set_startup_enabled(True))
-            mock_winreg.SetValueEx.assert_called_once()
+            mock_winreg.SetValueEx.assert_called_once_with(
+                mock_key, "SynapCap", 0, mock_winreg.REG_SZ, '"C:\\app.exe"',
+            )
+            launch_command.assert_called_once_with()
 
             # Set disabled
             self.assertTrue(set_startup_enabled(False))

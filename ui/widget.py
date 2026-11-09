@@ -1369,7 +1369,12 @@ class SynapCapWidget(QWidget):
                 preset,
             )
             button.setObjectName("focusProviderButton")
-            button.setMinimumWidth(104)
+            summary_font = QFont("Segoe UI")
+            summary_font.setPixelSize(button.summary_size)
+            summary_font.setWeight(QFont.Weight.DemiBold)
+            # Fallback fonts can be wider than Segoe UI on macOS/Linux.
+            summary_width = QFontMetrics(summary_font).horizontalAdvance("100 / 100%")
+            button.setMinimumWidth(max(104, 9 + 22 + 8 + summary_width + 7))
             button.setChecked(provider.provider_id == self._focused_provider_id)
             button.clicked.connect(
                 lambda _checked=False, provider_id=provider.provider_id: (

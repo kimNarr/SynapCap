@@ -29,7 +29,7 @@ class BundleVerificationTests(unittest.TestCase):
                 report = verify_bundle(bundle, "windows", "0.3.1")
 
             run.assert_called_once_with(
-                [str(helper), "--self-check"],
+                [str(helper.resolve()), "--self-check"],
                 capture_output=True,
                 check=False,
                 text=True,
