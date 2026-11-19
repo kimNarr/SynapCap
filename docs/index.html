@@ -29,6 +29,7 @@
       <a href="#download">다운로드</a>
       <a href="#features">기능</a>
       <a href="#requirements">연동 조건</a>
+      <a href="#cli-setup">CLI 설치</a>
       <a href="#troubleshooting">오류 해결</a>
       <a href="#updates">업데이트</a>
       <button id="theme-toggle" class="theme-toggle" type="button" aria-label="라이트 테마로 전환" aria-pressed="false"><span aria-hidden="true">☼</span><span class="theme-toggle-label">테마</span></button>
@@ -164,12 +165,118 @@
         <h2>웹 채팅이 아닌<br>로컬 로그인 기준</h2>
         <p>SynapCap은 각 서비스의 로컬 앱 또는 CLI가 제공하는 구독 한도를 읽습니다. 웹 채팅만 사용하는 계정의 사용량은 조회하지 않으며 별도의 유료 API를 호출하지 않습니다.</p>
         <p class="usage-sync-note">Claude 사용량은 Claude Code CLI 기준입니다. 실행 중인 Claude 화면이 먼저 갱신되면 SynapCap 값에는 수분 뒤 반영될 수 있으며, 앱의 프로바이더·사용량 툴팁에서 출처와 마지막 조회 시각을 확인할 수 있습니다.</p>
+        <a class="setup-jump" href="#cli-setup">Windows·macOS CLI 설치 순서 보기 <span aria-hidden="true">↓</span></a>
       </div>
       <div class="requirement-list">
         <div><span class="service-letter"><img src="assets/provider-codex.svg" alt=""></span><p><strong>Codex</strong><small>Codex CLI · Windows는 Codex 앱도 지원</small></p><b>설치·로그인 필요</b></div>
         <div><span class="service-letter gemini-letter"><img src="assets/provider-gemini.svg" alt=""></span><p><strong>Gemini</strong><small>Antigravity CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
         <div><span class="service-letter claude-letter"><img src="assets/provider-claude.svg" alt=""></span><p><strong>Claude</strong><small>Claude Code CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
       </div>
+    </section>
+
+    <section id="cli-setup" class="cli-setup section-shell" aria-labelledby="cli-setup-title">
+      <div class="section-heading centered">
+        <p class="section-kicker">CLI setup · Windows &amp; macOS</p>
+        <h2 id="cli-setup-title">처음이어도, 설치부터 로그인까지</h2>
+        <p>기본 연동 3종 중 사용하는 서비스만 준비하세요. 아래는 별도 패키지 관리자 없이 공식 설치 스크립트를 사용하는 방법입니다.</p>
+      </div>
+      <div class="setup-overview" aria-label="연동 준비 순서">
+        <p><b>01</b> 내 운영체제에서 CLI 설치</p>
+        <p><b>02</b> 새 터미널에서 버전 확인</p>
+        <p><b>03</b> 구독 계정으로 로그인</p>
+        <p><b>04</b> SynapCap 완전 종료·재실행</p>
+      </div>
+      <p class="setup-safety">명령어는 해당 서비스의 공식 설치 프로그램을 내려받아 실행합니다. 먼저 각 카드의 <b>공식 설치 안내</b>와 주소를 확인하고, 회사 PC에서는 관리자 정책을 따르세요. 설치만으로 모든 계정에 구독 한도가 생기지는 않습니다.</p>
+
+      <details class="cli-platform" id="cli-windows" open>
+        <summary><span><strong>Windows 10 / 11</strong><small>Windows PowerShell에서 진행</small></span><span class="setup-toggle" aria-hidden="true">+</span></summary>
+        <div class="cli-platform-body">
+          <p class="shell-intro"><b>터미널 열기:</b> 시작 메뉴에서 <b>PowerShell</b>을 검색해 실행하세요. 아래 Windows 명령은 <b>명령 프롬프트(CMD)·Git Bash·WSL이 아닌 PowerShell</b>에 한 줄씩 붙여 넣고 Enter를 누릅니다.</p>
+          <div class="cli-guide-grid">
+            <article class="cli-guide" data-service="codex">
+              <h3>Codex <small>ChatGPT 구독 계정</small></h3>
+              <ol>
+                <li><strong>CLI 설치</strong><pre><code translate="no">irm https://chatgpt.com/codex/install.ps1 | iex</code></pre></li>
+                <li><strong>PowerShell을 닫고 새로 열어 확인</strong><pre><code translate="no">codex --version</code></pre><p>버전 번호가 나오면 설치가 확인된 것입니다.</p></li>
+                <li><strong>ChatGPT 계정으로 로그인</strong><pre><code translate="no">codex login</code></pre><p>브라우저에서 사용량을 확인할 ChatGPT 계정으로 로그인하세요. 구독 조회용이므로 API 키 로그인과 혼동하지 마세요.</p></li>
+              </ol>
+              <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex 공식 설치 안내 ↗</a>
+            </article>
+            <article class="cli-guide" data-service="antigravity">
+              <h3>Gemini <small>Antigravity CLI · agy</small></h3>
+              <ol>
+                <li><strong>Antigravity CLI 설치</strong><pre><code translate="no">irm https://antigravity.google/cli/install.ps1 | iex</code></pre></li>
+                <li><strong>새 PowerShell에서 확인</strong><pre><code translate="no">agy --version</code></pre><p>이름은 <code>gemini</code>가 아니라 <code>agy</code>입니다.</p></li>
+                <li><strong>처음 실행하고 Google 계정 로그인</strong><pre><code translate="no">agy</code></pre><p>초기 안내를 마치고 사용하는 Google 계정으로 로그인하세요. 터미널이 인증 코드를 요청하는 경우에만 브라우저의 코드를 붙여 넣고 Enter를 누릅니다.</p></li>
+              </ol>
+              <a href="https://antigravity.google/docs/getting-started" target="_blank" rel="noreferrer">Antigravity 공식 설치 안내 ↗</a>
+            </article>
+            <article class="cli-guide" data-service="claude">
+              <h3>Claude <small>Claude Code 구독 계정</small></h3>
+              <ol>
+                <li><strong>Claude Code 설치</strong><pre><code translate="no">irm https://claude.ai/install.ps1 | iex</code></pre></li>
+                <li><strong>새 PowerShell에서 확인</strong><pre><code translate="no">claude --version</code></pre><p>설치 중 진행 표시가 없을 수 있으니 완료 안내를 기다리세요.</p></li>
+                <li><strong>처음 실행하고 Claude 계정 로그인</strong><pre><code translate="no">claude</code></pre><p>브라우저에서 Claude Code를 사용할 수 있는 Claude 구독 계정으로 로그인하세요. 웹 채팅 로그인만으로 CLI 인증이 끝나지는 않습니다.</p></li>
+              </ol>
+              <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer">Claude Code 공식 설치 안내 ↗</a>
+            </article>
+          </div>
+          <p class="setup-platform-note"><b>Windows에서 주의:</b> WSL에만 설치한 CLI·로그인 정보는 Windows용 SynapCap이 자동으로 찾지 못할 수 있습니다. 이 안내는 Windows 네이티브 설치 기준입니다.</p>
+        </div>
+      </details>
+
+      <details class="cli-platform" id="cli-macos">
+        <summary><span><strong>macOS</strong><small>Apple Silicon·Intel 공통 · 터미널에서 진행</small></span><span class="setup-toggle" aria-hidden="true">+</span></summary>
+        <div class="cli-platform-body">
+          <p class="shell-intro"><b>터미널 열기:</b> <kbd>⌘</kbd> + <kbd>Space</kbd>로 Spotlight를 열고 <b>터미널</b>을 검색하세요. 사용하는 서비스의 명령만 한 줄씩 실행합니다. 비밀번호 입력 중에는 글자가 표시되지 않을 수 있습니다.</p>
+          <div class="cli-guide-grid">
+            <article class="cli-guide" data-service="codex">
+              <h3>Codex <small>ChatGPT 구독 계정</small></h3>
+              <ol>
+                <li><strong>CLI 설치</strong><pre><code translate="no">curl -fsSL https://chatgpt.com/codex/install.sh | sh</code></pre></li>
+                <li><strong>새 터미널에서 확인</strong><pre><code translate="no">codex --version</code></pre><p>버전 번호가 나오면 설치가 확인된 것입니다.</p></li>
+                <li><strong>ChatGPT 계정으로 로그인</strong><pre><code translate="no">codex login</code></pre><p>브라우저에서 구독 계정으로 로그인합니다. 로그인 상태는 <code>codex login status</code>로 확인할 수 있습니다.</p></li>
+              </ol>
+              <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex 공식 설치 안내 ↗</a>
+            </article>
+            <article class="cli-guide" data-service="antigravity">
+              <h3>Gemini <small>Antigravity CLI · agy</small></h3>
+              <ol>
+                <li><strong>Antigravity CLI 설치</strong><pre><code translate="no">curl -fsSL https://antigravity.google/cli/install.sh | bash</code></pre></li>
+                <li><strong>새 터미널에서 확인</strong><pre><code translate="no">agy --version</code></pre><p>기존 Gemini 웹 로그인과 CLI 로그인은 구분해 확인하세요.</p></li>
+                <li><strong>처음 실행하고 Google 계정 로그인</strong><pre><code translate="no">agy</code></pre><p>초기 안내와 브라우저 로그인을 마칩니다. 인증 코드 입력을 요청받으면 실행 중인 <code>agy</code> 터미널로 돌아와 입력하세요.</p></li>
+              </ol>
+              <a href="https://antigravity.google/docs/getting-started" target="_blank" rel="noreferrer">Antigravity 공식 설치 안내 ↗</a>
+            </article>
+            <article class="cli-guide" data-service="claude">
+              <h3>Claude <small>Claude Code 구독 계정</small></h3>
+              <ol>
+                <li><strong>Claude Code 설치</strong><pre><code translate="no">curl -fsSL https://claude.ai/install.sh | bash</code></pre></li>
+                <li><strong>새 터미널에서 확인</strong><pre><code translate="no">claude --version</code></pre><p>작동 여부를 더 확인하려면 <code>claude doctor</code>로 설치 진단을 볼 수 있습니다.</p></li>
+                <li><strong>처음 실행하고 Claude 계정 로그인</strong><pre><code translate="no">claude</code></pre><p>Claude 구독 계정을 선택하고 브라우저에서 승인하세요. API·Console 인증은 구독 사용량과 같은 기준이 아닙니다.</p></li>
+              </ol>
+              <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer">Claude Code 공식 설치 안내 ↗</a>
+            </article>
+          </div>
+          <p class="setup-platform-note"><b>macOS에서 주의:</b> 앱에 임의의 전체 디스크 접근 권한을 부여하거나 보안 기능을 끌 필요는 없습니다. 명령을 찾지 못하면 아래 경로 확인부터 진행하세요.</p>
+        </div>
+      </details>
+
+      <div class="setup-finish">
+        <h3>로그인까지 마쳤다면, SynapCap에 반영하기</h3>
+        <ol>
+          <li>트레이·메뉴바의 SynapCap 메뉴에서 <b>종료</b>한 뒤 다시 실행합니다. 창을 트레이로 접는 것만으로는 완전 종료되지 않습니다.</li>
+          <li><b>설정 → AI Providers</b>에서 사용하는 서비스가 활성화돼 있는지 확인합니다.</li>
+          <li><b>새로고침</b>을 누르고 조회가 끝날 때까지 기다립니다. 값이 없으면 표시된 상태를 눌러 진단 정보를 확인합니다.</li>
+        </ol>
+        <p>로그인·버전 확인만으로 연동을 준비할 수 있습니다. 확인을 위해 AI에게 유료 작업을 요청하거나 토큰·인증 파일을 SynapCap에 붙여 넣을 필요는 없습니다.</p>
+      </div>
+      <div class="setup-help" aria-label="설치 중 자주 막히는 부분">
+        <details><summary>설치했는데 ‘명령을 찾을 수 없음’이 나와요</summary><p>먼저 터미널을 완전히 닫고 새로 여세요. Windows PowerShell에서는 <code>Get-Command codex</code>, <code>Get-Command agy</code>, <code>Get-Command claude</code>로 설치 경로를 확인합니다. macOS에서는 <code>command -v codex</code>, <code>command -v agy</code>, <code>command -v claude</code>를 사용하세요. 경로가 나오지 않으면 해당 서비스 공식 문서의 PATH 안내를 따릅니다.</p></details>
+        <details><summary>브라우저에서는 로그인했는데 위젯은 ‘로그인 필요’예요</summary><p>같은 PC·운영체제의 CLI에서 로그인했는지 확인하세요. 웹사이트나 WSL에만 로그인한 상태는 다를 수 있습니다. 해당 CLI를 직접 실행해 인증을 마친 뒤 SynapCap을 재시작합니다. Antigravity 인증 코드가 표시돼도 터미널이 요청하지 않으면 임의로 붙여 넣지 마세요.</p></details>
+        <details><summary>설치 스크립트 실행이 차단되거나 계속 조회 오류가 나요</summary><p>PowerShell·CMD·macOS 명령을 섞어 쓰지 않았는지 확인하세요. 조직의 보안 정책을 임의로 해제하지 말고 공식 설치 안내나 관리자에게 문의하세요. CLI 버전과 로그인이 확인됐다면 위젯의 오류 상태에서 진단 보고서를 확인합니다. 토큰·계정 인증 파일은 공유하지 마세요.</p></details>
+      </div>
+      <p class="setup-reviewed">공식 문서 확인: 2026-11-09 · 명령과 로그인 화면은 서비스 업데이트에 따라 바뀔 수 있습니다. 각 카드의 공식 안내를 우선 확인하세요.</p>
     </section>
 
     <section id="troubleshooting" class="troubleshooting section-shell">
@@ -180,7 +287,7 @@
       </div>
       <div class="error-grid">
         <article><span class="error-badge dormant">미설치</span><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다. 사용하지 않는 서비스는 설정에서 숨길 수 있습니다.</p></article>
-        <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행합니다. Antigravity 인증 코드는 복사해서 <code>agy</code>가 기다리는 터미널에 붙여 넣고 Enter를 누릅니다.</p></article>
+        <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행합니다. Antigravity가 인증 코드 입력을 요청하면 브라우저의 코드를 <code>agy</code> 터미널에 붙여 넣고 Enter를 누릅니다.</p></article>
         <article><span class="error-badge warning">시간 초과</span><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
         <article><span class="error-badge muted">조회 오류</span><h3>진단 정보를 확인하세요</h3><p>상태 배지를 눌러 원인을 확인하고 토큰이 없는 진단 보고서를 복사해 Issue에 첨부할 수 있습니다.</p></article>
       </div>
@@ -192,19 +299,6 @@
         <strong>Apple Music이나 볼륨 접근을 요청하나요?</strong>
         <p>SynapCap에는 Apple Music, 다른 앱의 데이터, 네트워크·외장 볼륨 권한이 필요하지 않습니다. <b>허용하지 않음</b>을 선택하고 MCP 격리 기능이 포함된 최신 버전으로 업데이트하세요.</p>
       </aside>
-      <div class="mac-setup">
-        <div class="mac-setup-copy">
-          <p class="section-kicker">macOS quick setup</p>
-          <h3>세 카드가 모두 `미설치`라면</h3>
-          <p>macOS에서는 앱이나 웹 로그인만으로 사용량을 읽을 수 없습니다. 사용하는 서비스의 CLI만 설치하세요.</p>
-        </div>
-        <div class="command-list" aria-label="macOS CLI 설치 명령">
-          <div><span>Codex</span><code>curl -fsSL https://chatgpt.com/codex/install.sh | sh</code><a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer" aria-label="Codex CLI 공식 설치 문서">공식 안내 ↗</a></div>
-          <div><span>Gemini</span><code>curl -fsSL https://antigravity.google/cli/install.sh | bash</code><a href="https://antigravity.google/docs/cli-install" target="_blank" rel="noreferrer" aria-label="Antigravity CLI 공식 설치 문서">공식 안내 ↗</a></div>
-          <div><span>Claude</span><code>curl -fsSL https://claude.ai/install.sh | bash</code><a href="https://code.claude.com/docs/en/getting-started" target="_blank" rel="noreferrer" aria-label="Claude Code 공식 설치 문서">공식 안내 ↗</a></div>
-        </div>
-        <p class="restart-note"><strong>설치 다음:</strong> <code>codex --version</code>, <code>agy --version</code>, <code>claude --version</code>으로 확인 → 각 CLI 최초 로그인 → Antigravity는 브라우저의 인증 코드를 <code>agy</code> 터미널에 붙여 넣기 → SynapCap 완전 종료 후 다시 실행. 계속 실패하면 키체인 접근에서 <code>Antigravity CLI</code>가 <code>agy</code>를 허용하는지 확인하세요.</p>
-      </div>
     </section>
 
     <section id="updates" class="updates section-shell">
