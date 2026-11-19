@@ -1705,6 +1705,25 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(reset_label.toolTip(), "")
         self.assertGreaterEqual(reset_label.width(), reset_label.sizeHint().width())
 
+    def test_claude_idle_session_label_is_visible_without_tooltip(self):
+        provider = ClaudeProvider({"id": "claude", "name": "Claude"})
+        self.widget.rebuild_ui({"settings": {"always_on_top": False}}, [provider])
+        usage = ModelUsage(
+            "claude", "Claude", "Claude Code", 7, 100, "%",
+            windows=[
+                UsageWindow("5시간", 0, "세션 대기", 100),
+                UsageWindow("주간", 7, "11/24 18:00", 93),
+            ],
+        )
+        self.widget.update_data([usage])
+
+        row = self.widget.provider_ui_map["claude"]["window_rows"][0]
+        reset_label = row.findChild(QLabel, "resetCountdown")
+        self.assertIsNotNone(reset_label)
+        self.assertEqual(reset_label.text(), "세션 대기")
+        self.assertEqual(reset_label.toolTip(), "")
+        self.assertGreaterEqual(reset_label.width(), reset_label.sizeHint().width())
+
     def test_stale_reset_shows_short_label_without_tooltip(self):
         self.widget.provider_ui_map["codex"]["show_five_hour"] = True
         self.usage.windows = [UsageWindow("5시간", 40, "8/12 13:00", 60)]

@@ -766,6 +766,13 @@ def _format_claude_reset(value: str) -> str:
     return f"{month}/{int(match.group(2))} {hour:02d}:{minute:02d}"
 
 
+def _claude_reset_text(label: str, used: float, reset_text: str) -> str:
+    # Claude has no reset deadline while an unused five-hour session is idle.
+    if label == "5시간" and used == 0 and not reset_text:
+        return "세션 대기"
+    return reset_text
+
+
 def _read_claude_oauth_token() -> str:
     """Reuse Claude Code's login without logging or copying credentials."""
     config_dir = Path(
@@ -892,7 +899,7 @@ def _query_claude_oauth_usage(timeout_sec: float) -> SubscriptionSnapshot:
             SubscriptionWindow(
                 label,
                 used,
-                _format_iso_reset(reset) if reset else "",
+                _claude_reset_text(label, used, _format_iso_reset(reset) if reset else ""),
                 100.0 - used,
             )
         )
@@ -906,7 +913,8 @@ def _query_claude_oauth_usage(timeout_sec: float) -> SubscriptionSnapshot:
     return SubscriptionSnapshot(
         active.used_percent,
         "Claude Code",
-        f"{active.label} · {active.reset_text} 리셋",
+        f"{active.label} · {active.reset_text}"
+        + ("" if active.reset_text == "세션 대기" else " 리셋"),
         tuple(windows),
     )
 
@@ -972,11 +980,13 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
     for label, pattern in patterns:
         match = re.search(pattern, output, re.IGNORECASE | re.MULTILINE)
         if match:
+            used = _clamp_percent(float(match.group(1)))
+            reset = _format_claude_reset(match.group(2)) if match.group(2) else ""
             windows.append(
                 {
                     "label": label,
-                    "used": _clamp_percent(float(match.group(1))),
-                    "reset": (_format_claude_reset(match.group(2)) if match.group(2) else ""),
+                    "used": used,
+                    "reset": _claude_reset_text(label, used, reset),
                 }
             )
 
@@ -1000,7 +1010,8 @@ def query_claude_subscription(config: dict[str, Any]) -> SubscriptionSnapshot:
     return SubscriptionSnapshot(
         used_percent=active["used"],
         model_name="Claude Code",
-        status_text=f"{active['label']} · {active['reset']} 리셋",
+        status_text=f"{active['label']} · {active['reset']}"
+        + ("" if active["reset"] == "세션 대기" else " 리셋"),
         windows=tuple(
             SubscriptionWindow(
                 label=item["label"],

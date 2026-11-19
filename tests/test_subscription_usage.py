@@ -88,7 +88,35 @@ class SubscriptionUsageTests(unittest.TestCase):
         self.assertEqual(result.used_percent, 55)
         self.assertEqual([w.label for w in result.windows], ["5시간", "주간"])
         self.assertEqual(result.windows[0].used_percent, 0)
-        self.assertEqual(result.windows[0].reset_text, "")
+        self.assertEqual(result.windows[0].reset_text, "세션 대기")
+
+    @patch("subscription_usage.urllib.request.build_opener")
+    @patch("subscription_usage._read_claude_oauth_token", return_value="test-token")
+    def test_claude_api_only_marks_idle_sessions_as_waiting(self, token, opener):
+        for used, reset, expected in (
+            (0, None, "세션 대기"),
+            (0, "", "세션 대기"),
+            (0.1, None, ""),
+            (10, None, ""),
+            (0, "2026-11-20T00:00:00Z", None),
+            (0, "not-a-date", "리셋 시각 미상"),
+        ):
+            with self.subTest(used=used, reset=reset):
+                payload = {
+                    "five_hour": {"utilization": used, "resets_at": reset},
+                    "seven_day": {"utilization": 0, "resets_at": None},
+                }
+                opener.return_value.open.return_value = io.StringIO(json.dumps(payload))
+                result = _query_claude_oauth_usage(5)
+                session, weekly = result.windows
+                if expected is None:
+                    self.assertNotIn(session.reset_text, ("", "세션 대기"))
+                    self.assertRegex(session.reset_text, r"^\d{1,2}/\d{1,2} \d{2}:\d{2}$")
+                else:
+                    self.assertEqual(session.reset_text, expected)
+                self.assertEqual(weekly.reset_text, "")
+                if expected == "세션 대기":
+                    self.assertEqual(result.status_text, "5시간 · 세션 대기")
 
     @patch("subscription_usage.urllib.request.build_opener")
     @patch("subscription_usage._read_claude_oauth_token", return_value="test-token")
@@ -359,7 +387,23 @@ Current week (all models): 55% used · resets Aug 12, 4am (Asia/Seoul)
 
         self.assertEqual([window.label for window in result.windows], ["5시간", "주간"])
         self.assertEqual([window.used_percent for window in result.windows], [0.0, 55.0])
-        self.assertEqual(result.windows[0].reset_text, "")
+        self.assertEqual(result.windows[0].reset_text, "세션 대기")
+
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="claude.exe")
+    def test_claude_cli_only_marks_idle_sessions_as_waiting(self, command_path, run_command):
+        for output, expected in (
+            ("Current session: 0% used", "세션 대기"),
+            ("Current session: 0.1% used", ""),
+            ("Current session: 10% used", ""),
+            ("Current session: 0% used · resets Nov 20, 4am", "11/20 04:00"),
+        ):
+            with self.subTest(output=output):
+                run_command.return_value = output
+                result = query_claude_subscription({})
+                self.assertEqual(result.windows[0].reset_text, expected)
+                if expected == "세션 대기":
+                    self.assertEqual(result.status_text, "5시간 · 세션 대기")
 
     @patch("subscription_usage.urllib.request.build_opener")
     def test_grok_no_quota_headers_returns_no_quota(self, build_opener):
