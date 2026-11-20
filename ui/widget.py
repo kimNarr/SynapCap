@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from macos_display import notch_rect
 from providers import BaseAIProvider, ModelUsage, UsageWindow
 from subscription_usage import STATUS_BADGE_LABELS, StatusKind
 from theme import palette, t
@@ -25,8 +26,9 @@ from version import APP_VERSION
 
 from .icon import (
     create_app_pixmap,
+    create_arrow_down_icon,
+    create_arrow_up_icon,
     create_close_icon,
-    create_expand_square_icon,
     create_minimize_icon,
     create_provider_pixmap,
     create_refresh_icon,
@@ -93,6 +95,8 @@ _ROOT_FRAME_QSS = """
     QFrame#rootFrame[compactMode="true"] {
         background-color: %(ground_deep)s;
         border-color: %(frame_border_deep)s;
+        border-width: 1px;
+        border-radius: 10px;
     }
     QWidget#compactBar {
         background-color: %(ground_deep)s;
@@ -132,6 +136,7 @@ _COMPACT_BTN_QSS = """
         border-radius: 5px;
     }
     QPushButton:hover { background-color: %(hover)s; }
+    QPushButton:focus { border: 1px solid %(accent)s; }
 """
 
 # Long reset-status strings do not fit the fixed-width reset column; the full
@@ -475,6 +480,13 @@ class SynapCapWidget(QWidget):
         self._fit_timer.timeout.connect(self._fit_to_content)
 
         self.init_ui()
+        app = QApplication.instance()
+        if app is not None:
+            app.screenAdded.connect(self._screen_configuration_changed)
+            app.screenRemoved.connect(self._screen_configuration_changed)
+            for screen in app.screens():
+                screen.availableGeometryChanged.connect(self._screen_configuration_changed)
+                screen.geometryChanged.connect(self._screen_configuration_changed)
 
     def init_ui(self):
         # Frameless Window & Translucent Background
@@ -660,7 +672,7 @@ class SynapCapWidget(QWidget):
 
         self.expand_btn = QPushButton()
         self.expand_btn.setFixedSize(24, 24)
-        self.expand_btn.setIcon(create_expand_square_icon(14, t("accent")))
+        self.expand_btn.setIcon(create_arrow_up_icon(14, t("accent")))
         self.expand_btn.setStyleSheet(compact_btn_style)
         self.expand_btn.clicked.connect(lambda: self._request_window_mode("expanded"))
         self._enable_instant_tooltip(self.expand_btn, "전체 위젯 펼치기")
@@ -673,6 +685,10 @@ class SynapCapWidget(QWidget):
         self.compact_close_btn.clicked.connect(self.quit_requested.emit)
         self._enable_instant_tooltip(self.compact_close_btn, "SynapCap 완전 종료")
         self.compact_layout.addWidget(self.compact_close_btn)
+        # App actions remain in the tray menu; the strip only needs an expand control.
+        self.compact_logo.hide()
+        self.compact_tray_btn.hide()
+        self.compact_close_btn.hide()
         self._apply_compact_metrics()
         self.compact_bar.hide()
         self.frame_layout.addWidget(self.compact_bar)
@@ -812,7 +828,7 @@ class SynapCapWidget(QWidget):
             "icon_size": max(19, font_size + 8),
             "logo_size": max(22, font_size + 12),
             "button_size": max(20, font_size + 9),
-            "glyph_size": max(11, font_size),
+            "glyph_size": max(14, font_size),
             "item_spacing": max(6, round(font_size * 0.55)),
             "logo_spacing": max(9, round(font_size * 0.75)),
             "provider_spacing": max(10, round(font_size * 0.75)),
@@ -874,7 +890,7 @@ class SynapCapWidget(QWidget):
         self.expand_btn.setFixedSize(button_size, button_size)
         self.compact_tray_btn.setFixedSize(button_size, button_size)
         self.compact_close_btn.setFixedSize(button_size, button_size)
-        self.expand_btn.setIcon(create_expand_square_icon(glyph_size, t("accent")))
+        self.expand_btn.setIcon(create_arrow_up_icon(glyph_size, t("accent")))
         self.compact_tray_btn.setIcon(create_to_tray_icon(glyph_size, t("ink_mid")))
         self.compact_close_btn.setIcon(create_close_icon(glyph_size, t("danger_soft")))
 
@@ -924,6 +940,8 @@ class SynapCapWidget(QWidget):
         if self._pending_resize_anchor is not None:
             self._move_to_resize_anchor(self._pending_resize_anchor)
             self._pending_resize_anchor = None
+        if self.is_compact and sys.platform == "darwin":
+            self._position_compact_for_platform()
 
     def _available_geometry(self, point: QPoint | None = None):
         screen = QApplication.screenAt(point) if point is not None else self.screen()
@@ -965,9 +983,10 @@ class SynapCapWidget(QWidget):
         self._snap_to_screen_edges()
 
     def _update_expand_direction(self, resize_anchor: ResizeAnchor) -> None:
-        # The glyph is a stable square; the pop-up direction lives in the tooltip.
         _point, _anchor_left, anchor_top = resize_anchor
         tooltip = "아래로 전체 위젯 펼치기" if anchor_top else "위로 전체 위젯 펼치기"
+        icon = create_arrow_down_icon if anchor_top else create_arrow_up_icon
+        self.expand_btn.setIcon(icon(self._compact_metrics()["glyph_size"], t("accent")))
         self._enable_instant_tooltip(self.expand_btn, tooltip)
 
     def _snap_to_screen_edges(self) -> None:
@@ -1013,8 +1032,16 @@ class SynapCapWidget(QWidget):
 
         for provider in self.providers:
             provider_type = provider.config.get("type", provider.provider_id)
-            item_widget = QWidget()
+            if provider_type == "grok" or provider.config.get("source") == "api_rate_limit":
+                continue
+            item_widget = QPushButton()
             item_widget.setObjectName("compactProviderGroup")
+            item_widget.setFlat(True)
+            item_widget.setStyleSheet(_COMPACT_BTN_QSS % palette())
+            item_widget.setAccessibleName(f"{provider.name} 사용량 펼치기")
+            item_widget.clicked.connect(
+                lambda _checked=False, provider_id=provider.provider_id: self._open_compact_provider(provider_id)
+            )
             item_layout = QHBoxLayout(item_widget)
             horizontal_pad = max(4, round(metrics["font_size"] * 0.34))
             vertical_pad = max(3, round(metrics["font_size"] * 0.22))
@@ -1030,7 +1057,7 @@ class SynapCapWidget(QWidget):
             icon_label = QLabel()
             icon_size = metrics["icon_size"]
             icon_label.setFixedSize(icon_size, icon_size)
-            icon_label.setPixmap(create_provider_pixmap(provider_type, icon_size))
+            icon_label.setPixmap(create_provider_pixmap(provider_type, icon_size, bare=True))
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             item_layout.addWidget(icon_label)
 
@@ -1057,7 +1084,19 @@ class SynapCapWidget(QWidget):
                 "item": item_widget,
                 "provider_type": provider_type,
             }
+        if not self.compact_ui_map:
+            empty = QLabel("—")
+            empty.setObjectName("compactEmpty")
+            empty.setAccessibleName("표시할 구독 서비스 없음")
+            self._set_label_font(empty, metrics["font_size"])
+            empty.setStyleSheet(f"color: {t('ink_dim')};")
+            self._enable_instant_tooltip(empty, "표시할 구독 서비스가 없습니다. 펼침에서 설정을 확인하세요.")
+            self.compact_items_layout.addWidget(empty)
         self.compact_items_container.adjustSize()
+
+    def _open_compact_provider(self, provider_id: str) -> None:
+        self._select_focus_provider(provider_id)
+        self._request_window_mode("expanded")
 
     def enter_compact_mode(self) -> None:
         if self.is_compact:
@@ -1068,6 +1107,41 @@ class SynapCapWidget(QWidget):
         self._window_mode = "bar"
         self._apply_layout_visibility()
         self._refresh_compact_values(resize_anchor)
+
+    def _position_compact_for_platform(self) -> None:
+        if not self.is_compact or self._window_mode != "bar":
+            return
+        if sys.platform == "darwin":
+            notch = notch_rect()
+            if notch is None:
+                self.hide()
+                return
+            available = self._available_geometry(notch.center())
+            x = notch.center().x() - self.width() // 2
+            y = max(notch.bottom() + 1, available.top()) + 4
+            self.move(
+                max(available.left(), min(x, available.right() - self.width() + 1)),
+                min(y, available.bottom() - self.height() + 1),
+            )
+            self._enable_instant_tooltip(self.expand_btn, "아래로 전체 위젯 펼치기")
+            self.expand_btn.setIcon(create_arrow_down_icon(self._compact_metrics()["glyph_size"], t("accent")))
+            self.show()
+        else:
+            available = self._available_geometry()
+            self.move(available.right() - self.width() - 11,
+                      available.bottom() - self.height() - COMPACT_BOTTOM_SAFE_GAP + 1)
+            self._update_expand_direction(self._capture_resize_anchor())
+
+    def _screen_configuration_changed(self, *_args) -> None:
+        if _args and hasattr(_args[0], "availableGeometryChanged"):
+            _args[0].availableGeometryChanged.connect(self._screen_configuration_changed)
+            _args[0].geometryChanged.connect(self._screen_configuration_changed)
+        if self.is_compact and self._window_mode == "bar":
+            if sys.platform == "darwin":
+                self._position_compact_for_platform()
+            else:
+                self._apply_compact_width()
+                self._snap_to_screen_edges()
 
     def _request_window_mode(self, mode: str) -> None:
         self.window_mode_requested.emit(mode, False)
@@ -1089,17 +1163,25 @@ class SynapCapWidget(QWidget):
             self._window_mode = "expanded"
         self.show()
         self._snap_to_screen_edges()
+        if self.is_compact and sys.platform == "darwin":
+            self._position_compact_for_platform()
 
     def window_mode(self) -> str:
         return self._window_mode
 
     def restore_position(self, x: int, y: int) -> None:
         """Restore a saved position and constrain it to the usable desktop."""
+        if self.is_compact and sys.platform == "darwin":
+            self._position_compact_for_platform()
+            return
         self.move(x, y)
         self._snap_to_screen_edges()
 
     def center_on_screen(self) -> None:
         """Middle of the active screen — used on first run and after an update."""
+        if self.is_compact:
+            self._position_compact_for_platform()
+            return
         available = self._available_geometry()
         frame = self.frameGeometry()
         self.move(
@@ -1167,6 +1249,12 @@ class SynapCapWidget(QWidget):
         self.update()
 
     def _apply_compact_width(self) -> None:
+        for ui in self.compact_ui_map.values():
+            layout = ui["item"].layout()
+            layout.invalidate()
+            layout.activate()
+            # QPushButton's text-only sizeHint does not include our icon/value layout.
+            ui["item"].setFixedSize(layout.sizeHint())
         self.compact_items_container.adjustSize()
         self.compact_items_layout.invalidate()
         self.compact_items_layout.activate()
@@ -1177,17 +1265,18 @@ class SynapCapWidget(QWidget):
         self.compact_items_scroll.setFixedHeight(item_size.height())
         bar_margins = self.compact_layout.contentsMargins()
         outer_margins = self.frame_layout.contentsMargins()
-        controls = (
-            self.compact_logo.width()
-            + self.compact_tray_btn.width()
-            + self.expand_btn.width()
-            + self.compact_close_btn.width()
-        )
+        visible_controls = [control for control in (
+            self.compact_logo, self.compact_tray_btn, self.expand_btn, self.compact_close_btn
+        ) if not control.isHidden()]
+        controls = sum(control.width() for control in visible_controls)
         chrome_width = (
-            bar_margins.left() + bar_margins.right() + controls + self.compact_layout.spacing() * 4
+            bar_margins.left() + bar_margins.right() + controls
+            + self.compact_layout.spacing() * len(visible_controls)
         )
         outer_width = outer_margins.left() + outer_margins.right() + 10
-        available_width = self._available_geometry(self.frameGeometry().center()).width()
+        notch = notch_rect() if sys.platform == "darwin" else None
+        point = notch.center() if notch is not None else self.frameGeometry().center()
+        available_width = self._available_geometry(point).width()
         viewport_width = max(
             1,
             min(item_size.width(), available_width - chrome_width - outer_width),
@@ -1212,12 +1301,15 @@ class SynapCapWidget(QWidget):
         stable_text = re.sub(r"\d+", lambda m: "8" * max(2, len(m.group())), plain_text)
         safety_padding = max(6, round(font_size * 0.5))
         # QLabel's rich-text sizeHint can be almost twice the glyph width on
-        # Windows. A fixed, metrics-based width keeps three cards compact while
-        # the doubled padding still covers bold/critical values such as 100%.
+        # Windows. Measure the real fallback font, including 100% and the stale marker.
+        font_metrics = QFontMetrics(value_label.font())
+        bold_font = QFont(value_label.font())
+        bold_font.setWeight(QFont.Weight.Bold)
         reserved_width = max(
             font_size * 3,
-            round(len(stable_text) * font_size * 0.62) + safety_padding * 2,
-        )
+            font_metrics.horizontalAdvance(stable_text),
+            QFontMetrics(bold_font).horizontalAdvance("100%*"),
+        ) + safety_padding
         value_label.setFixedWidth(reserved_width)
         parent = value_label.parentWidget()
         if parent is not None:
@@ -1242,13 +1334,12 @@ class SynapCapWidget(QWidget):
             spinner.stop()
             value_label.show()
             if usage.is_stale:
-                provider_ui = self.provider_ui_map.get(provider_id, {})
-                windows = self._visible_usage_windows(provider_ui, usage.windows or [])
+                windows = usage.windows or []
                 used = max(
                     (window.used for window in windows if not window.unlimited),
                     default=usage.used or 0.0,
                 )
-                plain_value = self._compact_windows_text(windows, used)
+                plain_value = self._compact_peak_text(windows, usage.used) + "*"
                 value_label.setProperty("compactPlainText", plain_value)
                 value_label.setText(plain_value)
                 self._apply_compact_value_style(
@@ -1289,13 +1380,12 @@ class SynapCapWidget(QWidget):
                 compact_ui["item"].setToolTip(f"{usage.provider_name}: 한도 없음")
                 continue
 
-            provider_ui = self.provider_ui_map.get(provider_id, {})
-            windows = self._visible_usage_windows(provider_ui, usage.windows or [])
+            windows = usage.windows or []
             used = max(
                 (window.used for window in windows if not window.unlimited),
                 default=usage.used or 0.0,
             )
-            plain_value = self._compact_windows_text(windows, used)
+            plain_value = self._compact_peak_text(windows, usage.used)
             value_label.setProperty("compactPlainText", plain_value)
             value_label.setText(plain_value)
             self._apply_compact_value_style(
@@ -1310,6 +1400,7 @@ class SynapCapWidget(QWidget):
                     f"{window.display_label} 무제한"
                     if window.unlimited
                     else f"{window.display_label} {window.used:.0f}% 사용"
+                    + (f" · {self._condensed_reset(self._reset_presentation(window.reset_text)[0])}" if window.reset_text else "")
                 )
                 for window in windows
             ] or [f"{used:.0f}% 사용"]
@@ -1956,6 +2047,15 @@ class SynapCapWidget(QWidget):
         if used < USAGE_WARN:
             return t("compact_value")
         return cls._usage_color(used)
+
+    @staticmethod
+    def _compact_peak_text(windows: list[UsageWindow], fallback: float | None) -> str:
+        finite = [window.used for window in windows if not window.unlimited]
+        if finite:
+            return f"{max(finite):.0f}%"
+        if windows:
+            return "무제한"
+        return "—" if fallback is None else f"{fallback:.0f}%"
 
     @staticmethod
     def _compact_windows_text(windows: list[UsageWindow], fallback: float) -> str:

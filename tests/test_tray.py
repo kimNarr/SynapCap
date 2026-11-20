@@ -10,9 +10,10 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 from feedback import FEEDBACK_CHOOSER_URL
 from providers import ModelUsage, UsageWindow
 from subscription_usage import StatusKind
-from ui.tray import SynapCapTray, create_usage_tray_icon
+from ui.tray import SynapCapTray, create_macos_status_icon, create_usage_tray_icon
 
 
+@patch("ui.tray.sys.platform", "win32")
 class TrayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -233,6 +234,42 @@ class TrayTests(unittest.TestCase):
     def test_three_digit_usage_tray_icon_is_rendered(self):
         self.assertFalse(create_usage_tray_icon(100).isNull())
 
+    def test_macos_menu_icon_has_room_for_icon_percent_and_stale_marker(self):
+        for text in ("0%", "100%", "55%*", "—"):
+            with self.subTest(text=text):
+                icon = create_macos_status_icon("claude", text)
+                self.assertFalse(icon.isNull())
+                self.assertTrue(icon.isMask())
+                self.assertTrue(all(size.width() > size.height() for size in icon.availableSizes()))
+
+    def test_api_values_never_become_subscription_headlines(self):
+        tray = SynapCapTray()
+        try:
+            api = ModelUsage("team-api", "API", "API", 100, 100, "%", source="api_rate_limit")
+            subscription = ModelUsage("codex", "Codex", "Codex", 55, 100, "%")
+            tray.update_usage([api, subscription])
+            self.assertEqual(tray._tray_metric_value(), 55)
+            self.assertNotIn("API", tray.tray_icon.toolTip())
+        finally:
+            tray.tray_icon.hide()
+            tray.tray_icon.deleteLater()
+
+    @patch("ui.tray.create_macos_status_icon", return_value=QIcon())
+    def test_macos_menu_uses_selected_provider_and_marks_stale_values(self, status_icon):
+        with patch("ui.tray.sys.platform", "darwin"):
+            tray = SynapCapTray(tray_metric="claude")
+            try:
+                usage = ModelUsage("claude", "Claude", "Claude", 55, 100, "%", is_stale=True)
+                tray.update_usage([usage])
+                status_icon.assert_called_with("claude", "55%*")
+                usage.is_stale = False
+                usage.used = 0
+                tray.update_usage([usage])
+                status_icon.assert_called_with("claude", "0%")
+            finally:
+                tray.tray_icon.hide()
+                tray.tray_icon.deleteLater()
+
     def test_tray_peak_identifies_quota_group_and_unavailable_argon(self):
         tray = SynapCapTray()
         usage = ModelUsage("gemini", "Gemini", "Gemini Models", 95, 100, "%", windows=[
@@ -280,7 +317,7 @@ class TrayTests(unittest.TestCase):
 
         create_icon.assert_not_called()
         app_icon.assert_called()
-        self.assertIn("Grok 한도 없음", tray.tray_icon.toolTip())
+        self.assertNotIn("Grok", tray.tray_icon.toolTip())
         self.assertIn("Copilot 무제한", tray.tray_icon.toolTip())
         tray.tray_icon.hide()
         tray.tray_icon.deleteLater()

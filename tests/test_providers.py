@@ -12,6 +12,7 @@ from providers import (
     PROVIDER_TYPE_OPTIONS,
     ClaudeProvider,
     CodexProvider,
+    GrokProvider,
     load_providers_from_config,
 )
 from subscription_usage import (
@@ -56,6 +57,26 @@ class ProviderSelectionTests(unittest.TestCase):
         )
         self.assertEqual(len(providers), 1)
         self.assertIsInstance(providers[0], CodexProvider)
+
+
+class SubscriptionSourceTests(unittest.TestCase):
+    def test_api_source_is_preserved_for_custom_ids_without_mutating_settings(self):
+        settings = {"id": "company-api", "name": "Company API", "source": "local_subscription"}
+        provider = GrokProvider(settings)
+        with patch.object(provider, "_fetch_snapshot", return_value=SubscriptionSnapshot(55, "xAI API", "")):
+            usage = provider.fetch_usage()
+        self.assertFalse(usage.is_subscription)
+        self.assertEqual(usage.provider_type, "grok")
+        self.assertEqual(usage.source, "api_rate_limit")
+        self.assertEqual(settings["source"], "local_subscription")
+        self.assertNotIn("type", settings)
+
+    def test_api_errors_are_not_reclassified_as_subscription_zero(self):
+        provider = GrokProvider({"id": "company-api", "name": "API"})
+        with patch.object(provider, "_fetch_snapshot", side_effect=SubscriptionUsageError("server")):
+            usage = provider.fetch_usage()
+        self.assertFalse(usage.is_subscription)
+        self.assertIsNotNone(usage.error)
 
 
 class ProviderLifecycleAndStaleTests(unittest.TestCase):

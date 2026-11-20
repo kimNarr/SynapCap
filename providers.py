@@ -47,8 +47,16 @@ class ModelUsage:
     last_success_at: datetime | None = None
     retry_after_sec: int | None = None
     action_hint: str | None = None
+    source: str = "local_subscription"
+    provider_type: str = ""
+
+    @property
+    def is_subscription(self) -> bool:
+        return self.source == "local_subscription" and self.unit == "%"
 
     def __post_init__(self):
+        if self.provider_type == "grok" or self.provider_id == "grok":
+            self.source = "api_rate_limit"
         if self.error and (not self.status_kind or self.status_kind == StatusKind.OK):
             err_str = str(self.error)
             if "찾을 수 없음" in err_str or "미설치" in err_str:
@@ -164,6 +172,8 @@ class BaseAIProvider(ABC):
                 last_success_at=now_dt if snapshot.status_kind == StatusKind.OK else None,
                 retry_after_sec=snapshot.retry_after_sec,
                 action_hint=snapshot.action_hint,
+                source=self.config.get("source", "local_subscription"),
+                provider_type=self.config.get("type", self.provider_id),
             )
 
             if snapshot.status_kind == StatusKind.OK:
@@ -202,6 +212,8 @@ class BaseAIProvider(ABC):
                     last_success_at=last_success,
                     retry_after_sec=exc.retry_after_sec,
                     action_hint=exc.action_hint,
+                    source=self.config.get("source", "local_subscription"),
+                    provider_type=self.config.get("type", self.provider_id),
                 )
             else:
                 # SC-002: 최초 실패 시 error 기록 (UI에서는 error 존재 시 0% 수치를 렌더링하지 않음)
@@ -221,6 +233,8 @@ class BaseAIProvider(ABC):
                     last_success_at=None,
                     retry_after_sec=exc.retry_after_sec,
                     action_hint=exc.action_hint,
+                    source=self.config.get("source", "local_subscription"),
+                    provider_type=self.config.get("type", self.provider_id),
                 )
 
             if exc.status_kind == StatusKind.RATE_LIMITED or str(exc).startswith(
@@ -281,6 +295,9 @@ class CopilotProvider(BaseAIProvider):
 # 5. xAI Grok Provider
 # ==========================================
 class GrokProvider(BaseAIProvider):
+    def __init__(self, config: dict):
+        super().__init__({**config, "type": "grok", "source": "api_rate_limit"})
+
     def _default_model_name(self) -> str:
         return "xAI API"
 

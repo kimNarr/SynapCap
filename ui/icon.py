@@ -63,7 +63,7 @@ def _brand_colors(token: str | None) -> tuple[str, str]:
 
 
 @lru_cache(maxsize=24)
-def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
+def create_provider_pixmap(provider_type: str, size: int = 30, bare: bool = False) -> QPixmap:
     """Render a local, network-free brand badge for a usage provider."""
     brand = _PROVIDER_BRANDS.get(provider_type, {"fallback": "AI"})
     foreground, background = _brand_colors(brand.get("token"))
@@ -75,9 +75,10 @@ def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(QColor(background))
-    radius = max(5.0, size * 0.24)
-    painter.drawRoundedRect(QRectF(0, 0, size, size), radius, radius)
+    if not bare:
+        painter.setBrush(QColor(background))
+        radius = max(5.0, size * 0.24)
+        painter.drawRoundedRect(QRectF(0, 0, size, size), radius, radius)
 
     if "path" in brand:
         inner = f'<path fill="{foreground}" d="{brand["path"]}"/>'
@@ -92,7 +93,7 @@ def create_provider_pixmap(provider_type: str, size: int = 30) -> QPixmap:
             f"{inner}</svg>"
         )
         renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
-        inset = size * 0.24
+        inset = size * (0.07 if bare else 0.24)
         renderer.render(
             painter,
             QRectF(inset, inset, size - (inset * 2), size - (inset * 2)),

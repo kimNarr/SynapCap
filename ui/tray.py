@@ -1,5 +1,7 @@
+import sys
+
 from PySide6.QtCore import QObject, QRectF, Qt, Signal
-from PySide6.QtGui import QActionGroup, QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QActionGroup, QColor, QFont, QFontMetrics, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from feedback import FEEDBACK_CHOOSER_URL
@@ -8,7 +10,7 @@ from subscription_usage import STATUS_BADGE_LABELS, StatusKind
 from theme import palette, t
 from version import APP_VERSION
 
-from .icon import create_app_icon
+from .icon import create_app_icon, create_app_pixmap, create_provider_pixmap
 
 _MENU_QSS = """
     QMenu {
@@ -58,6 +60,8 @@ def _usage_value(usage: ModelUsage) -> float:
 
 
 def _has_measurable_usage(usage: ModelUsage) -> bool:
+    if not usage.is_subscription:
+        return False
     if usage.status_kind == StatusKind.NO_QUOTA:
         return False
     if usage.error and not usage.is_stale:
@@ -122,6 +126,32 @@ def create_usage_tray_icon(value: float) -> QIcon:
     return icon
 
 
+def create_macos_status_icon(provider_type: str, text: str) -> QIcon:
+    """A rectangular template image lets Cocoa fit icon + text without a new status item."""
+    app = QApplication.instance()
+    font = QFont(app.font() if app else QFont())
+    font.setPixelSize(12)
+    font.setWeight(QFont.Weight.Medium)
+    width = 18 + 5 + QFontMetrics(font).horizontalAdvance(text) + 3
+    icon = QIcon()
+    for scale in (1, 2):
+        pixmap = QPixmap(width * scale, 18 * scale)
+        pixmap.setDevicePixelRatio(scale)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        artwork = (create_provider_pixmap(provider_type, 18, bare=True)
+                   if provider_type else create_app_pixmap(18))
+        painter.drawPixmap(0, 0, artwork)
+        painter.setFont(font)
+        painter.setPen(Qt.GlobalColor.black)
+        painter.drawText(QRectF(23, 0, width - 23, 18), Qt.AlignmentFlag.AlignVCenter, text)
+        painter.end()
+        icon.addPixmap(pixmap)
+    icon.setIsMask(True)  # AppKit chooses contrast for the actual menu-bar appearance.
+    return icon
+
+
 class SynapCapTray(QObject):
     refresh_requested = Signal()
     window_mode_requested = Signal(str)
@@ -169,8 +199,8 @@ class SynapCapTray(QObject):
         self.mode_actions = {}
         for label, mode in (
             ("펼침", "expanded"),
-            ("막대", "bar"),
-            ("트레이만", "none"),
+            ("미니 (노치·메뉴바)" if sys.platform == "darwin" else "간단 보기", "bar"),
+            ("메뉴바만" if sys.platform == "darwin" else "트레이만", "none"),
         ):
             action = display_menu.addAction(label)
             action.setCheckable(True)
@@ -264,7 +294,17 @@ class SynapCapTray(QObject):
     def _update_usage_icon(self) -> None:
         valid_usage = [usage for usage in self._latest_usage if _has_measurable_usage(usage)]
         headline = self._tray_metric_value()
-        if headline is None:
+        if sys.platform == "darwin" and self.tray_metric != "none":
+            selected = (max(valid_usage, key=_usage_value, default=None)
+                        if self.tray_metric == "highest" else
+                        next((u for u in valid_usage if u.provider_id == self.tray_metric), None))
+            text = f"{headline:.0f}%" if headline is not None else "—"
+            if selected is not None and selected.is_stale:
+                text += "*"
+            self.tray_icon.setIcon(create_macos_status_icon(
+                (selected.provider_type or selected.provider_id) if selected else "", text,
+            ))
+        elif headline is None:
             self.tray_icon.setIcon(create_app_icon(32))
         else:
             self.tray_icon.setIcon(create_usage_tray_icon(headline))
@@ -275,6 +315,8 @@ class SynapCapTray(QObject):
 
         details = []
         for usage in self._latest_usage:
+            if not usage.is_subscription:
+                continue
             if (
                 usage.is_stale
                 and usage.windows
@@ -303,6 +345,16 @@ class SynapCapTray(QObject):
                     if window.unlimited
                 ]
                 detail = f"{usage.provider_name} {window_label} {value:.0f}%"
+                finite_windows = [window for window in usage.windows or [] if not window.unlimited]
+                if finite_windows:
+                    peak_window = max(finite_windows, key=lambda window: window.used)
+                    if peak_window.reset_text:
+                        detail += f" ({peak_window.reset_text})"
+                    for window in finite_windows:
+                        if window is not peak_window:
+                            detail += f" · {_tray_window_label(window.display_label)} {window.used:.0f}%"
+                            if window.reset_text:
+                                detail += f" ({window.reset_text})"
                 if unlimited_labels:
                     detail += f" · {', '.join(unlimited_labels)} 무제한"
                 if usage.action_hint:
@@ -313,7 +365,7 @@ class SynapCapTray(QObject):
         if fetched_times:
             latest = max(fetched_times).astimezone()
             freshness = f"\n마지막 조회 {latest.month}/{latest.day} {latest:%H:%M}"
-        self.tray_icon.setToolTip(" · ".join(details) + freshness)
+        self.tray_icon.setToolTip((" · ".join(details) + freshness) or "SynapCap · 구독 사용량 없음")
 
     def show_tray_pin_guidance(self) -> None:
         self.tray_icon.showMessage(

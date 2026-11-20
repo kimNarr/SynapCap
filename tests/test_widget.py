@@ -29,6 +29,8 @@ from ui.widget import (
 )
 
 
+# Keep baseline geometry deterministic; dedicated Mac tests override this patch.
+@patch("ui.widget.sys.platform", "win32")
 class WidgetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -101,7 +103,7 @@ class WidgetTests(unittest.TestCase):
         self.widget.enter_compact_mode()
         self.app.processEvents()
         compact = self.widget.compact_ui_map["codex"]
-        self.assertEqual(compact["value"].property("compactPlainText"), "최대 35%")
+        self.assertEqual(compact["value"].property("compactPlainText"), "35%")
         self.assertIn("Gemini 4 Argon · 주간 2%", compact["item"].toolTip())
 
     def test_group_rename_triggers_redraw_and_period_visibility_still_applies(self):
@@ -1007,7 +1009,7 @@ class WidgetTests(unittest.TestCase):
             "#1e293b",
         )
 
-    def test_compact_bar_uses_one_percent_suffix_for_two_windows(self):
+    def test_compact_bar_uses_the_peak_of_two_windows(self):
         provider = AntigravityProvider(
             {
                 "id": "gemini",
@@ -1037,7 +1039,7 @@ class WidgetTests(unittest.TestCase):
         self.app.processEvents()
 
         compact_value = self.widget.compact_ui_map["gemini"]["value"]
-        self.assertEqual(compact_value.property("compactPlainText"), "8 / 72%")
+        self.assertEqual(compact_value.property("compactPlainText"), "72%")
         self.assertEqual(compact_value.text().count("%"), 1)
 
     def test_loading_uses_animation_and_keeps_existing_rows(self):
@@ -1060,7 +1062,7 @@ class WidgetTests(unittest.TestCase):
         self.assertFalse(ui["spinner"].is_spinning())
         self.assertTrue(self.widget.refresh_btn.isEnabled())
 
-    def test_compact_bar_shows_both_enabled_usage_windows(self):
+    def test_compact_bar_summarizes_all_windows_and_keeps_tooltip_details(self):
         provider = AntigravityProvider(
             {
                 "id": "gemini",
@@ -1093,7 +1095,7 @@ class WidgetTests(unittest.TestCase):
 
         compact_value = self.widget.compact_ui_map["gemini"]["value"]
         compact_item = self.widget.compact_ui_map["gemini"]["item"]
-        self.assertEqual(compact_value.text(), "15 / 49%")
+        self.assertEqual(compact_value.text(), "49%")
         self.assertGreaterEqual(compact_value.width(), compact_value.font().pointSize() * 3)
         self.assertIn("5시간 15% 사용", compact_item.toolTip())
         self.assertIn("주간 49% 사용", compact_item.toolTip())
@@ -1101,6 +1103,103 @@ class WidgetTests(unittest.TestCase):
         self.widget.provider_ui_map["gemini"]["show_five_hour"] = False
         self.widget._refresh_compact_values()
         self.assertEqual(compact_value.text(), "49%")
+        usage.windows[0].used = 3
+        usage.windows[1].used = 80
+        self.widget._refresh_compact_values()
+        self.assertEqual(compact_value.text(), "80%")
+
+    def test_compact_provider_click_opens_selected_detail_without_extra_controls(self):
+        providers = [
+            CodexProvider({"id": "codex", "name": "Codex", "type": "codex"}),
+            ClaudeProvider({"id": "claude", "name": "Claude", "type": "claude"}),
+        ]
+        self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
+        self.widget.enter_compact_mode()
+        self.assertTrue(self.widget.compact_logo.isHidden())
+        self.assertTrue(self.widget.compact_tray_btn.isHidden())
+        self.assertTrue(self.widget.compact_close_btn.isHidden())
+        self.widget.compact_ui_map["claude"]["item"].click()
+        self.app.processEvents()
+        self.assertFalse(self.widget.is_compact)
+        self.assertEqual(self.widget._focused_provider_id, "claude")
+
+    def test_peak_text_distinguishes_missing_zero_and_unlimited(self):
+        self.assertEqual(self.widget._compact_peak_text([], None), "—")
+        self.assertEqual(self.widget._compact_peak_text([], 0), "0%")
+        unlimited = UsageWindow("주간", 0, "", unlimited=True)
+        self.assertEqual(self.widget._compact_peak_text([unlimited], 0), "무제한")
+        self.assertEqual(self.widget._compact_peak_text([
+            unlimited, UsageWindow("5시간", 100, ""),
+        ], 0), "100%")
+
+    def test_three_subscriptions_at_100_percent_fit_and_stale_is_marked(self):
+        providers = [
+            CodexProvider({"id": "codex", "name": "Codex"}),
+            AntigravityProvider({"id": "gemini", "name": "Gemini"}),
+            ClaudeProvider({"id": "claude", "name": "Claude"}),
+        ]
+        self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
+        usages = [ModelUsage(provider.provider_id, provider.name, provider.name, 100, 100, "%",
+                             windows=[UsageWindow("5시간", 100, ""), UsageWindow("주간", 100, "")])
+                  for provider in providers]
+        self.widget.update_data(usages)
+        self.widget.enter_compact_mode()
+        self.app.processEvents()
+        for ui in self.widget.compact_ui_map.values():
+            value = ui["value"]
+            self.assertEqual(value.text(), "100%")
+            self.assertGreaterEqual(value.width(), QFontMetrics(value.font()).horizontalAdvance("100%"))
+            bounds = QRect(value.mapTo(self.widget, QPoint()), value.size())
+            self.assertTrue(self.widget.rect().contains(bounds))
+        usages[0].is_stale = True
+        usages[0].error = "temporary error"
+        self.widget.update_data(usages)
+        self.assertEqual(self.widget.compact_ui_map["codex"]["value"].text(), "100%*")
+        self.assertIn("갱신 실패", self.widget.compact_ui_map["codex"]["item"].toolTip())
+
+    def test_api_provider_with_custom_id_is_not_in_simple_view(self):
+        from providers import GrokProvider
+
+        api = GrokProvider({"id": "company-api", "name": "xAI API"})
+        self.widget.rebuild_ui(self.widget.config_data, [*self.widget.providers, api])
+        self.assertNotIn("company-api", self.widget.compact_ui_map)
+        self.assertIn("company-api", self.widget.provider_ui_map)
+        self.widget.rebuild_ui(self.widget.config_data, [api], preserve_usage=False)
+        self.assertEqual(self.widget.compact_bar.findChild(QLabel, "compactEmpty").text(), "—")
+
+    def test_macos_notch_position_and_missing_notch_menu_bar_fallback(self):
+        with (
+            patch("ui.widget.sys.platform", "darwin"),
+            patch("ui.widget.notch_rect", return_value=QRect(400, 0, 200, 30)) as notch,
+            patch.object(self.widget, "_available_geometry", return_value=QRect(0, 30, 1000, 770)),
+        ):
+            self.widget.set_window_mode("bar")
+            self.app.processEvents()
+            self.assertTrue(self.widget.isVisible())
+            self.assertEqual(self.widget.y(), 34)
+            self.assertLessEqual(abs(self.widget.frameGeometry().center().x() - 499), 1)
+            self.widget.restore_position(0, 500)
+            self.assertEqual(self.widget.y(), 34)
+            notch.return_value = None
+            self.widget._screen_configuration_changed()
+            self.assertFalse(self.widget.isVisible())
+            self.assertEqual(self.widget.window_mode(), "bar")
+            notch.return_value = QRect(400, 0, 200, 30)
+            self.widget._screen_configuration_changed()
+            self.assertTrue(self.widget.isVisible())
+            self.widget.set_window_mode("none")
+            self.widget._screen_configuration_changed()
+            self.app.processEvents()
+            self.assertFalse(self.widget.isVisible())
+
+    def test_first_simple_view_is_placed_above_taskbar_not_in_screen_center(self):
+        self.widget.set_window_mode("bar")
+        self.app.processEvents()
+        self.widget.center_on_screen()
+        available = self.widget.screen().availableGeometry()
+        self.assertLessEqual(self.widget.frameGeometry().bottom(), available.bottom() - COMPACT_BOTTOM_SAFE_GAP)
+        self.assertGreater(self.widget.frameGeometry().center().x(), available.center().x())
+        self.assertIn("위로", self.widget.expand_btn.toolTip())
 
     def test_fixed_focus_ring_places_window_tiles_side_by_side(self):
         self.usage.windows = [
@@ -1584,14 +1683,14 @@ class WidgetTests(unittest.TestCase):
         with patch.object(
             self.widget,
             "_available_geometry",
-            return_value=QRect(0, 0, 480, 900),
+            return_value=QRect(0, 0, 280, 900),
         ):
             self.widget.rebuild_ui(self.widget.config_data, providers, preserve_usage=False)
             self.widget.enter_compact_mode()
             self.widget._fit_to_content()
             self.app.processEvents()
 
-        self.assertLessEqual(self.widget.width(), 480)
+        self.assertLessEqual(self.widget.width(), 280)
         self.assertGreater(self.widget.compact_items_scroll.horizontalScrollBar().maximum(), 0)
 
     def test_compact_toggle_expands_downward_near_top_edge(self):

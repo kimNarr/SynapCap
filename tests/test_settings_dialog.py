@@ -190,7 +190,7 @@ class SettingsDialogTests(unittest.TestCase):
     def test_window_mode_selector_round_trips_and_previews_immediately(self):
         self.assertEqual(
             self.dialog.window_mode_combo.currentData(),
-            "expanded",
+            "bar",
         )
         previewed = []
         self.dialog.preview_requested.connect(previewed.append)
@@ -204,6 +204,18 @@ class SettingsDialogTests(unittest.TestCase):
         self.dialog.config_saved.connect(saved.append)
         self.dialog.on_save()
         self.assertEqual(saved[0]["settings"]["window_mode"], "none")
+
+    def test_api_setting_is_kept_but_not_offered_as_subscription_metric(self):
+        self.dialog.close()
+        self.dialog.deleteLater()
+        config = get_default_config()
+        config["providers"].append({
+            "id": "company-api", "type": "grok", "name": "xAI API",
+            "source": "api_rate_limit", "enabled": True,
+        })
+        self.dialog = SettingsDialog(config)
+        self.assertEqual(self.dialog.tray_metric_combo.findData("company-api"), -1)
+        self.assertEqual(self._provider_item("company-api")["id"], "company-api")
 
     def test_tray_metric_selector_lists_providers_and_round_trips(self):
         combo = self.dialog.tray_metric_combo

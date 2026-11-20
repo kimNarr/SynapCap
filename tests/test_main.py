@@ -1,9 +1,12 @@
+import gc
 import os
 import unittest
 from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QCoreApplication, QEvent, Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from main import (
@@ -16,8 +19,10 @@ from main import (
     _should_start_centered,
     confirm_quit,
     show_provider_diagnostics,
+    show_whats_new_dialog,
 )
 from providers import CodexProvider, ModelUsage
+from release_notes import release_url
 from ui.widget import SynapCapWidget
 
 
@@ -203,6 +208,89 @@ class QuitConfirmationTests(unittest.TestCase):
             dialog.button(QMessageBox.StandardButton.Yes).sizeHint().width(),
             90,
         )
+
+
+class WhatsNewDialogTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        self.widget = SynapCapWidget(
+            {"settings": {"always_on_top": True}},
+            [CodexProvider({"id": "codex", "name": "Codex"})],
+        )
+        self.widget.show()
+        self.dialog = None
+
+    def tearDown(self):
+        if self.dialog is not None:
+            self.dialog.close()
+        self.widget.begin_shutdown()
+        self.widget.close()
+        self.widget.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.app.processEvents()
+
+    def test_notice_stays_above_topmost_widget_without_blocking_input(self):
+        refreshed = []
+        self.widget.refresh_requested.connect(lambda: refreshed.append(True))
+        self.dialog = show_whats_new_dialog(self.widget)
+        self.app.processEvents()
+
+        self.assertTrue(self.dialog.isVisible())
+        self.assertFalse(self.dialog.isModal())
+        self.assertIsNone(self.app.activeModalWidget())
+        self.assertTrue(self.dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        self.assertTrue(self.widget.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        self.assertIn("업데이트되었습니다", self.dialog.text())
+        QTest.mouseClick(self.widget.refresh_btn, Qt.MouseButton.LeftButton)
+        self.assertEqual(refreshed, [True])
+
+    @patch("main.QDesktopServices.openUrl")
+    def test_close_deletes_notice_without_opening_browser_or_closing_widget(self, open_url):
+        self.widget.set_always_on_top(False)
+        self.dialog = show_whats_new_dialog(self.widget)
+        self.assertFalse(self.dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        deleted = []
+        self.dialog.destroyed.connect(lambda: deleted.append(True))
+        close_button = next(button for button in self.dialog.buttons() if button.text() == "닫기")
+        close_button.click()
+        self.dialog = None
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.app.processEvents()
+
+        self.assertEqual(deleted, [True])
+        self.assertIsNone(self.app.activeModalWidget())
+        self.assertTrue(self.widget.isVisible())
+        open_url.assert_not_called()
+
+    @patch("main.QDesktopServices.openUrl")
+    def test_details_opens_this_versions_release_without_blocking_widget(self, open_url):
+        self.dialog = show_whats_new_dialog(self.widget)
+        details = next(button for button in self.dialog.buttons() if button.text() == "변경 사항 보기")
+        details.click()
+        self.dialog = None
+        self.app.processEvents()
+
+        open_url.assert_called_once()
+        self.assertEqual(open_url.call_args.args[0].toString(), release_url())
+        self.assertIsNone(self.app.activeModalWidget())
+        self.assertTrue(self.widget.isVisible())
+
+    def test_parent_retains_notice_until_window_manager_close(self):
+        show_whats_new_dialog(self.widget)
+        gc.collect()
+        self.app.processEvents()
+        notices = self.widget.findChildren(QMessageBox)
+        self.assertEqual(len(notices), 1)
+        self.assertTrue(notices[0].isVisible())
+        self.assertTrue(notices[0].close())
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.app.processEvents()
+        self.assertEqual(self.widget.findChildren(QMessageBox), [])
+        self.assertTrue(self.widget.isVisible())
+        self.assertIsNone(self.app.activeModalWidget())
 
 
 class ProviderDiagnosticsIntegrationTests(unittest.TestCase):

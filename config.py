@@ -7,7 +7,7 @@ from typing import Any
 
 from version import APP_NAME
 
-CONFIG_SCHEMA_VERSION = 9
+CONFIG_SCHEMA_VERSION = 10
 
 
 def _default_config_path() -> Path:
@@ -39,8 +39,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "check_updates": True,
         "last_seen_version": "",
         "theme": "auto",
-        "window_mode": "expanded",
-        "last_window_mode": "expanded",
+        "window_mode": "bar",
+        "last_window_mode": "bar",
         "window_pos_expanded": None,
         "window_pos_bar": None,
         "tray_pin_guidance_shown": False,
@@ -126,6 +126,10 @@ def load_config(file_path: str = CONFIG_FILE_PATH) -> dict[str, Any]:
                 loaded_settings = {}
             settings = deepcopy(DEFAULT_CONFIG["settings"])
             settings.update(loaded_settings)
+            # Only new installs default to the new strip; keep existing launch behaviour.
+            if source_schema_version < 10 and "window_mode" not in loaded_settings:
+                settings["window_mode"] = "expanded"
+                settings["last_window_mode"] = "expanded"
             # Existing installations should see the first post-update note.
             # Brand-new configurations return above with an empty value.
             if "last_seen_version" not in loaded_settings:

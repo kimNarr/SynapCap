@@ -3,10 +3,25 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from config import get_default_config, load_config, save_config
+from config import CONFIG_SCHEMA_VERSION, get_default_config, load_config, save_config
 
 
 class ConfigTests(unittest.TestCase):
+    def test_new_install_defaults_to_simple_view(self):
+        self.assertEqual(get_default_config()["settings"]["window_mode"], "bar")
+
+    def test_existing_display_mode_and_position_are_preserved(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "synapcap.json"
+            config = get_default_config()
+            config["schema_version"] = 9
+            config["settings"]["window_mode"] = "expanded"
+            config["settings"]["window_pos_bar"] = [42, 108]
+            self.assertTrue(save_config(config, str(path)))
+            loaded = load_config(str(path))
+            self.assertEqual(loaded["settings"]["window_mode"], "expanded")
+            self.assertEqual(loaded["settings"]["window_pos_bar"], [42, 108])
+
     def test_save_creates_user_config_directory(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             destination = Path(temp_dir) / "SynapCap" / "synapcap.json"
@@ -281,7 +296,7 @@ class ConfigTests(unittest.TestCase):
 
             loaded = load_config(str(path))
 
-            self.assertEqual(loaded["schema_version"], 9)
+            self.assertEqual(loaded["schema_version"], CONFIG_SCHEMA_VERSION)
             self.assertFalse(loaded["providers"][0]["show_five_hour"])
             self.assertTrue(loaded["providers"][0]["show_weekly"])
 

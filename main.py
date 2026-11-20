@@ -3,7 +3,7 @@ import subprocess
 import sys
 from copy import deepcopy
 
-from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -186,6 +186,35 @@ def show_provider_diagnostics(
     return report
 
 
+def show_whats_new_dialog(parent) -> QMessageBox:
+    dialog = QMessageBox(parent)
+    dialog.setWindowTitle(f"SynapCap v{APP_VERSION}")
+    dialog.setIcon(QMessageBox.Icon.Information)
+    dialog.setText(f"SynapCap이 v{APP_VERSION}로 업데이트되었습니다.")
+    dialog.setInformativeText(
+        "새 기능과 오류 수정 사항이 적용되었습니다. "
+        "자세한 내용은 GitHub 릴리스에서 확인할 수 있습니다."
+    )
+    dialog.setStyleSheet(_CONFIRM_QUIT_QSS % palette())
+    dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+    # This optional notice must never block the widget behind it.
+    dialog.setWindowModality(Qt.WindowModality.NonModal)
+    dialog.setWindowFlag(
+        Qt.WindowType.WindowStaysOnTopHint,
+        bool(parent.windowFlags() & Qt.WindowType.WindowStaysOnTopHint),
+    )
+    details_button = dialog.addButton("변경 사항 보기", QMessageBox.ButtonRole.ActionRole)
+    dialog.addButton("닫기", QMessageBox.ButtonRole.RejectRole)
+    dialog.buttonClicked.connect(
+        lambda button: QDesktopServices.openUrl(QUrl(release_url()))
+        if button is details_button else None
+    )
+    dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
+    return dialog
+
+
 def _launch_windows_installer(path: str) -> None:
     parameters = subprocess.list2cmdline(
         [
@@ -279,6 +308,8 @@ def main():
         current_mode = widget.window_mode()
         if current_mode == "none" or not widget.isVisible():
             last_mode = config_data.get("settings", {}).get("last_window_mode", "expanded")
+            if sys.platform == "darwin":
+                last_mode = "expanded"
             apply_window_mode(last_mode)
             widget.show()
             widget.raise_()
@@ -371,6 +402,8 @@ def main():
             "expanded",
         )
         if mode == "none":
+            mode = "expanded"
+        if sys.platform == "darwin":
             mode = "expanded"
         apply_window_mode(mode)
         if widget.isMinimized():
@@ -804,26 +837,8 @@ def main():
     widget.diagnostics_requested.connect(open_provider_diagnostics)
     widget.quit_requested.connect(request_quit)
 
-    def show_whats_new_dialog():
-        dialog = QMessageBox(widget)
-        dialog.setWindowTitle(f"SynapCap v{APP_VERSION}")
-        dialog.setIcon(QMessageBox.Icon.Information)
-        dialog.setText(f"SynapCap이 v{APP_VERSION}로 업데이트되었습니다.")
-        dialog.setInformativeText(
-            "새 기능과 오류 수정 사항이 적용되었습니다. "
-            "자세한 내용은 GitHub 릴리스에서 확인할 수 있습니다."
-        )
-        details_button = dialog.addButton(
-            "변경 사항 보기",
-            QMessageBox.ButtonRole.ActionRole,
-        )
-        dialog.addButton("닫기", QMessageBox.ButtonRole.RejectRole)
-        dialog.exec()
-        if dialog.clickedButton() is details_button:
-            QDesktopServices.openUrl(QUrl(release_url()))
-
     if show_whats_new:
-        QTimer.singleShot(1200, show_whats_new_dialog)
+        QTimer.singleShot(1200, lambda: show_whats_new_dialog(widget))
 
     print("[SynapCap] HUD Application with GUI Settings started successfully.")
     sys.exit(app.exec())

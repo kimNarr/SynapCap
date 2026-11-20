@@ -638,8 +638,8 @@ class SettingsDialog(QDialog):
 
         self.window_mode_combo = NoWheelComboBox()
         self.window_mode_combo.addItem("펼침", "expanded")
-        self.window_mode_combo.addItem("막대", "bar")
-        self.window_mode_combo.addItem("트레이만", "none")
+        self.window_mode_combo.addItem("미니 (노치·메뉴바)" if sys.platform == "darwin" else "간단 보기", "bar")
+        self.window_mode_combo.addItem("메뉴바만" if sys.platform == "darwin" else "트레이만", "none")
         selected_mode = settings.get("window_mode", "expanded")
         mode_index = self.window_mode_combo.findData(selected_mode)
         self.window_mode_combo.setCurrentIndex(max(mode_index, 0))
@@ -652,7 +652,8 @@ class SettingsDialog(QDialog):
         self.tray_metric_combo = NoWheelComboBox()
         self.tray_metric_combo.addItem("최고 사용률", "highest")
         for provider in self.config_data.get("providers", []):
-            if provider.get("enabled", True):
+            if (provider.get("enabled", True) and provider.get("type") != "grok"
+                    and provider.get("source") != "api_rate_limit"):
                 self.tray_metric_combo.addItem(
                     provider.get("name", provider.get("id", "")),
                     provider.get("id"),
@@ -662,8 +663,9 @@ class SettingsDialog(QDialog):
         metric_index = self.tray_metric_combo.findData(selected_metric)
         self.tray_metric_combo.setCurrentIndex(max(metric_index, 0))
         self.tray_metric_combo.setToolTip(
-            "트레이 아이콘에 표시할 수치입니다. 특정 서비스를 고르면 그 서비스의 "
-            "최고 사용률만, '숫자 표시 안 함'이면 앱 아이콘만 보여 줍니다."
+            "구독 사용량만 표시합니다. 간단 보기와 트레이·메뉴바의 숫자는 세션·주간 "
+            "전체 한도 중 최대 사용률이며, 기간 표시 옵션은 상세 링에 적용됩니다. "
+            "'숫자 표시 안 함'이면 앱 아이콘만 보여 줍니다."
         )
         self.tray_metric_combo.currentIndexChanged.connect(lambda _index: self.on_preview())
         form.addRow("트레이 표시:", self.tray_metric_combo)
