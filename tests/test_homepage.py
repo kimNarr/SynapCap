@@ -14,6 +14,11 @@ class SetupParser(HTMLParser):
         self.platform = None
         self.service = None
         self.code = None
+        self.div_depth = 0
+        self.platform_depth = None
+        self.tabs = {}
+        self.commands = []
+        self.copy_targets = []
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
@@ -22,8 +27,17 @@ class SetupParser(HTMLParser):
             self.ids.append(attrs["id"])
         if tag == "a" and attrs.get("href", "").startswith("#"):
             self.anchors.append(attrs["href"][1:])
-        if tag == "details" and attrs.get("id") in {"cli-windows", "cli-macos"}:
+        if tag == "div":
+            self.div_depth += 1
+        if attrs.get("role") == "tab":
+            self.tabs[attrs["id"]] = attrs["aria-controls"]
+        if tag == "pre":
+            self.commands.append(attrs["id"])
+        if "data-copy" in attrs:
+            self.copy_targets.append(attrs["data-copy"])
+        if attrs.get("id") in {"cli-windows", "cli-macos"}:
             self.platform = attrs["id"]
+            self.platform_depth = self.div_depth
             self.panels[self.platform] = {}
         if tag == "article" and self.platform and "data-service" in attrs:
             self.service = attrs["data-service"]
@@ -41,8 +55,11 @@ class SetupParser(HTMLParser):
             self.code = None
         if tag == "article":
             self.service = None
-        if tag == "details":
-            self.platform = None
+        if tag == "div":
+            if self.div_depth == self.platform_depth:
+                self.platform = None
+                self.platform_depth = None
+            self.div_depth -= 1
 
 
 class HomepageSetupTests(unittest.TestCase):
@@ -91,6 +108,18 @@ class HomepageSetupTests(unittest.TestCase):
         self.assertIn("command -v codex", self.html)
         self.assertIn("완전 종료", self.html)
         self.assertIn("WSL", self.html)
+
+    def test_preview_setup_and_error_tabs_resolve_to_unique_panels(self):
+        self.assertEqual(len(self.setup.tabs), 15)
+        self.assertTrue(set(self.setup.tabs.values()).issubset(self.setup.ids))
+        self.assertEqual(len(set(self.setup.tabs.values())), len(self.setup.tabs))
+        self.assertIn('aria-controls="mode-tray"', self.html)
+        for status in ("uninstalled", "login", "timeout", "query"):
+            self.assertEqual(self.setup.tabs[f"error-{status}-tab"], f"error-{status}")
+
+    def test_all_terminal_blocks_have_copy_controls(self):
+        self.assertEqual(len(self.setup.commands), 18)
+        self.assertCountEqual(self.setup.commands, self.setup.copy_targets)
 
 
 if __name__ == "__main__":

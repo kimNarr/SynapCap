@@ -1,16 +1,18 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-type="software">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="API 키 없이 Codex, Gemini, Claude의 5시간·주간 구독 사용량을 펼침·막대·트레이 숫자로 확인하는 데스크톱 위젯 SynapCap을 다운로드하세요.">
-  <meta name="theme-color" content="#11111b">
-  <meta property="og:title" content="SynapCap — AI 사용량을 한눈에">
-  <meta property="og:description" content="API 키 없이 Codex, Gemini, Claude의 구독 한도를 펼침·막대·트레이 숫자로 보여주는 가벼운 데스크톱 위젯">
+  <meta name="description" content="로컬에 로그인된 Codex, Gemini(Antigravity), Claude의 구독 사용량과 리셋 시간을 작게 띄워 확인하는 데스크톱 위젯 SynapCap을 다운로드하세요.">
+  <meta name="page-type" content="software">
+  <meta name="site-kind" content="software">
+  <meta name="theme-color" content="#101113">
+  <meta property="og:title" content="SynapCap : AI 사용량을 한눈에">
+  <meta property="og:description" content="로컬에 로그인된 Codex, Gemini(Antigravity), Claude의 구독 사용량과 리셋 시간을 작게 띄워 확인하는 데스크톱 위젯">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://kimNarr.github.io/SynapCap/">
   <link rel="canonical" href="https://kimNarr.github.io/SynapCap/">
-  <title>SynapCap — AI 사용량 위젯</title>
+  <title>SynapCap : AI 사용량 위젯</title>
   <script>!function(){var t=localStorage.getItem("synapcap-theme");document.documentElement.dataset.theme=t||("matchMedia"in window&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}();</script>
   <link rel="icon" href="assets/logo-icon.svg" type="image/svg+xml">
   <link rel="icon" href="assets/logo.png" type="image/png" sizes="256x256">
@@ -18,8 +20,7 @@
   <script src="app.js" defer></script>
 </head>
 <body>
-  <div class="ambient ambient-one" aria-hidden="true"></div>
-  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <a class="skip-link" href="#top">본문으로 건너뛰기</a>
 
   <header class="site-header">
     <a class="brand" href="#top" aria-label="SynapCap 홈">
@@ -27,22 +28,18 @@
     </a>
     <nav aria-label="주요 메뉴">
       <a href="#download">다운로드</a>
-      <a href="#features">기능</a>
-      <a href="#requirements">연동 조건</a>
-      <a href="#cli-setup">CLI 설치</a>
-      <a href="#troubleshooting">오류 해결</a>
-      <a href="#updates">업데이트</a>
-      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="라이트 테마로 전환" aria-pressed="false"><span aria-hidden="true">☼</span><span class="theme-toggle-label">테마</span></button>
-      <a class="github-link" href="https://github.com/kimNarr/SynapCap" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+      <a href="#cli-setup">설치</a>
+      <a href="#troubleshooting">문제해결</a>
+      <a class="github-link" href="https://github.com/kimNarr/SynapCap" target="_blank" rel="noreferrer">GitHub</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="라이트 테마로 전환" aria-pressed="false"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none"/></svg><span class="theme-toggle-label">테마</span></button>
     </nav>
   </header>
 
   <main id="top">
-    <section class="hero section-shell">
+    <section class="hero section-shell" data-enter>
       <div class="hero-copy">
-        <div class="eyebrow"><span class="live-dot"></span><span id="release-status" aria-live="polite">최신 공개 버전 확인 중</span></div>
-        <h1>AI 한도,<br><span>작게 띄워두고</span><br>한눈에.</h1>
-        <p class="hero-description">Codex, Gemini, Claude의 구독 사용량은 아이콘과 숫자로 간단하게, 세션·주간 한도와 리셋 시간은 펼친 위젯에서 확인하세요.</p>
+        <h1>AI 한도,<br>작게 띄워두고<br>한눈에.</h1>
+        <p class="hero-description">로컬에 로그인된 Codex, Gemini(Antigravity), Claude의 구독 사용량과 리셋 시간을 작게 띄워 확인하는 데스크톱 위젯.</p>
         <div class="hero-actions">
           <a id="primary-download" class="button button-primary" href="https://github.com/kimNarr/SynapCap/releases/latest">
             <span class="button-os" aria-hidden="true">↓</span>
@@ -50,86 +47,136 @@
           </a>
           <a id="alternate-download" class="button button-secondary" href="#download">다른 운영체제 선택</a>
         </div>
-        <p class="microcopy">무료 · 오픈소스 · API 키 불필요 · 사용량은 로컬 도구에서 조회</p>
+        <div class="release-line"><span id="release-status" aria-live="polite">최신 공개 버전 확인 중</span></div>
+        <p class="microcopy">무료 / 오픈소스 / 기본 구독 조회에 API 키 불필요<br>사용할 로컬 도구의 설치·로그인이 필요합니다.</p>
       </div>
 
-      <div class="product-stage" aria-label="SynapCap 위젯 미리보기">
-        <div class="stage-glow"></div>
-        <div class="widget-preview">
-          <div class="widget-header">
-            <div class="widget-brand"><img src="assets/logo-icon.svg" alt="" width="18" height="18"><strong>SynapCap</strong></div>
-            <div class="widget-tools" aria-hidden="true"><span>↻</span><span>⚙</span><span class="widget-tools-divider"></span><span>⇩</span><span>−</span><span>×</span></div>
+      <div class="product-stage" data-tabset data-preview-mode="expanded" aria-label="SynapCap 위젯 미리보기">
+        <div class="stage-toolbar">
+          <span>SynapCap</span>
+          <div class="mode-tabs tab-list" role="tablist" aria-label="위젯 표시 모드" hidden>
+            <button type="button" id="mode-expanded-tab" role="tab" aria-controls="mode-expanded" aria-selected="true">펼침</button>
+            <button type="button" id="mode-bar-tab" role="tab" aria-controls="mode-bar" aria-selected="false" tabindex="-1">막대</button>
+            <button type="button" id="mode-tray-tab" role="tab" aria-controls="mode-tray" aria-selected="false" tabindex="-1">트레이만</button>
           </div>
-          <div class="provider-tabs" aria-label="사용량 제공자">
-            <div class="preview-tab is-selected"><span class="preview-provider-badge codex-badge"><img src="assets/provider-codex.svg" alt=""></span><span><small>Codex</small><b>62 / 44%</b></span></div>
-            <div class="preview-tab"><span class="preview-provider-badge gemini-badge"><img src="assets/provider-gemini.svg" alt=""></span><span><small>Gemini</small><b>15 / 9%</b></span></div>
-            <div class="preview-tab"><span class="preview-provider-badge claude-badge"><img src="assets/provider-claude.svg" alt=""></span><span><small>Claude</small><b>55 / 21%</b></span></div>
-          </div>
-          <div class="focus-rings">
-            <article class="focus-ring-card">
-              <strong>SESSION</strong>
-              <div class="preview-ring session-ring"><b>62</b><span>%</span></div>
-              <small>2h 3m</small>
-            </article>
-            <article class="focus-ring-card">
-              <strong>WEEKLY</strong>
-              <div class="preview-ring weekly-ring"><b>44</b><span>%</span></div>
-              <small>4d 20h</small>
-            </article>
-          </div>
-          <div class="stage-caption"><span></span>상세 위젯 · 간단 보기 · 트레이·메뉴바</div>
         </div>
-      </div>
-    </section>
-
-    <section class="theme-showcase section-shell" aria-labelledby="theme-showcase-title">
-      <div class="section-heading centered">
-        <p class="section-kicker">Dark &amp; Light</p>
-        <h2 id="theme-showcase-title">환경에 맞춰 자연스럽게</h2>
-        <p>시스템 테마를 따르거나 다크·라이트 테마를 직접 선택할 수 있습니다.</p>
-      </div>
-      <div class="theme-shots">
-        <figure class="theme-shot theme-shot-dark">
-          <div class="theme-shot-label"><span></span>다크 테마</div>
-          <img src="assets/widget-dark.png" alt="다크 테마로 표시된 SynapCap 펼침 위젯" width="384" height="271" loading="lazy">
-        </figure>
-        <figure class="theme-shot theme-shot-light">
-          <div class="theme-shot-label"><span></span>라이트 테마</div>
-          <img src="assets/widget-light.png" alt="라이트 테마로 표시된 SynapCap 펼침 위젯" width="384" height="271" loading="lazy">
-        </figure>
+        <div class="preview-viewport">
+          <div id="mode-expanded" class="mode-panel" role="tabpanel" aria-labelledby="mode-expanded-tab" tabindex="0">
+            <div class="widget-preview">
+              <div class="widget-header"><div class="widget-brand"><img src="assets/logo-icon.svg" alt="" width="18" height="18" loading="lazy"><strong>SynapCap</strong></div><span class="widget-tools" aria-hidden="true">↻ &nbsp; ⚙ &nbsp; − &nbsp; ×</span></div>
+              <div class="provider-tabs" aria-label="사용량 제공자">
+                <div class="preview-tab is-selected"><img src="assets/provider-codex.svg" alt="" width="18" height="18" loading="lazy"><span>Codex<b>62 / 44%</b></span></div>
+                <div class="preview-tab"><img src="assets/provider-gemini.svg" alt="" width="18" height="18" loading="lazy"><span>Gemini<b>15 / 9%</b></span></div>
+                <div class="preview-tab"><img src="assets/provider-claude.svg" alt="" width="18" height="18" loading="lazy"><span>Claude<b>55 / 21%</b></span></div>
+              </div>
+              <div class="focus-rings">
+                <div class="focus-ring-card"><strong>세션</strong><div class="preview-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="62 100"/></svg><b>62<span>%</span></b></div><small>리셋까지 <time>2h 3m</time></small></div>
+                <div class="focus-ring-card"><strong>주간</strong><div class="preview-ring weekly-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="44 100"/></svg><b>44<span>%</span></b></div><small>리셋까지 <time>4d 20h</time></small></div>
+              </div>
+            </div>
+          </div>
+          <div id="mode-bar" class="mode-panel" role="tabpanel" aria-labelledby="mode-bar-tab" tabindex="0">
+            <div class="bar-preview"><img src="assets/logo-icon.svg" alt="SynapCap" width="22" height="22" loading="lazy"><span><img src="assets/provider-codex.svg" alt="Codex" width="18" height="18" loading="lazy">62%</span><span><img src="assets/provider-gemini.svg" alt="Gemini" width="18" height="18" loading="lazy">15%</span><span><img src="assets/provider-claude.svg" alt="Claude" width="18" height="18" loading="lazy">55%</span></div>
+            <p class="mode-description">Windows 간단 보기 / 서비스별 구독 한도의 최대 사용률</p>
+          </div>
+          <div id="mode-tray" class="mode-panel" role="tabpanel" aria-labelledby="mode-tray-tab" tabindex="0">
+            <div class="tray-desktop"><span>위젯은 접어두고, 작업 공간은 그대로.</span><div class="tray-preview"><img src="assets/logo-icon.svg" alt="SynapCap" width="20" height="20" loading="lazy"><b>62%</b><span class="tray-separator"></span><span>트레이 / 메뉴바</span></div></div>
+          </div>
+        </div>
+        <div class="stage-footer"><span>표시 방식 목업 / 예시 사용률</span><span>사용한 비율 %</span></div>
       </div>
     </section>
 
     <section id="features" class="features section-shell">
       <div class="section-heading">
-        <p class="section-kicker">필요한 정보만</p>
-        <h2>작지만 충분한 위젯</h2>
+        <h2>구독 한도와 표시 방식</h2>
       </div>
       <div class="feature-grid">
-        <article><div class="feature-icon">01</div><h3>선택한 모델에 집중</h3><p>상단 탭에서 모델을 고르면 세션과 주간 사용량을 큰 링 두 개로 바로 보여줍니다.</p></article>
-        <article><div class="feature-icon">02</div><h3>한도를 내 방식대로</h3><p>5시간·주간 한도를 고르고 선택한 임계치에 도달할 때만 알림을 받을 수 있습니다.</p></article>
-        <article><div class="feature-icon">03</div><h3>리셋까지 바로</h3><p>각 링 아래에 다음 리셋까지 남은 시간을 함께 표시해 한도와 여유 시간을 빠르게 파악합니다.</p></article>
-        <article><div class="feature-icon">04</div><h3>로컬 우선</h3><p>API 키를 서버로 보내지 않고 로그인된 로컬 클라이언트에서 조회합니다.</p></article>
-        <article><div class="feature-icon">05</div><h3>운영체제에 맞는 간단 보기</h3><p>Windows는 작업 영역의 한 줄 바, Mac은 노치 아래 미니 바와 메뉴바로 구독 한도의 최대 사용률을 표시합니다. 노치가 없으면 메뉴바를 사용하며, 기존 설정은 유지됩니다. Mac 실기기 동작은 추가 확인 중입니다.</p></article>
-        <article><div class="feature-icon">06</div><h3>검증형 원클릭 업데이트</h3><p>새 버전을 알리고 운영체제에 맞는 설치 파일을 내려받아 SHA-256 확인 후 설치를 이어갑니다.</p></article>
+        <article class="feature-density" data-bento="density">
+          <h3>3단계 표시 밀도 전환</h3>
+          <p>세션·주간 한도는 펼쳐서, 구독 한도의 최대 사용률은 막대나 트레이에서 확인하세요.</p>
+          <dl class="density-preview" aria-label="펼침, 막대, 트레이만 표시 비교" data-visual>
+            <div>
+              <dt>펼침<small>세션 / 주간</small></dt>
+              <dd class="density-expanded">
+                <div><span>Codex</span><strong class="bento-num">62 / 44%</strong></div>
+                <div><span>Gemini</span><strong class="bento-num">15 / 9%</strong></div>
+                <div><span>Claude</span><strong class="bento-num">55 / 21%</strong></div>
+              </dd>
+            </div>
+            <div>
+              <dt>막대<small>한 줄 요약</small></dt>
+              <dd class="density-bar"><span>Codex <b class="bento-num">62%</b></span><span>Gemini <b class="bento-num">15%</b></span><span>Claude <b class="bento-num">55%</b></span></dd>
+            </div>
+            <div>
+              <dt>트레이만<small>위젯 숨김</small></dt>
+              <dd class="density-tray"><span>SynapCap</span><strong class="bento-num">62%</strong></dd>
+            </div>
+          </dl>
+          <div class="density-platforms">
+            <p><strong>Windows</strong>작업 영역의 한 줄 바</p>
+            <p><strong>macOS</strong>노치 아래 미니 바 / 메뉴바</p>
+          </div>
+          <p class="bento-note">노치가 없거나 화면 정보를 읽지 못하면 메뉴바로 대체합니다. Mac 실기기 동작은 추가 확인 중입니다.</p>
+          <p class="bento-note">앱은 시스템 테마를 따르거나 다크·라이트 테마를 직접 선택할 수 있습니다.</p>
+          <p class="bento-note">한도 알림은 5시간·주간 기간과 임계치를 선택해 받을 수 있습니다.</p>
+          <a class="text-link" href="#top">히어로에서 세 가지 모드 전환하기</a>
+        </article>
+
+        <article class="feature-security" data-bento="security">
+          <h3>로컬 우선 보안</h3>
+          <p>기본 구독 조회는 API 키 없이 로그인된 로컬 도구에서 읽습니다. SynapCap 서버는 없습니다.</p>
+          <dl class="security-settings" aria-label="계정 정보와 설정 보관 방식" data-visual>
+            <div><dt>사용량 조회</dt><dd>로컬 CLI 로그인</dd></div>
+            <div><dt>API 키</dt><dd><span class="bento-status">불필요</span></dd></div>
+            <div><dt>프로바이더·위젯 설정</dt><dd><span class="bento-status">이 컴퓨터에 저장</span></dd></div>
+            <div><dt>MCP 설정</dt><dd><span class="bento-status">보존</span></dd></div>
+          </dl>
+          <p class="bento-note">사용자의 MCP 설정을 삭제하거나 일괄 비활성화하지 않습니다.</p>
+        </article>
+
+        <article class="feature-rings" data-bento="rings">
+          <h3>세션·주간 링 차트 및 리셋 타이머</h3>
+          <div class="bento-model"><strong>Codex</strong><span>5시간 / 주간</span></div>
+          <div class="bento-rings" aria-label="Codex 세션 62%, 주간 44% 사용량 미리보기" data-visual>
+            <div><span>세션</span><div class="preview-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="62 100"/></svg><b>62<span>%</span></b></div><small>리셋까지</small><time datetime="PT2H3M">2h 3m</time></div>
+            <div><span>주간</span><div class="preview-ring weekly-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="44 100"/></svg><b>44<span>%</span></b></div><small>리셋까지</small><time datetime="P4DT20H">4d 20h</time></div>
+          </div>
+          <p>선택한 모델의 5시간·주간 한도와 다음 리셋까지 남은 시간을 표시합니다.</p>
+        </article>
+
+        <article class="feature-updates" data-bento="updates">
+          <h3>SHA-256 검증형 원클릭 업데이트</h3>
+          <dl class="verification-flow" aria-label="다운로드부터 설치까지의 검증 절차" data-visual>
+            <div><dt>공식 Release</dt><dd>파일 다운로드</dd></div>
+            <div><dt>SHA-256</dt><dd><span class="bento-status">자동 검증</span></dd></div>
+            <div><dt>설치 진행</dt><dd>검증 통과 후</dd></div>
+          </dl>
+          <p>새 버전을 알리고 설치 파일의 체크섬을 확인합니다. macOS는 검증된 DMG를 연 뒤 앱을 직접 교체합니다.</p>
+          <a class="text-link" href="#updates">업데이트 절차 보기</a>
+        </article>
       </div>
+      <details class="usage-details"><summary>사용률 숫자와 갱신 상태 읽는 법</summary><div>
+        <p><b>55%는 사용한 비율</b>입니다. 간단 보기의 숫자는 해당 서비스의 전체 구독 한도 중 최대 사용률이며 평균이나 합산이 아닙니다. 세션·주간·별도 그룹의 값은 앱 툴팁과 상세 화면에서 확인하세요.</p>
+        <p><b>*는 갱신 실패 후 마지막 정상 값</b>입니다. 오류·값 없음·무제한을 0%로 표시하지 않습니다.</p>
+        <p><b>새 설치만 간단 보기로 시작</b>합니다. 기존 사용자의 모드·위치는 유지됩니다.</p>
+      </div></details>
     </section>
 
     <section id="download" class="download-section section-shell">
       <div class="section-heading centered">
-        <p class="section-kicker">Download</p>
         <h2>내 운영체제에 맞게 설치</h2>
         <p id="release-meta" aria-live="polite">GitHub Release에서 최신 버전 정보를 확인하고 있습니다.</p>
       </div>
       <div class="download-grid">
         <article class="download-card" data-platform-card="windows">
           <div class="os-mark windows-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-          <div><h3>Windows</h3><p>Windows 10/11 · 64비트</p></div>
+          <div><h3>Windows</h3><p>Windows 10/11 / 64비트</p></div>
           <a class="download-link" data-asset="SynapCap-Windows-x64-Setup.exe" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SynapCap-Windows-x64-Setup.exe">설치 파일 받기 <span>↓</span></a>
         </article>
         <article class="download-card" data-platform-card="mac">
-          <div class="os-mark apple-mark" aria-hidden="true">●</div>
-          <div><h3>macOS</h3><p>Apple Silicon · M1 이상</p></div>
+          <div class="os-mark intel-mark" aria-hidden="true">mac</div>
+          <div><h3>macOS</h3><p>Apple Silicon / M1 이상</p></div>
           <a class="download-link" data-asset="SynapCap-macOS-arm64.dmg" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SynapCap-macOS-arm64.dmg">Apple Silicon 받기 <span>↓</span></a>
         </article>
         <article class="download-card compact-card" data-platform-card="mac-intel">
@@ -138,15 +185,15 @@
           <a class="download-link" data-asset="SynapCap-macOS-x64.dmg" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SynapCap-macOS-x64.dmg">Intel 버전 받기 <span>↓</span></a>
         </article>
       </div>
-      <div class="download-support">
-        <a class="checksum-link" data-asset="SHA256SUMS.txt" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SHA256SUMS.txt">SHA-256 체크섬 받기</a>
-        <a href="https://github.com/kimNarr/SynapCap/releases/latest" target="_blank" rel="noreferrer">릴리스 노트 보기 <span aria-hidden="true">↗</span></a>
-      </div>
-      <p class="signing-note"><strong>Windows에서 “일반적으로 다운로드되지 않음”이 표시되나요?</strong> 악성 파일 판정이 아니라 아직 코드 서명과 다운로드 평판이 없는 새 파일에 표시되는 경고입니다. 공식 GitHub Release에서 받은 파일인지 확인하고 SHA-256 체크섬과 GitHub 빌드 출처 증명을 검증한 뒤에만 Edge 다운로드 패널의 <b>유지 → 더 보기 → 그래도 계속</b>을 선택하세요. 출처나 해시가 다르면 파일을 삭제하세요.</p>
-      <div class="mac-first-run" aria-labelledby="mac-first-run-title">
+      <div class="download-notices">
+        <details><summary>Windows SmartScreen 경고 안내</summary><div class="notice-body">      <p class="signing-note"><strong>Windows에서 “일반적으로 다운로드되지 않음”이 표시되나요?</strong> 악성 파일 판정이 아니라 아직 코드 서명과 다운로드 평판이 없는 새 파일에 표시되는 경고입니다. 공식 GitHub Release에서 받은 파일인지 확인하고 SHA-256 체크섬과 GitHub 빌드 출처 증명을 검증한 뒤에만 Edge 다운로드 패널의 <b>유지 → 더 보기 → 그래도 계속</b>을 선택하세요. 출처나 해시가 다르면 파일을 삭제하세요.</p>      <div class="permission-note">
+        <strong>Windows 다운로드 평판 경고</strong>
+        <p>코드 서명 전 초기 릴리스는 새 버전마다 Edge·SmartScreen 경고가 나타날 수 있습니다. Release의 <code>SHA256SUMS.txt</code>와 <code>gh attestation verify 파일명 -R kimNarr/SynapCap</code>으로 무결성과 빌드 출처를 확인할 수 있습니다. 경고를 근본적으로 없애려면 추후 Microsoft Store 또는 신원 확인 코드 서명이 필요합니다.</p>
+      </div></div></details>
+        <details><summary>macOS ‘그래도 열기’ 안내</summary>
+      <div class="mac-first-run">
         <div class="mac-first-run-heading">
-          <p class="section-kicker">macOS first launch</p>
-          <h3 id="mac-first-run-title">처음 실행할 때 차단된다면</h3>
+          <strong>처음 실행할 때 차단된다면</strong>
           <p>현재 설치본은 Apple 개발자 서명·공증 전입니다. 공식 Release 파일과 SHA-256을 확인한 경우에만 SynapCap 하나를 예외로 허용하세요.</p>
         </div>
         <ol class="mac-first-run-steps">
@@ -155,28 +202,31 @@
           <li><span>3</span><div><strong>그래도 열기 허용</strong><p>Apple 메뉴 → <b>시스템 설정</b> → <b>개인정보 보호 및 보안</b> → 아래쪽 <b>보안</b>에서 <b>그래도 열기</b>를 누릅니다.</p></div></li>
           <li><span>4</span><div><strong>열기 확인</strong><p>암호 또는 Touch ID로 승인하고 다시 나타나는 창에서 <b>열기</b>를 선택합니다.</p></div></li>
         </ol>
-        <p class="mac-first-run-note"><b>다시 설치할 필요는 없습니다.</b> 승인 후 응용 프로그램 폴더에서 다시 실행하세요. `그래도 열기` 버튼은 첫 실행 시도 후 약 1시간 동안 표시됩니다. <a href="https://support.apple.com/ko-kr/102445" target="_blank" rel="noreferrer">Apple 공식 안내 ↗</a></p>
+        <p class="mac-first-run-note"><b>다시 설치할 필요는 없습니다.</b> 승인 후 응용 프로그램 폴더에서 다시 실행하세요. `그래도 열기` 버튼은 첫 실행 시도 후 약 1시간 동안 표시됩니다. <a href="https://support.apple.com/ko-kr/102445" target="_blank" rel="noreferrer">Apple 공식 안내</a></p>
+      </div></details>
+      </div>
+      <div class="download-support">
+        <a class="checksum-link" data-asset="SHA256SUMS.txt" href="https://github.com/kimNarr/SynapCap/releases/latest/download/SHA256SUMS.txt">SHA-256 체크섬 받기</a>
+        <a href="https://github.com/kimNarr/SynapCap/releases/latest" target="_blank" rel="noreferrer">릴리스 노트 보기 </a>
       </div>
     </section>
 
     <section id="requirements" class="requirements section-shell">
       <div class="requirement-copy">
-        <p class="section-kicker">Before installing</p>
-        <h2>웹 채팅이 아닌<br>로컬 로그인 기준</h2>
+        <h2>웹 채팅이 아닌 로컬 로그인 기준</h2>
         <p>SynapCap은 각 서비스의 로컬 앱 또는 CLI가 제공하는 구독 한도를 읽습니다. 웹 채팅만 사용하는 계정의 사용량은 조회하지 않으며 별도의 유료 API를 호출하지 않습니다.</p>
         <p class="usage-sync-note">Claude 사용량은 Claude Code CLI 기준입니다. 실행 중인 Claude 화면이 먼저 갱신되면 SynapCap 값에는 수분 뒤 반영될 수 있으며, 앱의 프로바이더·사용량 툴팁에서 출처와 마지막 조회 시각을 확인할 수 있습니다.</p>
-        <a class="setup-jump" href="#cli-setup">Windows·macOS CLI 설치 순서 보기 <span aria-hidden="true">↓</span></a>
+        <a class="setup-jump" href="#cli-setup">Windows·macOS CLI 설치 순서 보기 </a>
       </div>
       <div class="requirement-list">
-        <div><span class="service-letter"><img src="assets/provider-codex.svg" alt=""></span><p><strong>Codex</strong><small>Codex CLI · Windows는 Codex 앱도 지원</small></p><b>설치·로그인 필요</b></div>
-        <div><span class="service-letter gemini-letter"><img src="assets/provider-gemini.svg" alt=""></span><p><strong>Gemini</strong><small>Antigravity CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
-        <div><span class="service-letter claude-letter"><img src="assets/provider-claude.svg" alt=""></span><p><strong>Claude</strong><small>Claude Code CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
+        <div><span class="service-letter"><img src="assets/provider-codex.svg" alt="" width="18" height="18" loading="lazy"></span><p><strong>Codex</strong><small>Codex CLI / Windows는 Codex 앱도 지원</small></p><b>설치·로그인 필요</b></div>
+        <div><span class="service-letter gemini-letter"><img src="assets/provider-gemini.svg" alt="" width="18" height="18" loading="lazy"></span><p><strong>Gemini</strong><small>Antigravity CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
+        <div><span class="service-letter claude-letter"><img src="assets/provider-claude.svg" alt="" width="18" height="18" loading="lazy"></span><p><strong>Claude</strong><small>Claude Code CLI 설치 및 로그인</small></p><b>설치·로그인 필요</b></div>
       </div>
     </section>
 
     <section id="cli-setup" class="cli-setup section-shell" aria-labelledby="cli-setup-title">
       <div class="section-heading centered">
-        <p class="section-kicker">CLI setup · Windows &amp; macOS</p>
         <h2 id="cli-setup-title">처음이어도, 설치부터 로그인까지</h2>
         <p>기본 연동 3종 중 사용하는 서비스만 준비하세요. 아래는 별도 패키지 관리자 없이 공식 설치 스크립트를 사용하는 방법입니다.</p>
       </div>
@@ -188,113 +238,133 @@
       </div>
       <p class="setup-safety">명령어는 해당 서비스의 공식 설치 프로그램을 내려받아 실행합니다. 먼저 각 카드의 <b>공식 설치 안내</b>와 주소를 확인하고, 회사 PC에서는 관리자 정책을 따르세요. 설치만으로 모든 계정에 구독 한도가 생기지는 않습니다.</p>
 
-      <details class="cli-platform" id="cli-windows" open>
-        <summary><span><strong>Windows 10 / 11</strong><small>Windows PowerShell에서 진행</small></span><span class="setup-toggle" aria-hidden="true">+</span></summary>
-        <div class="cli-platform-body">
+      <div class="setup-console" data-tabset>
+        <div class="os-tabs tab-list" role="tablist" aria-label="CLI 운영체제" hidden>
+          <button type="button" id="os-windows-tab" role="tab" aria-controls="cli-windows" aria-selected="true">Windows</button>
+          <button type="button" id="os-macos-tab" role="tab" aria-controls="cli-macos" aria-selected="false" tabindex="-1">macOS</button>
+        </div>
+      <div class="cli-platform" id="cli-windows" role="tabpanel" aria-labelledby="os-windows-tab">
+
+        <div class="cli-platform-body" data-tabset>
+          <div class="service-tabs tab-list" role="tablist" aria-label="Windows CLI 서비스" hidden>
+            <button type="button" id="windows-codex-tab" role="tab" aria-controls="windows-codex" aria-selected="true"><img src="assets/provider-codex.svg" alt="" width="18" height="18" loading="lazy">Codex</button>
+            <button type="button" id="windows-antigravity-tab" role="tab" aria-controls="windows-antigravity" aria-selected="false" tabindex="-1"><img src="assets/provider-gemini.svg" alt="" width="18" height="18" loading="lazy">Gemini</button>
+            <button type="button" id="windows-claude-tab" role="tab" aria-controls="windows-claude" aria-selected="false" tabindex="-1"><img src="assets/provider-claude.svg" alt="" width="18" height="18" loading="lazy">Claude</button>
+          </div>
           <p class="shell-intro"><b>터미널 열기:</b> 시작 메뉴에서 <b>PowerShell</b>을 검색해 실행하세요. 아래 Windows 명령은 <b>명령 프롬프트(CMD)·Git Bash·WSL이 아닌 PowerShell</b>에 한 줄씩 붙여 넣고 Enter를 누릅니다.</p>
           <div class="cli-guide-grid">
-            <article class="cli-guide" data-service="codex">
+            <article class="cli-guide" data-service="codex" id="windows-codex" role="tabpanel" aria-labelledby="windows-codex-tab" tabindex="0">
               <h3>Codex <small>ChatGPT 구독 계정</small></h3>
               <ol>
-                <li><strong>CLI 설치</strong><pre><code translate="no">irm https://chatgpt.com/codex/install.ps1 | iex</code></pre></li>
-                <li><strong>PowerShell을 닫고 새로 열어 확인</strong><pre><code translate="no">codex --version</code></pre><p>버전 번호가 나오면 설치가 확인된 것입니다.</p></li>
-                <li><strong>ChatGPT 계정으로 로그인</strong><pre><code translate="no">codex login</code></pre><p>브라우저에서 사용량을 확인할 ChatGPT 계정으로 로그인하세요. 구독 조회용이므로 API 키 로그인과 혼동하지 마세요.</p></li>
+                <li><strong>CLI 설치</strong><div class="command-block"><pre id="command-1"><code translate="no">irm https://chatgpt.com/codex/install.ps1 | iex</code></pre><button class="copy-command" type="button" data-copy="command-1" aria-label="명령어 복사">복사</button></div></li>
+                <li><strong>PowerShell을 닫고 새로 열어 확인</strong><div class="command-block"><pre id="command-2"><code translate="no">codex --version</code></pre><button class="copy-command" type="button" data-copy="command-2" aria-label="명령어 복사">복사</button></div><p>버전 번호가 나오면 설치가 확인된 것입니다.</p></li>
+                <li><strong>ChatGPT 계정으로 로그인</strong><div class="command-block"><pre id="command-3"><code translate="no">codex login</code></pre><button class="copy-command" type="button" data-copy="command-3" aria-label="명령어 복사">복사</button></div><p>브라우저에서 사용량을 확인할 ChatGPT 계정으로 로그인하세요. 구독 조회용이므로 API 키 로그인과 혼동하지 마세요.</p></li>
               </ol>
-              <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex 공식 설치 안내 ↗</a>
+              <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex 공식 설치 안내</a>
             </article>
-            <article class="cli-guide" data-service="antigravity">
-              <h3>Gemini <small>Antigravity CLI · agy</small></h3>
+            <article class="cli-guide" data-service="antigravity" id="windows-antigravity" role="tabpanel" aria-labelledby="windows-antigravity-tab" tabindex="0">
+              <h3>Gemini <small>Antigravity CLI / agy</small></h3>
               <ol>
-                <li><strong>Antigravity CLI 설치</strong><pre><code translate="no">irm https://antigravity.google/cli/install.ps1 | iex</code></pre></li>
-                <li><strong>새 PowerShell에서 확인</strong><pre><code translate="no">agy --version</code></pre><p>이름은 <code>gemini</code>가 아니라 <code>agy</code>입니다.</p></li>
-                <li><strong>처음 실행하고 Google 계정 로그인</strong><pre><code translate="no">agy</code></pre><p>초기 안내를 마치고 사용하는 Google 계정으로 로그인하세요. 터미널이 인증 코드를 요청하는 경우에만 브라우저의 코드를 붙여 넣고 Enter를 누릅니다.</p></li>
+                <li><strong>Antigravity CLI 설치</strong><div class="command-block"><pre id="command-4"><code translate="no">irm https://antigravity.google/cli/install.ps1 | iex</code></pre><button class="copy-command" type="button" data-copy="command-4" aria-label="명령어 복사">복사</button></div></li>
+                <li><strong>새 PowerShell에서 확인</strong><div class="command-block"><pre id="command-5"><code translate="no">agy --version</code></pre><button class="copy-command" type="button" data-copy="command-5" aria-label="명령어 복사">복사</button></div><p>이름은 <code>gemini</code>가 아니라 <code>agy</code>입니다.</p></li>
+                <li><strong>처음 실행하고 Google 계정 로그인</strong><div class="command-block"><pre id="command-6"><code translate="no">agy</code></pre><button class="copy-command" type="button" data-copy="command-6" aria-label="명령어 복사">복사</button></div><p>초기 안내를 마치고 사용하는 Google 계정으로 로그인하세요. 터미널이 인증 코드를 요청하는 경우에만 브라우저의 코드를 붙여 넣고 Enter를 누릅니다.</p></li>
               </ol>
-              <a href="https://antigravity.google/docs/getting-started" target="_blank" rel="noreferrer">Antigravity 공식 설치 안내 ↗</a>
+              <a href="https://antigravity.google/docs/getting-started" target="_blank" rel="noreferrer">Antigravity 공식 설치 안내</a>
             </article>
-            <article class="cli-guide" data-service="claude">
+            <article class="cli-guide" data-service="claude" id="windows-claude" role="tabpanel" aria-labelledby="windows-claude-tab" tabindex="0">
               <h3>Claude <small>Claude Code 구독 계정</small></h3>
               <ol>
-                <li><strong>Claude Code 설치</strong><pre><code translate="no">irm https://claude.ai/install.ps1 | iex</code></pre></li>
-                <li><strong>새 PowerShell에서 확인</strong><pre><code translate="no">claude --version</code></pre><p>설치 중 진행 표시가 없을 수 있으니 완료 안내를 기다리세요.</p></li>
-                <li><strong>처음 실행하고 Claude 계정 로그인</strong><pre><code translate="no">claude</code></pre><p>브라우저에서 Claude Code를 사용할 수 있는 Claude 구독 계정으로 로그인하세요. 웹 채팅 로그인만으로 CLI 인증이 끝나지는 않습니다.</p></li>
+                <li><strong>Claude Code 설치</strong><div class="command-block"><pre id="command-7"><code translate="no">irm https://claude.ai/install.ps1 | iex</code></pre><button class="copy-command" type="button" data-copy="command-7" aria-label="명령어 복사">복사</button></div></li>
+                <li><strong>새 PowerShell에서 확인</strong><div class="command-block"><pre id="command-8"><code translate="no">claude --version</code></pre><button class="copy-command" type="button" data-copy="command-8" aria-label="명령어 복사">복사</button></div><p>설치 중 진행 표시가 없을 수 있으니 완료 안내를 기다리세요.</p></li>
+                <li><strong>처음 실행하고 Claude 계정 로그인</strong><div class="command-block"><pre id="command-9"><code translate="no">claude</code></pre><button class="copy-command" type="button" data-copy="command-9" aria-label="명령어 복사">복사</button></div><p>브라우저에서 Claude Code를 사용할 수 있는 Claude 구독 계정으로 로그인하세요. 웹 채팅 로그인만으로 CLI 인증이 끝나지는 않습니다.</p></li>
               </ol>
-              <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer">Claude Code 공식 설치 안내 ↗</a>
+              <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer">Claude Code 공식 설치 안내</a>
             </article>
           </div>
           <p class="setup-platform-note"><b>Windows에서 주의:</b> WSL에만 설치한 CLI·로그인 정보는 Windows용 SynapCap이 자동으로 찾지 못할 수 있습니다. 이 안내는 Windows 네이티브 설치 기준입니다.</p>
         </div>
-      </details>
+      </div>
 
-      <details class="cli-platform" id="cli-macos">
-        <summary><span><strong>macOS</strong><small>Apple Silicon·Intel 공통 · 터미널에서 진행</small></span><span class="setup-toggle" aria-hidden="true">+</span></summary>
-        <div class="cli-platform-body">
+      <div class="cli-platform" id="cli-macos" role="tabpanel" aria-labelledby="os-macos-tab">
+
+        <div class="cli-platform-body" data-tabset>
+          <div class="service-tabs tab-list" role="tablist" aria-label="macOS CLI 서비스" hidden>
+            <button type="button" id="macos-codex-tab" role="tab" aria-controls="macos-codex" aria-selected="true"><img src="assets/provider-codex.svg" alt="" width="18" height="18" loading="lazy">Codex</button>
+            <button type="button" id="macos-antigravity-tab" role="tab" aria-controls="macos-antigravity" aria-selected="false" tabindex="-1"><img src="assets/provider-gemini.svg" alt="" width="18" height="18" loading="lazy">Gemini</button>
+            <button type="button" id="macos-claude-tab" role="tab" aria-controls="macos-claude" aria-selected="false" tabindex="-1"><img src="assets/provider-claude.svg" alt="" width="18" height="18" loading="lazy">Claude</button>
+          </div>
           <p class="shell-intro"><b>터미널 열기:</b> <kbd>⌘</kbd> + <kbd>Space</kbd>로 Spotlight를 열고 <b>터미널</b>을 검색하세요. 사용하는 서비스의 명령만 한 줄씩 실행합니다. 비밀번호 입력 중에는 글자가 표시되지 않을 수 있습니다.</p>
           <div class="cli-guide-grid">
-            <article class="cli-guide" data-service="codex">
+            <article class="cli-guide" data-service="codex" id="macos-codex" role="tabpanel" aria-labelledby="macos-codex-tab" tabindex="0">
               <h3>Codex <small>ChatGPT 구독 계정</small></h3>
               <ol>
-                <li><strong>CLI 설치</strong><pre><code translate="no">curl -fsSL https://chatgpt.com/codex/install.sh | sh</code></pre></li>
-                <li><strong>새 터미널에서 확인</strong><pre><code translate="no">codex --version</code></pre><p>버전 번호가 나오면 설치가 확인된 것입니다.</p></li>
-                <li><strong>ChatGPT 계정으로 로그인</strong><pre><code translate="no">codex login</code></pre><p>브라우저에서 구독 계정으로 로그인합니다. 로그인 상태는 <code>codex login status</code>로 확인할 수 있습니다.</p></li>
+                <li><strong>CLI 설치</strong><div class="command-block"><pre id="command-10"><code translate="no">curl -fsSL https://chatgpt.com/codex/install.sh | sh</code></pre><button class="copy-command" type="button" data-copy="command-10" aria-label="명령어 복사">복사</button></div></li>
+                <li><strong>새 터미널에서 확인</strong><div class="command-block"><pre id="command-11"><code translate="no">codex --version</code></pre><button class="copy-command" type="button" data-copy="command-11" aria-label="명령어 복사">복사</button></div><p>버전 번호가 나오면 설치가 확인된 것입니다.</p></li>
+                <li><strong>ChatGPT 계정으로 로그인</strong><div class="command-block"><pre id="command-12"><code translate="no">codex login</code></pre><button class="copy-command" type="button" data-copy="command-12" aria-label="명령어 복사">복사</button></div><p>브라우저에서 구독 계정으로 로그인합니다. 로그인 상태는 <code>codex login status</code>로 확인할 수 있습니다.</p></li>
               </ol>
-              <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex 공식 설치 안내 ↗</a>
+              <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex 공식 설치 안내</a>
             </article>
-            <article class="cli-guide" data-service="antigravity">
-              <h3>Gemini <small>Antigravity CLI · agy</small></h3>
+            <article class="cli-guide" data-service="antigravity" id="macos-antigravity" role="tabpanel" aria-labelledby="macos-antigravity-tab" tabindex="0">
+              <h3>Gemini <small>Antigravity CLI / agy</small></h3>
               <ol>
-                <li><strong>Antigravity CLI 설치</strong><pre><code translate="no">curl -fsSL https://antigravity.google/cli/install.sh | bash</code></pre></li>
-                <li><strong>새 터미널에서 확인</strong><pre><code translate="no">agy --version</code></pre><p>기존 Gemini 웹 로그인과 CLI 로그인은 구분해 확인하세요.</p></li>
-                <li><strong>처음 실행하고 Google 계정 로그인</strong><pre><code translate="no">agy</code></pre><p>초기 안내와 브라우저 로그인을 마칩니다. 인증 코드 입력을 요청받으면 실행 중인 <code>agy</code> 터미널로 돌아와 입력하세요.</p></li>
+                <li><strong>Antigravity CLI 설치</strong><div class="command-block"><pre id="command-13"><code translate="no">curl -fsSL https://antigravity.google/cli/install.sh | bash</code></pre><button class="copy-command" type="button" data-copy="command-13" aria-label="명령어 복사">복사</button></div></li>
+                <li><strong>새 터미널에서 확인</strong><div class="command-block"><pre id="command-14"><code translate="no">agy --version</code></pre><button class="copy-command" type="button" data-copy="command-14" aria-label="명령어 복사">복사</button></div><p>기존 Gemini 웹 로그인과 CLI 로그인은 구분해 확인하세요.</p></li>
+                <li><strong>처음 실행하고 Google 계정 로그인</strong><div class="command-block"><pre id="command-15"><code translate="no">agy</code></pre><button class="copy-command" type="button" data-copy="command-15" aria-label="명령어 복사">복사</button></div><p>초기 안내와 브라우저 로그인을 마칩니다. 인증 코드 입력을 요청받으면 실행 중인 <code>agy</code> 터미널로 돌아와 입력하세요.</p></li>
               </ol>
-              <a href="https://antigravity.google/docs/getting-started" target="_blank" rel="noreferrer">Antigravity 공식 설치 안내 ↗</a>
+              <a href="https://antigravity.google/docs/getting-started" target="_blank" rel="noreferrer">Antigravity 공식 설치 안내</a>
             </article>
-            <article class="cli-guide" data-service="claude">
+            <article class="cli-guide" data-service="claude" id="macos-claude" role="tabpanel" aria-labelledby="macos-claude-tab" tabindex="0">
               <h3>Claude <small>Claude Code 구독 계정</small></h3>
               <ol>
-                <li><strong>Claude Code 설치</strong><pre><code translate="no">curl -fsSL https://claude.ai/install.sh | bash</code></pre></li>
-                <li><strong>새 터미널에서 확인</strong><pre><code translate="no">claude --version</code></pre><p>작동 여부를 더 확인하려면 <code>claude doctor</code>로 설치 진단을 볼 수 있습니다.</p></li>
-                <li><strong>처음 실행하고 Claude 계정 로그인</strong><pre><code translate="no">claude</code></pre><p>Claude 구독 계정을 선택하고 브라우저에서 승인하세요. API·Console 인증은 구독 사용량과 같은 기준이 아닙니다.</p></li>
+                <li><strong>Claude Code 설치</strong><div class="command-block"><pre id="command-16"><code translate="no">curl -fsSL https://claude.ai/install.sh | bash</code></pre><button class="copy-command" type="button" data-copy="command-16" aria-label="명령어 복사">복사</button></div></li>
+                <li><strong>새 터미널에서 확인</strong><div class="command-block"><pre id="command-17"><code translate="no">claude --version</code></pre><button class="copy-command" type="button" data-copy="command-17" aria-label="명령어 복사">복사</button></div><p>작동 여부를 더 확인하려면 <code>claude doctor</code>로 설치 진단을 볼 수 있습니다.</p></li>
+                <li><strong>처음 실행하고 Claude 계정 로그인</strong><div class="command-block"><pre id="command-18"><code translate="no">claude</code></pre><button class="copy-command" type="button" data-copy="command-18" aria-label="명령어 복사">복사</button></div><p>Claude 구독 계정을 선택하고 브라우저에서 승인하세요. API·Console 인증은 구독 사용량과 같은 기준이 아닙니다.</p></li>
               </ol>
-              <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer">Claude Code 공식 설치 안내 ↗</a>
+              <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noreferrer">Claude Code 공식 설치 안내</a>
             </article>
           </div>
           <p class="setup-platform-note"><b>macOS에서 주의:</b> 앱에 임의의 전체 디스크 접근 권한을 부여하거나 보안 기능을 끌 필요는 없습니다. 명령을 찾지 못하면 아래 경로 확인부터 진행하세요.</p>
         </div>
-      </details>
+      </div>
 
-      <div class="setup-finish">
-        <h3>로그인까지 마쳤다면, SynapCap에 반영하기</h3>
+      </div>
+      <details class="setup-finish"><summary>로그인 완료 후 SynapCap에 반영하기</summary><div>
+
         <ol>
           <li>트레이·메뉴바의 SynapCap 메뉴에서 <b>종료</b>한 뒤 다시 실행합니다. 창을 트레이로 접는 것만으로는 완전 종료되지 않습니다.</li>
           <li><b>설정 → AI Providers</b>에서 사용하는 서비스가 활성화돼 있는지 확인합니다.</li>
           <li><b>새로고침</b>을 누르고 조회가 끝날 때까지 기다립니다. 값이 없으면 표시된 상태를 눌러 진단 정보를 확인합니다.</li>
         </ol>
         <p>로그인·버전 확인만으로 연동을 준비할 수 있습니다. 확인을 위해 AI에게 유료 작업을 요청하거나 토큰·인증 파일을 SynapCap에 붙여 넣을 필요는 없습니다.</p>
-      </div>
+      </div></details>
       <div class="setup-help" aria-label="설치 중 자주 막히는 부분">
         <details><summary>설치했는데 ‘명령을 찾을 수 없음’이 나와요</summary><p>먼저 터미널을 완전히 닫고 새로 여세요. Windows PowerShell에서는 <code>Get-Command codex</code>, <code>Get-Command agy</code>, <code>Get-Command claude</code>로 설치 경로를 확인합니다. macOS에서는 <code>command -v codex</code>, <code>command -v agy</code>, <code>command -v claude</code>를 사용하세요. 경로가 나오지 않으면 해당 서비스 공식 문서의 PATH 안내를 따릅니다.</p></details>
         <details><summary>브라우저에서는 로그인했는데 위젯은 ‘로그인 필요’예요</summary><p>같은 PC·운영체제의 CLI에서 로그인했는지 확인하세요. 웹사이트나 WSL에만 로그인한 상태는 다를 수 있습니다. 해당 CLI를 직접 실행해 인증을 마친 뒤 SynapCap을 재시작합니다. Antigravity 인증 코드가 표시돼도 터미널이 요청하지 않으면 임의로 붙여 넣지 마세요.</p></details>
         <details><summary>설치 스크립트 실행이 차단되거나 계속 조회 오류가 나요</summary><p>PowerShell·CMD·macOS 명령을 섞어 쓰지 않았는지 확인하세요. 조직의 보안 정책을 임의로 해제하지 말고 공식 설치 안내나 관리자에게 문의하세요. CLI 버전과 로그인이 확인됐다면 위젯의 오류 상태에서 진단 보고서를 확인합니다. 토큰·계정 인증 파일은 공유하지 마세요.</p></details>
       </div>
-      <p class="setup-reviewed">공식 문서 확인: 2026-11-09 · 명령과 로그인 화면은 서비스 업데이트에 따라 바뀔 수 있습니다. 각 카드의 공식 안내를 우선 확인하세요.</p>
+      <p class="setup-reviewed">공식 문서 확인: 2026-11-09 / 명령과 로그인 화면은 서비스 업데이트에 따라 바뀔 수 있습니다. 각 카드의 공식 안내를 우선 확인하세요.</p>
     </section>
 
     <section id="troubleshooting" class="troubleshooting section-shell">
       <div class="section-heading centered">
-        <p class="section-kicker">Troubleshooting</p>
         <h2>오류 문구에서 바로 해결까지</h2>
-        <p>카드의 상태 배지를 누르면 CLI 감지 경로와 해결 안내가 열립니다. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다.</p>
+        <p>위젯에 표시된 상태를 선택해 해결 방법을 확인하세요. 사용하지 않는 서비스는 설정에서 비활성화할 수 있습니다.</p>
       </div>
-      <div class="error-grid">
-        <article><span class="error-badge dormant">미설치</span><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다. 사용하지 않는 서비스는 설정에서 숨길 수 있습니다.</p></article>
-        <article><span class="error-badge">로그인 필요</span><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행합니다. Antigravity가 인증 코드 입력을 요청하면 브라우저의 코드를 <code>agy</code> 터미널에 붙여 넣고 Enter를 누릅니다.</p></article>
-        <article><span class="error-badge warning">시간 초과</span><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
-        <article><span class="error-badge muted">조회 오류</span><h3>진단 정보를 확인하세요</h3><p>상태 배지를 눌러 원인을 확인하고 토큰이 없는 진단 보고서를 복사해 Issue에 첨부할 수 있습니다.</p></article>
+      <div class="error-console" data-tabset>
+        <div class="error-tabs tab-list" role="tablist" aria-label="오류 상태" hidden>
+          <button type="button" id="error-uninstalled-tab" role="tab" aria-controls="error-uninstalled" aria-selected="true">미설치</button>
+          <button type="button" id="error-login-tab" role="tab" aria-controls="error-login" aria-selected="false" tabindex="-1">로그인 필요</button>
+          <button type="button" id="error-timeout-tab" role="tab" aria-controls="error-timeout" aria-selected="false" tabindex="-1">시간 초과</button>
+          <button type="button" id="error-query-tab" role="tab" aria-controls="error-query" aria-selected="false" tabindex="-1">조회 오류</button>
+        </div>
+        <div class="error-panels">
+          <article class="error-solution" id="error-uninstalled" role="tabpanel" aria-labelledby="error-uninstalled-tab" tabindex="0"><h3>CLI를 찾지 못했어요</h3><p>해당 서비스의 CLI를 설치하고 <code>--version</code>으로 확인한 뒤 한 번 실행해 로그인합니다. 사용하지 않는 서비스는 설정에서 숨길 수 있습니다.</p></article>
+          <article class="error-solution" id="error-login" role="tabpanel" aria-labelledby="error-login-tab" tabindex="0"><h3>인증이 없거나 만료됐어요</h3><p>터미널에서 해당 CLI를 직접 실행합니다. Antigravity가 인증 코드 입력을 요청하면 브라우저의 코드를 <code>agy</code> 터미널에 붙여 넣고 Enter를 누릅니다.</p></article>
+          <article class="error-solution" id="error-timeout" role="tabpanel" aria-labelledby="error-timeout-tab" tabindex="0"><h3>응답이 늦어졌어요</h3><p>네트워크와 실행 중인 CLI를 확인한 다음 SynapCap에서 다시 새로고침합니다.</p></article>
+          <article class="error-solution" id="error-query" role="tabpanel" aria-labelledby="error-query-tab" tabindex="0"><h3>진단 정보를 확인하세요</h3><p>위젯의 상태 배지를 눌러 원인을 확인하고 토큰이 없는 진단 보고서를 복사해 Issue에 첨부할 수 있습니다.</p></article>
+        </div>
       </div>
-      <aside class="permission-note" aria-label="Windows 다운로드 평판 경고 안내">
-        <strong>Windows 다운로드 평판 경고</strong>
-        <p>코드 서명 전 초기 릴리스는 새 버전마다 Edge·SmartScreen 경고가 나타날 수 있습니다. Release의 <code>SHA256SUMS.txt</code>와 <code>gh attestation verify 파일명 -R kimNarr/SynapCap</code>으로 무결성과 빌드 출처를 확인할 수 있습니다. 경고를 근본적으로 없애려면 추후 Microsoft Store 또는 신원 확인 코드 서명이 필요합니다.</p>
-      </aside>
+
       <aside class="permission-note" aria-label="macOS 권한 요청 안내">
         <strong>Apple Music이나 볼륨 접근을 요청하나요?</strong>
         <p>SynapCap에는 Apple Music, 다른 앱의 데이터, 네트워크·외장 볼륨 권한이 필요하지 않습니다. <b>허용하지 않음</b>을 선택하고 MCP 격리 기능이 포함된 최신 버전으로 업데이트하세요.</p>
@@ -303,14 +373,14 @@
 
     <section id="updates" class="updates section-shell">
       <div class="section-heading centered">
-        <p class="section-kicker">Safe updates</p>
         <h2>한 번 선택하고, 안전하게 업데이트</h2>
         <p>업데이트를 선택한 뒤 공식 Release 파일을 검증하고 운영체제에 맞는 설치 단계까지 이어갑니다.</p>
       </div>
+      <details class="update-details"><summary>업데이트 절차 및 이전 버전 안내</summary>
       <div class="update-flow">
-        <article><span>1</span><h3>새 버전 확인</h3><p>앱 시작 시 최신 공개 버전을 확인하고, 업데이트 뒤에는 해당 Release 안내를 최초 한 번 표시합니다.</p></article>
-        <article><span>2</span><h3>다운로드·검증</h3><p>업데이트가 있을 때 나타나는 상단 버전 표시나 트레이 메뉴를 누르면 운영체제별 파일과 체크섬을 공식 Release에서 받아 SHA-256을 자동 확인합니다.</p></article>
-        <article><span>3</span><h3>설치 이어가기</h3><p>Windows는 UAC 승인 후 자동 설치·재실행합니다. 미서명 macOS 버전은 검증된 DMG를 열어 앱 교체만 남겨 둡니다.</p></article>
+        <article><h3><span>1</span> 새 버전 확인</h3><p>앱 시작 시 최신 공개 버전을 확인하고, 업데이트 뒤에는 해당 Release 안내를 최초 한 번 표시합니다.</p></article>
+        <article><h3><span>2</span> 다운로드·검증</h3><p>업데이트가 있을 때 나타나는 상단 버전 표시나 트레이 메뉴를 누르면 운영체제별 파일과 체크섬을 공식 Release에서 받아 SHA-256을 자동 확인합니다.</p></article>
+        <article><h3><span>3</span> 설치 이어가기</h3><p>Windows는 UAC 승인 후 자동 설치·재실행합니다. 미서명 macOS 버전은 검증된 DMG를 열어 앱 교체만 남겨 둡니다.</p></article>
       </div>
       <p class="signing-note"><strong>v0.1.4 이하를 사용 중인가요?</strong> 원클릭 기능이 없는 기존 버전에서는 이번 한 번 최신 Release 설치 파일을 직접 받아야 합니다. 그 다음 버전부터는 앱 안에서 업데이트할 수 있습니다.</p>
       <div class="document-links">
@@ -318,30 +388,20 @@
         <a href="https://github.com/kimNarr/SynapCap/blob/main/SECURITY.md" target="_blank" rel="noreferrer">보안 정책</a>
         <a href="https://github.com/kimNarr/SynapCap/blob/main/docs/RELEASING.md" target="_blank" rel="noreferrer">패치 관리 방식</a>
       </div>
-    </section>
-
-    <section class="privacy section-shell">
-      <div>
-        <p class="section-kicker">Local by design</p>
-        <h2>계정 정보는<br>내 컴퓨터에</h2>
-      </div>
-      <div class="privacy-points">
-        <p><strong>API 키 수집 없음</strong><span>기존 로컬 CLI 로그인 상태를 사용하며 SynapCap 서버는 없습니다.</span></p>
-        <p><strong>설정도 로컬 저장</strong><span>프로바이더 선택과 위젯 환경설정은 사용자 컴퓨터에만 저장됩니다.</span></p>
-        <p><strong>MCP 설정 보존</strong><span>사용자의 MCP 설정을 삭제하거나 일괄 비활성화하지 않습니다.</span></p>
-      </div>
+      </details>
     </section>
 
     <section class="final-cta section-shell">
-      <span class="cta-mark"><img class="theme-logo theme-logo-dark" src="assets/logo.svg" alt="" width="64" height="64"><img class="theme-logo theme-logo-light" src="assets/logo-light.svg" alt="" width="64" height="64"></span>
+      <span class="cta-mark"><img class="theme-logo theme-logo-dark" src="assets/logo.svg" alt="" width="64" height="64" loading="lazy"><img class="theme-logo theme-logo-light" src="assets/logo-light.svg" alt="" width="64" height="64" loading="lazy"></span>
       <h2>사용량 확인은 SynapCap에 맡기고,<br>작업에 집중하세요.</h2>
       <a href="#download" class="button button-primary">다운로드 선택하기</a>
     </section>
   </main>
 
+  <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
   <footer class="site-footer section-shell">
-    <div class="brand"><span class="brand-lockup brand-lockup-small"><span class="brand-mark"><img class="theme-logo theme-logo-dark" src="assets/logo.svg" alt="" width="25" height="25"><img class="theme-logo theme-logo-light" src="assets/logo-light.svg" alt="" width="25" height="25"></span><strong>Synap<span>Cap</span></strong></span></div>
-    <div class="footer-links"><a href="https://github.com/kimNarr/SynapCap#readme">README</a><a href="https://github.com/kimNarr/SynapCap/releases">Releases</a><a href="https://github.com/kimNarr/SynapCap/blob/main/LICENSE">MIT License</a></div>
+    <div class="brand"><span class="brand-lockup brand-lockup-small"><span class="brand-mark"><img class="theme-logo theme-logo-dark" src="assets/logo.svg" alt="" width="25" height="25" loading="lazy"><img class="theme-logo theme-logo-light" src="assets/logo-light.svg" alt="" width="25" height="25" loading="lazy"></span><strong>Synap<span>Cap</span></strong></span></div>
+    <div class="footer-links"><a href="https://github.com/kimNarr/SynapCap#readme">Readme</a><a href="https://github.com/kimNarr/SynapCap/releases">Releases</a><a href="https://github.com/kimNarr/SynapCap/blob/main/LICENSE">MIT License</a></div>
     <p>Made by <a href="https://github.com/kimNarr">kimNarr</a></p>
   </footer>
 </body>

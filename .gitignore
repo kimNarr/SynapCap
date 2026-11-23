@@ -11,6 +11,8 @@ devel/
 develop-eggs/
 dist/
 artifacts/
+.taste-skill/
+.hallmark/
 downloads/
 eggs/
 .eggs/

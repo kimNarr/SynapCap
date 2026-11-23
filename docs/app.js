@@ -18,8 +18,7 @@ function configureThemeToggle() {
     document.documentElement.dataset.theme = theme;
     toggle.setAttribute("aria-pressed", String(isLight));
     toggle.setAttribute("aria-label", isLight ? "다크 테마로 전환" : "라이트 테마로 전환");
-    toggle.firstElementChild.textContent = isLight ? "◐" : "☼";
-    if (themeMeta) themeMeta.content = isLight ? "#f6f8fc" : "#11111b";
+    if (themeMeta) themeMeta.content = isLight ? "#fafaf9" : "#101113";
   };
 
   applyTheme(document.documentElement.dataset.theme || "dark");
@@ -48,7 +47,7 @@ function configurePrimaryDownload() {
     button.href = `${releaseBase}/${assets.windows}`;
     button.dataset.asset = assets.windows;
     buttonTitle.textContent = "Windows 최신 버전";
-    label.textContent = "Windows 10/11 · 64비트";
+    label.textContent = "Windows 10/11 / 64비트";
     alternate.href = "#download";
     delete alternate.dataset.asset;
     alternate.textContent = "macOS 버전 선택";
@@ -57,7 +56,7 @@ function configurePrimaryDownload() {
     button.href = "#download";
     delete button.dataset.asset;
     buttonTitle.textContent = "macOS 버전 선택";
-    label.textContent = "macOS · Apple Silicon 또는 Intel 선택";
+    label.textContent = "macOS / Apple Silicon 또는 Intel 선택";
     alternate.href = `${releaseBase}/${assets.windows}`;
     alternate.dataset.asset = assets.windows;
     alternate.textContent = "Windows 최신 버전";
@@ -89,7 +88,7 @@ async function loadLatestRelease() {
     const downloads = (release.assets || []).reduce((sum, item) => sum + (item.download_count || 0), 0);
 
     status.textContent = `${release.tag_name} 다운로드 가능`;
-    meta.textContent = `최신 ${release.tag_name} · ${published} 공개 · 누적 다운로드 ${downloads.toLocaleString("ko-KR")}회`;
+    meta.textContent = `최신 ${release.tag_name} / ${published} 공개 / 누적 다운로드 ${downloads.toLocaleString("ko-KR")}회`;
 
     const availableAssets = new Map((release.assets || []).map((item) => [item.name, item.browser_download_url]));
     document.querySelectorAll("[data-asset]").forEach((link) => {
@@ -102,6 +101,76 @@ async function loadLatestRelease() {
   }
 }
 
+function configureTabs() {
+  document.querySelectorAll("[data-tabset]").forEach((group) => {
+    const tablist = group.querySelector('[role="tablist"]');
+    const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+    const select = (selected) => {
+      if (group.classList.contains("product-stage")) {
+        group.dataset.previewMode = selected.getAttribute("aria-controls").replace("mode-", "");
+      }
+      tabs.forEach((tab) => {
+        const active = tab === selected;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+        document.getElementById(tab.getAttribute("aria-controls")).hidden = !active;
+      });
+    };
+
+    tablist.hidden = false;
+    const initial = group.classList.contains("setup-console") && detectPlatform() === "mac"
+      ? tabs[1] : tabs[0];
+    select(initial);
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        let next;
+        if (event.key === "ArrowRight") next = tabs[(index + 1) % tabs.length];
+        if (event.key === "ArrowLeft") next = tabs[(index + tabs.length - 1) % tabs.length];
+        if (event.key === "Home") next = tabs[0];
+        if (event.key === "End") next = tabs[tabs.length - 1];
+        if (!next) return;
+        event.preventDefault();
+        select(next);
+        next.focus();
+      });
+    });
+  });
+}
+
+function configureCommandCopy() {
+  const status = document.getElementById("copy-status");
+  document.querySelectorAll("[data-copy]").forEach((button) => {
+    let reset;
+    button.addEventListener("click", async () => {
+      const command = document.getElementById(button.dataset.copy);
+      clearTimeout(reset);
+      delete button.dataset.copied;
+      try {
+        await navigator.clipboard.writeText(command.textContent);
+        button.textContent = "복사됨";
+        button.dataset.copied = "true";
+        status.textContent = "명령어를 클립보드에 복사했습니다.";
+      } catch (error) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(command);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        button.textContent = "직접 복사";
+        status.textContent = "클립보드에 접근할 수 없습니다. 선택된 명령어를 직접 복사하세요.";
+      }
+      reset = setTimeout(() => {
+        button.textContent = "복사";
+        delete button.dataset.copied;
+        status.textContent = "";
+      }, 2500);
+    });
+  });
+}
+
 configurePrimaryDownload();
 configureThemeToggle();
+configureTabs();
+configureCommandCopy();
 loadLatestRelease();
