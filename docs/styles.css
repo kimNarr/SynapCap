@@ -17,7 +17,7 @@ a:hover { color: var(--blue); }
 button:active, .button:active { transform: translateY(1px); }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
 [hidden] { display: none !important; }
-.section-shell, .site-header { width: min(1120px, calc(100% - 64px)); margin-inline: auto; }
+.section-shell, .site-header { width: min(1320px, calc(100% - 64px)); margin-inline: auto; }
 .sr-only, .skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skip-link:focus { position: fixed; top: 12px; left: 20px; z-index: 20; background: var(--text); color: var(--base); padding: 12px 20px; }
 .muted { color: var(--muted); }
