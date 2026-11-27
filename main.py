@@ -125,6 +125,12 @@ def _setting_changed(previous: dict, current: dict, key: str) -> bool:
 def confirm_quit(parent=None, dialog_factory=None) -> bool:
     factory = dialog_factory or QMessageBox
     dialog = factory(parent)
+    # Qt may rebuild the message-box flags when its modality changes.
+    dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+    dialog.setWindowFlag(
+        Qt.WindowType.WindowStaysOnTopHint,
+        parent is not None and bool(parent.windowFlags() & Qt.WindowType.WindowStaysOnTopHint),
+    )
     dialog.setWindowTitle("SynapCap 종료")
     dialog.setIcon(QMessageBox.Icon.Question)
     dialog.setText("SynapCap을 종료할까요?")
@@ -141,6 +147,9 @@ def confirm_quit(parent=None, dialog_factory=None) -> bool:
     if cancel_button is not None:
         cancel_button.setText("취소")
 
+    dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
     return dialog.exec() == QMessageBox.StandardButton.Yes
 
 

@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QCoreApplication, QEvent, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, Qt, QTimer
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QWidget
 
 from main import (
     _changed_provider_query_ids,
@@ -188,6 +188,85 @@ class QuitConfirmationTests(unittest.TestCase):
         dialog = self._dialog(QMessageBox.StandardButton.No)
 
         self.assertFalse(confirm_quit(None, lambda _parent: dialog))
+
+    def test_confirmation_matches_owner_topmost_and_is_presented_before_exec(self):
+        class InspectMessageBox(QMessageBox):
+            def exec(self):
+                self.presented = self.isVisible()
+                return QMessageBox.StandardButton.No
+
+        for topmost in (True, False):
+            with self.subTest(topmost=topmost):
+                owner = QWidget()
+                owner.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+                owner.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, topmost)
+                owner.show()
+                dialog = InspectMessageBox(owner)
+                try:
+                    with patch.object(dialog, "raise_", wraps=dialog.raise_) as raised, patch.object(
+                        dialog, "activateWindow", wraps=dialog.activateWindow,
+                    ) as activated:
+                        self.assertFalse(confirm_quit(owner, lambda _parent, dialog=dialog: dialog))
+                    self.assertEqual(
+                        bool(dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint), topmost,
+                    )
+                    self.assertTrue(dialog.presented)
+                    self.assertTrue(dialog.isModal())
+                    raised.assert_called_once()
+                    activated.assert_called_once()
+                finally:
+                    dialog.close()
+                    owner.close()
+                    owner.deleteLater()
+                    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+    def test_real_confirmation_preserves_buttons_escape_and_window_close(self):
+        actions = (
+            ("exit", lambda dialog: dialog.button(QMessageBox.StandardButton.Yes).click(), True),
+            ("cancel", lambda dialog: dialog.button(QMessageBox.StandardButton.No).click(), False),
+            ("escape", lambda dialog: QTest.keyClick(dialog, Qt.Key.Key_Escape), False),
+            ("window_close", lambda dialog: dialog.close(), False),
+        )
+        for name, action, expected in actions:
+            with self.subTest(action=name):
+                owner = QWidget()
+                owner.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+                owner.show()
+                dialog = QMessageBox(owner)
+                observed = []
+
+                def finish(dialog=dialog, action=action, observed=observed):
+                    observed.append((dialog.isVisible(), self.app.activeModalWidget() is dialog))
+                    action(dialog)
+
+                try:
+                    QTimer.singleShot(0, finish)
+                    self.assertEqual(confirm_quit(owner, lambda _parent, dialog=dialog: dialog), expected)
+                    self.assertEqual(observed, [(True, True)])
+                    self.assertIs(dialog.defaultButton(), dialog.button(QMessageBox.StandardButton.No))
+                    self.assertIs(dialog.escapeButton(), dialog.button(QMessageBox.StandardButton.No))
+                    self.assertIsNone(self.app.activeModalWidget())
+                    self.assertTrue(owner.isVisible())
+                    self.assertTrue(owner.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+                finally:
+                    dialog.close()
+                    owner.close()
+                    owner.deleteLater()
+                    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+    def test_confirmation_does_not_reveal_hidden_tray_owner(self):
+        owner = QWidget()
+        owner.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        dialog = QMessageBox(owner)
+        try:
+            QTimer.singleShot(0, lambda: dialog.button(QMessageBox.StandardButton.No).click())
+            self.assertFalse(confirm_quit(owner, lambda _parent: dialog))
+            self.assertFalse(owner.isVisible())
+            self.assertTrue(dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+        finally:
+            dialog.close()
+            owner.deleteLater()
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
     def test_confirmation_does_not_stretch_the_icon_column(self):
         class NonBlockingMessageBox(QMessageBox):
