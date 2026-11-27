@@ -639,13 +639,18 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
     unverified_groups: set[str] = set()
     for line in output.splitlines():
         parts = [part.strip() for part in line.split("\t")]
-        if len(parts) != 4 or not parts[2].endswith("%"):
+        if len(parts) != 4:
+            continue
+        if not parts[2].endswith("%"):
+            unverified_groups.add(parts[0])
             continue
         try:
             percent = float(parts[2][:-1])
         except ValueError:
+            unverified_groups.add(parts[0])
             continue
         if not math.isfinite(percent) or not 0 <= percent <= 100:
+            unverified_groups.add(parts[0])
             continue
         window_name = parts[1].casefold()
         if "weekly" in window_name:
@@ -653,9 +658,9 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
         elif "five hour" in window_name or "5 hour" in window_name:
             period = "5시간"
         else:
+            unverified_groups.add(parts[0])
             continue
-        # The desktop's Argon title does not say whether its percentage is
-        # remaining or used. Only accept a CLI row that states the semantics.
+        # Only convert rows whose remaining/used meaning is explicit.
         if "remaining" in window_name:
             remaining = percent
         elif "used" in window_name:
@@ -676,8 +681,8 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
         raise SubscriptionUsageError("Antigravity 사용량 형식 오류")
 
     requested_group = str(config.get("quota_group", "Gemini Models")).strip().casefold()
-    # The legacy default selects the Gemini family, including independently
-    # reported Argon limits. A custom selector remains an exact group match.
+    # Preserve any independently reported Gemini groups without requiring
+    # a particular model name. Custom selectors remain exact group matches.
     gemini_family = requested_group in {"gemini models", "gemini"}
     group_rows = [
         row for row in rows
@@ -714,15 +719,15 @@ def query_antigravity_subscription(config: dict[str, Any]) -> SubscriptionSnapsh
             ),
         )
     )
-    argon_supported = any("argon" in row["group"].casefold() for row in group_rows)
     hint = None
-    if gemini_family and not argon_supported:
-        reason = (
-            "CLI 응답에서 잔여량·사용량 기준을 확인할 수 없습니다."
-            if any("argon" in group.casefold() for group in unverified_groups)
-            else "CLI가 별도 한도를 제공하지 않습니다."
+    if any(
+        group.casefold().startswith("gemini ")
+        if gemini_family else group.casefold() == requested_group
+        for group in unverified_groups
+    ):
+        hint = (
+            "일부 한도 조회 미지원: CLI 응답의 기간·수치·잔여/사용 기준을 확인할 수 없습니다."
         )
-        hint = f"Argon 조회 미지원: {reason}"
     return SubscriptionSnapshot(
         used_percent=used,
         model_name=active["group"],

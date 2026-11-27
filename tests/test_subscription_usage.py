@@ -286,15 +286,51 @@ class SubscriptionUsageTests(unittest.TestCase):
 
     @patch("subscription_usage._run_text_command")
     @patch("subscription_usage._command_path", return_value="agy.exe")
-    def test_antigravity_missing_or_ambiguous_argon_does_not_invent_values(self, command_path, run_command):
+    def test_antigravity_shared_gemini_quota_does_not_require_individual_models(self, command_path, run_command):
+        # The live 2026-11-27 response contains only the two shared groups.
+        for session_remaining, weekly_remaining in ((100, 100), (72, 65), (0, 0)):
+            with self.subTest(remaining=(session_remaining, weekly_remaining)):
+                run_command.return_value = (
+                    f"Gemini Models\tWeekly Limit Remaining\t{weekly_remaining}%\t2026-12-04T05:12:06Z\n"
+                    f"Gemini Models\tFive Hour Limit Remaining\t{session_remaining}%\t2026-11-27T10:12:06Z\n"
+                    "Claude and GPT models\tWeekly Limit Remaining\t100%\t1970-01-01T00:00:00Z\n"
+                    "Claude and GPT models\tFive Hour Limit Remaining\t100%\t1970-01-01T00:00:00Z"
+                )
+                result = query_antigravity_subscription({})
+                self.assertEqual(
+                    [(w.quota_group, w.label, w.used_percent) for w in result.windows],
+                    [("Gemini Models", "5시간", 100 - session_remaining),
+                     ("Gemini Models", "주간", 100 - weekly_remaining)],
+                )
+                self.assertEqual(result.used_percent, max(w.used_percent for w in result.windows))
+                self.assertIsNone(result.action_hint)
+
+                from providers import AntigravityProvider
+                usage = AntigravityProvider({"id": "antigravity", "name": "Gemini"}).fetch_usage()
+                self.assertIsNone(usage.action_hint)
+                self.assertEqual(len(usage.windows), 2)
+
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="agy.exe")
+    def test_antigravity_ambiguous_reported_group_does_not_invent_values(self, command_path, run_command):
         base = "Gemini Models\tWeekly Limit Remaining\t65%\t2026-10-24T00:00:00Z"
-        for extra in ("", "\nGemini 4 Argon\tGemini 4 Argon Weekly Limit\t98%\t2026-10-25T09:00:00Z"):
-            with self.subTest(extra=extra):
-                run_command.return_value = base + extra
+        for group in ("Gemini 4 Argon", "Gemini 4 Neon", "Gemini 4 Hydrogen"):
+            with self.subTest(group=group):
+                run_command.return_value = base + f"\n{group}\tWeekly Limit\t98%\t2026-10-25T09:00:00Z"
                 result = query_antigravity_subscription({})
                 self.assertEqual(len(result.windows), 1)
                 self.assertEqual(result.windows[0].used_percent, 35)
-                self.assertIn("Argon 조회 미지원", result.action_hint)
+                self.assertIn("일부 한도 조회 미지원", result.action_hint)
+                self.assertNotIn("Argon", result.action_hint)
+
+    @patch("subscription_usage._run_text_command")
+    @patch("subscription_usage._command_path", return_value="agy.exe")
+    def test_antigravity_unselected_groups_do_not_trigger_warnings(self, command_path, run_command):
+        run_command.return_value = (
+            "Gemini Models\tWeekly Limit Remaining\t65%\t2026-12-04T05:12:06Z\n"
+            "Claude and GPT models\tWeekly Limit\t98%\t2026-12-04T05:12:06Z"
+        )
+        self.assertIsNone(query_antigravity_subscription({}).action_hint)
 
     @patch("subscription_usage._run_text_command")
     @patch("subscription_usage._command_path", return_value="agy.exe")
@@ -302,10 +338,12 @@ class SubscriptionUsageTests(unittest.TestCase):
         run_command.return_value = (
             "Gemini Models\tWeekly Limit Remaining\t65%\t2026-10-24T00:00:00Z\n"
             "Gemini 4 Argon\tWeekly Limit Used\t42%\t2026-10-25T09:00:00Z\n"
+            "Gemini 4 Neon\tWeekly Limit\t98%\t2026-10-25T09:00:00Z\n"
             "Gemini 4 Argon Plus\tWeekly Limit Remaining\t0%\t2026-10-25T09:00:00Z"
         )
         result = query_antigravity_subscription({"quota_group": "gemini 4 argon"})
         self.assertEqual([(w.quota_group, w.used_percent) for w in result.windows], [("Gemini 4 Argon", 42)])
+        self.assertIsNone(result.action_hint)
         with self.assertRaises(SubscriptionUsageError) as raised:
             query_antigravity_subscription({"quota_group": "missing group"})
         self.assertEqual(raised.exception.status_kind, StatusKind.FORMAT_ERROR)
@@ -313,7 +351,8 @@ class SubscriptionUsageTests(unittest.TestCase):
     @patch("subscription_usage._run_text_command")
     @patch("subscription_usage._command_path", return_value="agy.exe")
     def test_antigravity_group_changes_keep_period_identity(self, command_path, run_command):
-        for groups in (("Gemini Flash", "Gemini Argon"), ("Gemini Argon",)):
+        for groups in (("Gemini Flash", "Gemini Argon"), ("Gemini Argon",),
+                       ("Gemini 4 Neon", "Gemini 4 Carbon", "Gemini 4 Hydrogen")):
             with self.subTest(groups=groups):
                 run_command.return_value = "\n".join(
                     f"{group}\tFive Hour Limit Remaining\t80%\t2026-10-19T11:00:00Z"
@@ -322,17 +361,20 @@ class SubscriptionUsageTests(unittest.TestCase):
                 result = query_antigravity_subscription({})
                 self.assertEqual({w.quota_group for w in result.windows}, set(groups))
                 self.assertTrue(all(w.label == "5시간" for w in result.windows))
+                self.assertEqual(result.used_percent, 20)
+                self.assertIsNone(result.action_hint)
 
     @patch("subscription_usage._run_text_command")
     @patch("subscription_usage._command_path", return_value="agy.exe")
     def test_antigravity_ignores_invalid_percentages_and_unknown_periods(self, command_path, run_command):
-        for period, percent in (("Weekly Limit Remaining", "nan"), ("Weekly Limit Remaining", "inf"),
-                                ("Weekly Limit Remaining", "101"), ("Weekly Limit Remaining", "-1"),
-                                ("Monthly Limit Remaining", "20")):
+        for period, percent in (("Weekly Limit Remaining", "--"), ("Weekly Limit Remaining", "invalid%"),
+                                ("Weekly Limit Remaining", "nan%"), ("Weekly Limit Remaining", "inf%"),
+                                ("Weekly Limit Remaining", "101%"), ("Weekly Limit Remaining", "-1%"),
+                                ("Monthly Limit Remaining", "20%")):
             with self.subTest(period=period, percent=percent):
                 run_command.return_value = (
                     "Gemini Models\tWeekly Limit Remaining\t65%\t2026-10-24T00:00:00Z\n"
-                    f"Gemini 4 Argon\t{period}\t{percent}%\t2026-10-25T09:00:00Z"
+                    f"Gemini 4 Argon\t{period}\t{percent}\t2026-10-25T09:00:00Z"
                 )
                 result = query_antigravity_subscription({})
                 self.assertEqual(len(result.windows), 1)
