@@ -91,6 +91,17 @@ test('preview, OS/service and error status tabs switch by click and keyboard', (
   }
 });
 
+test('compact expand control opens the expanded preview and restores focus', () => {
+  const f = fixture();
+  f.context.configureTabs();
+  f.elements.get('mode-bar-tab').events.click();
+  assert.equal(f.elements.get('mode-expanded').hidden, true);
+  f.elements.get('preview-expand').events.click();
+  assert.equal(f.elements.get('mode-expanded').hidden, false);
+  assert.equal(f.elements.get('mode-bar').hidden, true);
+  assert.equal(f.elements.get('mode-expanded-tab').focused, true);
+});
+
 test('OS detection keeps platform downloads and architecture selection connected', () => {
   const base = 'https://github.com/kimNarr/SynapCap/releases/latest/download/';
   for (const [platform, primary, alternate, asset] of [

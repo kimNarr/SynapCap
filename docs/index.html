@@ -70,17 +70,20 @@
                 <div class="preview-tab"><img src="assets/provider-claude.svg" alt="" width="18" height="18" loading="lazy"><span>Claude<b>55 / 21%</b></span></div>
               </div>
               <div class="focus-rings">
-                <div class="focus-ring-card"><strong>세션</strong><div class="preview-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="62 100"/></svg><b>62<span>%</span></b></div><small>리셋까지 <time>2h 3m</time></small></div>
-                <div class="focus-ring-card"><strong>주간</strong><div class="preview-ring weekly-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="44 100"/></svg><b>44<span>%</span></b></div><small>리셋까지 <time>4d 20h</time></small></div>
+                <div class="focus-ring-card"><strong>SESSION</strong><div class="preview-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="62 100"/></svg><b>62<span>%</span></b></div><small><time datetime="PT2H3M" aria-label="리셋까지 2시간 3분">2h 3m</time></small></div>
+                <div class="focus-ring-card"><strong>WEEKLY</strong><div class="preview-ring weekly-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="44 100"/></svg><b>44<span>%</span></b></div><small><time datetime="P4DT20H" aria-label="리셋까지 4일 20시간">4d 20h</time></small></div>
               </div>
             </div>
           </div>
           <div id="mode-bar" class="mode-panel" role="tabpanel" aria-labelledby="mode-bar-tab" tabindex="0">
-            <div class="bar-preview"><img src="assets/logo-icon.svg" alt="SynapCap" width="22" height="22" loading="lazy"><span><img src="assets/provider-codex.svg" alt="Codex" width="18" height="18" loading="lazy">62%</span><span><img src="assets/provider-gemini.svg" alt="Gemini" width="18" height="18" loading="lazy">15%</span><span><img src="assets/provider-claude.svg" alt="Claude" width="18" height="18" loading="lazy">55%</span></div>
+            <div class="bar-preview"><span><img src="assets/provider-codex.svg" alt="Codex" width="18" height="18" loading="lazy">62%</span><span><img src="assets/provider-gemini.svg" alt="Gemini" width="18" height="18" loading="lazy">15%</span><span><img src="assets/provider-claude.svg" alt="Claude" width="18" height="18" loading="lazy">55%</span><button id="preview-expand" class="preview-expand" type="button" aria-label="전체 위젯 펼침 목업 보기" title="전체 위젯 펼치기"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 15 6-6 6 6"/></svg></button></div>
             <p class="mode-description">Windows 간단 보기 / 서비스별 구독 한도의 최대 사용률</p>
           </div>
           <div id="mode-tray" class="mode-panel" role="tabpanel" aria-labelledby="mode-tray-tab" tabindex="0">
-            <div class="tray-desktop"><span>위젯은 접어두고, 작업 공간은 그대로.</span><div class="tray-preview"><img src="assets/logo-icon.svg" alt="SynapCap" width="20" height="20" loading="lazy"><b>62%</b><span class="tray-separator"></span><span>트레이 / 메뉴바</span></div></div>
+            <div class="tray-desktop"><span>위젯은 접어두고, 작업 공간은 그대로.</span><div class="tray-examples">
+              <div class="tray-example"><span>Windows</span><div class="tray-preview windows-tray" aria-label="Windows 트레이 숫자 배지, 사용률 62퍼센트"><b class="tray-number">62</b></div></div>
+              <div class="tray-example"><span>macOS</span><div class="tray-preview macos-tray" aria-label="macOS 메뉴바 모델 아이콘과 사용률"><img src="assets/provider-codex.svg" alt="Codex" width="18" height="18" loading="lazy"><b>62%</b></div></div>
+            </div></div>
           </div>
         </div>
         <div class="stage-footer"><span>표시 방식 목업 / 예시 사용률</span><span>사용한 비율 %</span></div>
@@ -110,7 +113,7 @@
             </div>
             <div>
               <dt>트레이만<small>위젯 숨김</small></dt>
-              <dd class="density-tray"><span>SynapCap</span><strong class="bento-num">62%</strong></dd>
+              <dd class="density-tray"><div><span>Windows</span><b class="tray-number bento-num" aria-label="사용률 62퍼센트">62</b></div><div><span>macOS</span><span class="menu-usage"><img src="assets/provider-codex.svg" alt="Codex" width="16" height="16" loading="lazy"><b class="bento-num">62%</b></span></div></dd>
             </div>
           </dl>
           <div class="density-platforms">
@@ -139,8 +142,8 @@
           <h3>세션·주간 링 차트 및 리셋 타이머</h3>
           <div class="bento-model"><strong>Codex</strong><span>5시간 / 주간</span></div>
           <div class="bento-rings" aria-label="Codex 세션 62%, 주간 44% 사용량 미리보기" data-visual>
-            <div><span>세션</span><div class="preview-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="62 100"/></svg><b>62<span>%</span></b></div><small>리셋까지</small><time datetime="PT2H3M">2h 3m</time></div>
-            <div><span>주간</span><div class="preview-ring weekly-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="44 100"/></svg><b>44<span>%</span></b></div><small>리셋까지</small><time datetime="P4DT20H">4d 20h</time></div>
+            <div><span>SESSION</span><div class="preview-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="62 100"/></svg><b>62<span>%</span></b></div><time datetime="PT2H3M" aria-label="리셋까지 2시간 3분">2h 3m</time></div>
+            <div><span>WEEKLY</span><div class="preview-ring weekly-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="42"/><circle class="ring-fill" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="44 100"/></svg><b>44<span>%</span></b></div><time datetime="P4DT20H" aria-label="리셋까지 4일 20시간">4d 20h</time></div>
           </div>
           <p>선택한 모델의 5시간·주간 한도와 다음 리셋까지 남은 시간을 표시합니다.</p>
         </article>
@@ -216,6 +219,7 @@
         <h2>웹 채팅이 아닌 로컬 로그인 기준</h2>
         <p>SynapCap은 각 서비스의 로컬 앱 또는 CLI가 제공하는 구독 한도를 읽습니다. 웹 채팅만 사용하는 계정의 사용량은 조회하지 않으며 별도의 유료 API를 호출하지 않습니다.</p>
         <p class="usage-sync-note">Claude 사용량은 Claude Code CLI 기준입니다. 실행 중인 Claude 화면이 먼저 갱신되면 SynapCap 값에는 수분 뒤 반영될 수 있으며, 앱의 프로바이더·사용량 툴팁에서 출처와 마지막 조회 시각을 확인할 수 있습니다.</p>
+        <p class="gemini-quota-note"><b>Gemini는 공유 한도를 사용합니다.</b> Neon·Carbon·Argon·Hydrogen 등은 하나의 Gemini 공유 한도를 사용하며, 모델별 사용량을 합산하지 않습니다. 별도로 반환되는 그룹·기간은 구분해 표시합니다.</p>
         <a class="setup-jump" href="#cli-setup">Windows·macOS CLI 설치 순서 보기 </a>
       </div>
       <div class="requirement-list">

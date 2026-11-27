@@ -121,6 +121,12 @@ function configureTabs() {
     const initial = group.classList.contains("setup-console") && detectPlatform() === "mac"
       ? tabs[1] : tabs[0];
     select(initial);
+    if (group.classList.contains("product-stage")) {
+      document.getElementById("preview-expand").addEventListener("click", () => {
+        select(tabs[0]);
+        tabs[0].focus();
+      });
+    }
     tabs.forEach((tab, index) => {
       tab.addEventListener("click", () => select(tab));
       tab.addEventListener("keydown", (event) => {
